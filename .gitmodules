@@ -1,0 +1,3 @@
+[submodule "AppDataStorage"]
+	path = AppDataStorage
+	url = https://github.com/ktsu-io/AppDataStorage.git
