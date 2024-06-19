@@ -121,7 +121,12 @@ internal static class BuildMonitor
 
 				if (ImGui.TableNextColumn())
 				{
-					ImGui.TextUnformatted(duration.ToString("g", CultureInfo.InvariantCulture));
+					string format = @"hh\:mm\:ss";
+					if (duration.Days > 0)
+					{
+						format = @"d\.hh\:mm\:ss";
+					}
+					ImGui.TextUnformatted(duration.ToString(format, CultureInfo.InvariantCulture));
 				}
 
 				if (ImGui.TableNextColumn())
@@ -134,7 +139,12 @@ internal static class BuildMonitor
 				}
 				if (ImGui.TableNextColumn() && isRunning)
 				{
-					ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString("g", CultureInfo.InvariantCulture) : "???");
+					string format = @"hh\:mm\:ss";
+					if (eta.Days > 0)
+					{
+						format = @"d\.hh\:mm\:ss";
+					}
+					ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString(format, CultureInfo.InvariantCulture) : "???");
 				}
 			}
 		}
