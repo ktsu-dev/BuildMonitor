@@ -91,10 +91,12 @@ internal static class BuildMonitor
 
 			foreach (var (_, build) in builds)
 			{
-				var estimate = build.CalculateEstimatedDuration();
-				var eta = build.LastDuration < estimate ? estimate - build.LastDuration : TimeSpan.Zero;
-				double progress = build.LastDuration.TotalSeconds / estimate.TotalSeconds;
 				bool isRunning = build.Runs.Count > 0 && build.LastStatus is RunStatus.Pending or RunStatus.Running;
+				var estimate = build.CalculateEstimatedDuration();
+				var duration = isRunning ? DateTimeOffset.UtcNow - build.LastStarted : build.LastDuration;
+				var eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
+				double progress = duration.TotalSeconds / estimate.TotalSeconds;
+
 				ImGui.TableNextRow();
 				if (ImGui.TableNextColumn())
 				{
@@ -135,7 +137,7 @@ internal static class BuildMonitor
 				}
 				if (ImGui.TableNextColumn() && isRunning)
 				{
-					ImGui.TextUnformatted(eta.Humanize());
+					ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.Humanize() : "???");
 				}
 			}
 		}
