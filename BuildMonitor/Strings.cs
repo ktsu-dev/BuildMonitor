@@ -25,4 +25,5 @@ internal static class Strings
 	internal static string Progress { get; } = nameof(Progress).Titleize();
 	internal static string ETA { get; } = nameof(ETA).Titleize();
 	internal static string Status { get; } = nameof(Status).Titleize();
+	internal static string Duration { get; } = nameof(Duration).Titleize();
 }

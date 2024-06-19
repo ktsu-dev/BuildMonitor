@@ -3,7 +3,7 @@
 namespace ktsu.io.BuildMonitor;
 
 using System.Diagnostics;
-using Humanizer;
+using System.Globalization;
 using ImGuiNET;
 using ktsu.io.ImGuiApp;
 using ktsu.io.ImGuiWidgets;
@@ -77,12 +77,13 @@ internal static class BuildMonitor
 			.OrderByDescending(b => b.Value.LastStarted)
 			.ToList();
 
-		if (ImGui.BeginTable(Strings.Builds, 7, ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.RowBg))
+		if (ImGui.BeginTable(Strings.Builds, 8, ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.RowBg))
 		{
 			ImGui.TableSetupColumn("##buildStatus", ImGuiTableColumnFlags.WidthStretch);
 			ImGui.TableSetupColumn(Strings.Repository, ImGuiTableColumnFlags.WidthStretch);
 			ImGui.TableSetupColumn(Strings.BuildName, ImGuiTableColumnFlags.WidthStretch);
 			ImGui.TableSetupColumn(Strings.Status, ImGuiTableColumnFlags.WidthStretch);
+			ImGui.TableSetupColumn(Strings.Duration, ImGuiTableColumnFlags.WidthStretch);
 			ImGui.TableSetupColumn(Strings.History, ImGuiTableColumnFlags.WidthStretch);
 			ImGui.TableSetupColumn(Strings.Progress, ImGuiTableColumnFlags.WidthStretch);
 			ImGui.TableSetupColumn(Strings.ETA, ImGuiTableColumnFlags.WidthStretch);
@@ -120,24 +121,20 @@ internal static class BuildMonitor
 
 				if (ImGui.TableNextColumn())
 				{
-					//ImGui.TextUnformatted($"{build.Runs.Count} runs");
-					ShowBuildHistory(build);
+					ImGui.TextUnformatted(duration.ToString("g", CultureInfo.InvariantCulture));
 				}
+
 				if (ImGui.TableNextColumn())
 				{
-					if (isRunning)
-					{
-						//ImGui.TextUnformatted(build.LastDuration.Humanize());
-						ImGui.ProgressBar((float)progress, new(0, ImGui.GetFrameHeight()), $"{progress:P0}");
-					}
-					else
-					{
-						ImGui.TextUnformatted(build.LastDuration.Humanize());
-					}
+					ShowBuildHistory(build);
 				}
 				if (ImGui.TableNextColumn() && isRunning)
 				{
-					ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.Humanize() : "???");
+					ImGui.ProgressBar((float)progress, new(0, ImGui.GetFrameHeight()), $"{progress:P0}");
+				}
+				if (ImGui.TableNextColumn() && isRunning)
+				{
+					ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString("g", CultureInfo.InvariantCulture) : "???");
 				}
 			}
 		}
@@ -169,7 +166,7 @@ internal static class BuildMonitor
 		return status switch
 		{
 			RunStatus.Pending => Color.Gray,
-			RunStatus.Running => Color.Blue,
+			RunStatus.Running => Color.Yellow,
 			RunStatus.Canceled => Color.Red,
 			RunStatus.Success => Color.Green,
 			RunStatus.Failure => Color.Red,
