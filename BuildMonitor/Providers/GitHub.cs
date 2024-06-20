@@ -71,7 +71,7 @@ internal class GitHub : BuildProvider
 	internal override async Task SyncRunsAsync(Build build)
 	{
 		UpdateGitHubClientCredentials();
-		BuildMonitor.LastRequest = $"GitHubClient.Actions.Workflows.Runs.ListByWorkflow({build.Owner.Name}, {build.Repository.Name}, {build.Id})";
+		BuildMonitor.LastRequest = $"GitHubClient.Actions.Workflows.Runs.ListByWorkflow({build.Owner.Name}, {build.Repository.Name}, {build.Name})";
 		var runs = await GitHubClient.Actions.Workflows.Runs.ListByWorkflow(build.Owner.Name, build.Repository.Name, long.Parse(build.Id, CultureInfo.InvariantCulture), new(), new()
 		{
 			PageCount = 1,
@@ -98,7 +98,7 @@ internal class GitHub : BuildProvider
 	internal override async Task SyncRunAsync(Run run)
 	{
 		UpdateGitHubClientCredentials();
-		BuildMonitor.LastRequest = $"GitHubClient.Actions.Workflows.Runs.Get({run.Owner.Name}, {run.Repository.Name}, {run.Id})";
+		BuildMonitor.LastRequest = $"GitHubClient.Actions.Workflows.Runs.Get({run.Owner.Name}, {run.Repository.Name}, {run.Name})";
 		var gitHubRun = await GitHubClient.Actions.Workflows.Runs.Get(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture));
 		UpdateRunFromWorkflow(run, gitHubRun);
 	}
