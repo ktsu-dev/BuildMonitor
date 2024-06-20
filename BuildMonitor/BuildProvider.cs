@@ -1,5 +1,6 @@
 namespace ktsu.io.BuildMonitor;
 
+using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
 using ImGuiNET;
 using ktsu.io.ImGuiWidgets;
@@ -19,7 +20,7 @@ internal abstract class BuildProvider
 	[JsonInclude]
 	protected BuildProviderToken Token { get; private set; } = new();
 	[JsonInclude]
-	internal Dictionary<OwnerName, Owner> Owners { get; init; } = [];
+	internal ConcurrentDictionary<OwnerName, Owner> Owners { get; init; } = [];
 	private bool ShouldShowAccountIdPopup { get; set; }
 	private bool ShouldShowTokenPopup { get; set; }
 	private bool ShouldShowAddOwnerPopup { get; set; }
@@ -92,9 +93,8 @@ internal abstract class BuildProvider
 		_ = PopupInputString.ShowIfOpen();
 	}
 
-	internal abstract void OnTick();
-	internal abstract Task SyncRepositoriesAsync(Owner owner);
-	internal abstract Task SyncBuildsAsync(Repository repository);
-	internal abstract Task SyncRunsAsync(Build build);
-	internal abstract Task SyncRunAsync(Run run);
+	internal abstract Task UpdateRepositoriesAsync(Owner owner);
+	internal abstract Task UpdateBuildsAsync(Repository repository);
+	internal abstract Task UpdateBuildAsync(Build build);
+	internal abstract Task UpdateRunAsync(Run run);
 }

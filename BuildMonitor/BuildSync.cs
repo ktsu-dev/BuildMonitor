@@ -7,28 +7,25 @@ using System.Diagnostics;
 internal class BuildSync
 {
 	internal Build Build { get; set; } = new();
-	private Stopwatch SyncTimer { get; } = new Stopwatch();
+	private Stopwatch UpdateTimer { get; } = new Stopwatch();
 
-	private const int SyncInterval = 60;
+	private const int UpdateInterval = 60;
 
-	internal bool ShouldSync => SyncTimer.Elapsed.TotalSeconds >= SyncInterval;
+	internal bool ShouldUpdate => UpdateTimer.Elapsed.TotalSeconds >= UpdateInterval;
 
-	internal BuildSync() => SyncTimer.Start();
+	internal BuildSync() => UpdateTimer.Start();
 
-	internal async Task Sync()
+	internal async Task UpdateAsync()
 	{
-		await Build.Owner.BuildProvider.SyncRunsAsync(Build);
+		await Build.Owner.BuildProvider.UpdateBuildAsync(Build);
 
-		lock (BuildMonitor.SyncLock)
+		foreach (var (runId, run) in Build.Runs)
 		{
-			foreach (var (runId, run) in Build.Runs)
+			_ = BuildMonitor.RunSyncCollection.TryAdd(runId, new()
 			{
-				_ = BuildMonitor.RunSyncCollection.TryAdd(runId, new()
-				{
-					Run = run,
-				});
-			}
+				Run = run,
+			});
 		}
-		SyncTimer.Restart();
+		UpdateTimer.Restart();
 	}
 }
