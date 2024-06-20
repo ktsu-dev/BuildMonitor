@@ -28,6 +28,8 @@ internal static class BuildMonitor
 
 	private static Queue<Task> SyncQueue { get; } = [];
 	private static SyncStage SyncStage { get; set; }
+	internal static object SyncLock { get; } = new();
+
 	private static void Main()
 	{
 		AppData = AppData.LoadOrCreate();
@@ -43,7 +45,10 @@ internal static class BuildMonitor
 	private static void Start()
 	{
 		bool needsSave = false;
-		needsSave |= AppData.BuildProviders.TryAdd(GitHub.BuildProviderName, new GitHub());
+		lock (SyncLock)
+		{
+			needsSave |= AppData.BuildProviders.TryAdd(GitHub.BuildProviderName, new GitHub());
+		}
 		// add more providers here as needed
 
 		if (needsSave)
@@ -54,113 +59,108 @@ internal static class BuildMonitor
 
 	private static void Tick(float dt)
 	{
-		foreach (var (_, provider) in AppData.BuildProviders)
+		lock (SyncLock)
 		{
-			provider.Tick();
-		}
-
-		if (!RefreshTimer.IsRunning || RefreshTimer.Elapsed.TotalSeconds >= RefreshTimeout)
-		{
-			SyncStage = SyncStage.NotStarted;
-			RefreshTimer.Restart();
-		}
-
-		RunSyncQueue();
-		PruneSyncQueue();
-
-
-
-		var builds = AppData.BuildProviders
-			.SelectMany(p => p.Value.Owners)
-			.SelectMany(o => o.Value.Repositories)
-			.SelectMany(r => r.Value.Builds)
-			.OrderByDescending(b => b.Value.LastStarted)
-			.ToList();
-
-		if (ImGui.BeginTable(Strings.Builds, 8, ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.RowBg))
-		{
-			ImGui.TableSetupColumn("##buildStatus", ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.Repository, ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.BuildName, ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.Status, ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.Duration, ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.History, ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.Progress, ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.ETA, ImGuiTableColumnFlags.WidthStretch);
-
-			ImGui.TableHeadersRow();
-
-			foreach (var (_, build) in builds)
+			foreach (var (_, provider) in AppData.BuildProviders)
 			{
-				bool isRunning = build.Runs.Count > 0 && build.LastStatus is RunStatus.Pending or RunStatus.Running;
-				var estimate = build.CalculateEstimatedDuration();
-				var duration = isRunning ? DateTimeOffset.UtcNow - build.LastStarted : build.LastDuration;
-				var eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
-				double progress = duration.TotalSeconds / estimate.TotalSeconds;
+				provider.Tick();
+			}
 
-				ImGui.TableNextRow();
-				if (ImGui.TableNextColumn())
-				{
-					ColorIndicator.Show(GetStatusColor(build.LastStatus), true);
-				}
+			RunSyncQueue();
+			PruneSyncQueue();
 
-				if (ImGui.TableNextColumn())
-				{
-					ImGui.TextUnformatted($"{build.Owner.Name}/{build.Repository.Name}");
-				}
+			var builds = AppData.BuildProviders
+				.SelectMany(p => p.Value.Owners)
+				.SelectMany(o => o.Value.Repositories)
+				.SelectMany(r => r.Value.Builds)
+				.OrderByDescending(b => b.Value.LastStarted);
 
-				if (ImGui.TableNextColumn())
-				{
-					ImGui.TextUnformatted(build.Name);
-				}
+			if (ImGui.BeginTable(Strings.Builds, 8, ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.RowBg))
+			{
+				ImGui.TableSetupColumn("##buildStatus", ImGuiTableColumnFlags.WidthStretch);
+				ImGui.TableSetupColumn(Strings.Repository, ImGuiTableColumnFlags.WidthStretch);
+				ImGui.TableSetupColumn(Strings.BuildName, ImGuiTableColumnFlags.WidthStretch);
+				ImGui.TableSetupColumn(Strings.Status, ImGuiTableColumnFlags.WidthStretch);
+				ImGui.TableSetupColumn(Strings.Duration, ImGuiTableColumnFlags.WidthStretch);
+				ImGui.TableSetupColumn(Strings.History, ImGuiTableColumnFlags.WidthStretch);
+				ImGui.TableSetupColumn(Strings.Progress, ImGuiTableColumnFlags.WidthStretch);
+				ImGui.TableSetupColumn(Strings.ETA, ImGuiTableColumnFlags.WidthStretch);
 
-				if (ImGui.TableNextColumn())
-				{
-					ImGui.TextUnformatted($"{build.LastStatus}");
-				}
+				ImGui.TableHeadersRow();
 
-				if (ImGui.TableNextColumn())
+				foreach (var (_, build) in builds)
 				{
-					string format = @"hh\:mm\:ss";
-					if (duration.Days > 0)
+					bool isRunning = build.Runs.Count > 0 && build.LastStatus is RunStatus.Pending or RunStatus.Running;
+					var estimate = build.CalculateEstimatedDuration();
+					var duration = isRunning ? DateTimeOffset.UtcNow - build.LastStarted : build.LastDuration;
+					var eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
+					double progress = duration.TotalSeconds / estimate.TotalSeconds;
+
+					ImGui.TableNextRow();
+					if (ImGui.TableNextColumn())
 					{
-						format = @"d\.hh\:mm\:ss";
+						ColorIndicator.Show(GetStatusColor(build.LastStatus), true);
 					}
-					ImGui.TextUnformatted(duration.ToString(format, CultureInfo.InvariantCulture));
-				}
 
-				if (ImGui.TableNextColumn())
-				{
-					ShowBuildHistory(build);
-				}
-				if (ImGui.TableNextColumn() && isRunning)
-				{
-					ImGui.ProgressBar((float)progress, new(0, ImGui.GetFrameHeight()), $"{progress:P0}");
-				}
-				if (ImGui.TableNextColumn() && isRunning)
-				{
-					string format = @"hh\:mm\:ss";
-					if (eta.Days > 0)
+					if (ImGui.TableNextColumn())
 					{
-						format = @"d\.hh\:mm\:ss";
+						ImGui.TextUnformatted($"{build.Owner.Name}/{build.Repository.Name}");
 					}
-					ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString(format, CultureInfo.InvariantCulture) : "???");
+
+					if (ImGui.TableNextColumn())
+					{
+						ImGui.TextUnformatted(build.Name);
+					}
+
+					if (ImGui.TableNextColumn())
+					{
+						ImGui.TextUnformatted($"{build.LastStatus}");
+					}
+
+					if (ImGui.TableNextColumn())
+					{
+						string format = @"hh\:mm\:ss";
+						if (duration.Days > 0)
+						{
+							format = @"d\.hh\:mm\:ss";
+						}
+						ImGui.TextUnformatted(duration.ToString(format, CultureInfo.InvariantCulture));
+					}
+
+					if (ImGui.TableNextColumn())
+					{
+						ShowBuildHistory(build);
+					}
+					if (ImGui.TableNextColumn() && isRunning)
+					{
+						ImGui.ProgressBar((float)progress, new(0, ImGui.GetFrameHeight()), $"{progress:P0}");
+					}
+					if (ImGui.TableNextColumn() && isRunning)
+					{
+						string format = @"hh\:mm\:ss";
+						if (eta.Days > 0)
+						{
+							format = @"d\.hh\:mm\:ss";
+						}
+						ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString(format, CultureInfo.InvariantCulture) : "???");
+					}
 				}
 			}
-		}
-		ImGui.EndTable();
+			ImGui.EndTable();
 
-		ShowPopupsIfRequired();
-		SaveSettingsIfRequired();
+			ShowPopupsIfRequired();
+			SaveSettingsIfRequired();
+		}
 	}
 
 	private static void ShowBuildHistory(Build build)
 	{
 		const int recentRuns = 5;
+
 		var runs = build.Runs.Values
-			.OrderByDescending(r => r.LastUpdated)
-			.Take(recentRuns)
-			.ToList();
+		.OrderByDescending(r => r.LastUpdated)
+		.Take(recentRuns)
+		.ToList();
 
 		runs.Reverse();
 
@@ -189,7 +189,7 @@ internal static class BuildMonitor
 		switch (SyncStage)
 		{
 			case SyncStage.NotStarted:
-				if (SyncQueue.Count == 0)
+				if (SyncQueue.Count == 0 && (RefreshTimer.Elapsed.TotalSeconds >= RefreshTimeout || !RefreshTimer.IsRunning))
 				{
 					SyncStage = SyncStage.Repositories;
 					foreach (var (_, provider) in AppData.BuildProviders)
@@ -245,6 +245,8 @@ internal static class BuildMonitor
 				break;
 			case SyncStage.Finished:
 				QueueSaveAppData();
+				RefreshTimer.Restart();
+				SyncStage = SyncStage.NotStarted;
 				break;
 			default:
 				break;
@@ -255,9 +257,14 @@ internal static class BuildMonitor
 	{
 		while (SyncQueue.Count > 0)
 		{
-			if (SyncQueue.Peek().IsCompleted)
+			var peek = SyncQueue.Peek();
+			if (peek.IsCompleted)
 			{
-				SyncQueue.Dequeue();
+				if (peek.IsFaulted && peek.Exception is not null)
+				{
+					throw peek.Exception;
+				}
+				_ = SyncQueue.Dequeue();
 			}
 			else
 			{

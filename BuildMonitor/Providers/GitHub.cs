@@ -37,7 +37,10 @@ internal class GitHub : BuildProvider
 			var repositoryName = (RepositoryName)gitHubRepository.Name;
 			var repositoryId = (RepositoryId)gitHubRepository.Id.ToString(CultureInfo.InvariantCulture);
 			var repository = owner.CreateRepository(repositoryName, repositoryId);
-			_ = owner.Repositories.TryAdd(repositoryId, repository);
+			lock (BuildMonitor.SyncLock)
+			{
+				_ = owner.Repositories.TryAdd(repositoryId, repository);
+			}
 		}
 	}
 
@@ -51,7 +54,10 @@ internal class GitHub : BuildProvider
 			var buildName = (BuildName)workflow.Name;
 			var buildId = (BuildId)workflow.Id.ToString(CultureInfo.InvariantCulture);
 			var build = repository.CreateBuild(buildName, buildId);
-			_ = repository.Builds.TryAdd(buildId, build);
+			lock (BuildMonitor.SyncLock)
+			{
+				_ = repository.Builds.TryAdd(buildId, build);
+			}
 		}
 	}
 
@@ -74,7 +80,10 @@ internal class GitHub : BuildProvider
 				if (!build.Runs.TryGetValue(runId, out var run))
 				{
 					run = build.CreateRun(runName, runId);
-					build.Runs.Add(runId, run);
+					lock (BuildMonitor.SyncLock)
+					{
+						build.Runs.Add(runId, run);
+					}
 				}
 
 				run.Started = gitHubRun.RunStartedAt;
