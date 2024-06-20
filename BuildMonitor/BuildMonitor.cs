@@ -24,6 +24,8 @@ internal static class BuildMonitor
 
 	private static Task SyncTask { get; set; } = new(() => { });
 
+	internal static string LastRequest { get; set; } = string.Empty;
+
 	private static void Main()
 	{
 		AppData = AppData.LoadOrCreate();
@@ -72,6 +74,8 @@ internal static class BuildMonitor
 				.SelectMany(o => o.Value.Repositories)
 				.SelectMany(r => r.Value.Builds)
 				.OrderByDescending(b => b.Value.LastStarted);
+
+			ImGui.TextUnformatted(LastRequest);
 
 			if (ImGui.BeginTable(Strings.Builds, 8, ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.RowBg))
 			{
@@ -184,7 +188,7 @@ internal static class BuildMonitor
 
 	private static async Task RunSyncQueue()
 	{
-		if (ProviderRefreshTimer.Elapsed.TotalSeconds >= ProviderRefreshTimeout)
+		if (!ProviderRefreshTimer.IsRunning || ProviderRefreshTimer.Elapsed.TotalSeconds >= ProviderRefreshTimeout)
 		{
 			List<KeyValuePair<BuildProviderName, BuildProvider>> providers;
 			lock (SyncLock)
@@ -227,6 +231,8 @@ internal static class BuildMonitor
 					}
 				}
 			}
+
+			ProviderRefreshTimer.Restart();
 		}
 
 		List<KeyValuePair<BuildId, BuildSync>> buildSyncs;

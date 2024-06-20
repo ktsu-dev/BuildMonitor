@@ -27,8 +27,9 @@ internal class GitHub : BuildProvider
 	internal override async Task SyncRepositoriesAsync(Owner owner)
 	{
 		UpdateGitHubClientCredentials();
-
+		BuildMonitor.LastRequest = $"GitHubClient.Repository.GetAllForUser({owner.Name})";
 		var userRepositories = await GitHubClient.Repository.GetAllForUser(owner.Name);
+		BuildMonitor.LastRequest = $"GitHubClient.Repository.GetAllForOrg({owner.Name})";
 		var organizationRepositories = await GitHubClient.Repository.GetAllForOrg(owner.Name);
 		var allRepositories = userRepositories.Concat(organizationRepositories);
 
@@ -39,7 +40,10 @@ internal class GitHub : BuildProvider
 			var repository = owner.CreateRepository(repositoryName, repositoryId);
 			lock (BuildMonitor.SyncLock)
 			{
-				_ = owner.Repositories.TryAdd(repositoryId, repository);
+				if (owner.Repositories.TryAdd(repositoryId, repository))
+				{
+					BuildMonitor.QueueSaveAppData();
+				}
 			}
 		}
 	}
@@ -47,7 +51,7 @@ internal class GitHub : BuildProvider
 	internal override async Task SyncBuildsAsync(Repository repository)
 	{
 		UpdateGitHubClientCredentials();
-
+		BuildMonitor.LastRequest = $"GitHubClient.Actions.Workflows.Runs.ListByWorkflow({repository.Owner.Name}, {repository.Name})";
 		var workflows = await GitHubClient.Actions.Workflows.List(repository.Owner.Name, repository.Name);
 		foreach (var workflow in workflows.Workflows)
 		{
@@ -56,7 +60,10 @@ internal class GitHub : BuildProvider
 			var build = repository.CreateBuild(buildName, buildId);
 			lock (BuildMonitor.SyncLock)
 			{
-				_ = repository.Builds.TryAdd(buildId, build);
+				if (repository.Builds.TryAdd(buildId, build))
+				{
+					BuildMonitor.QueueSaveAppData();
+				}
 			}
 		}
 	}
@@ -64,7 +71,7 @@ internal class GitHub : BuildProvider
 	internal override async Task SyncRunsAsync(Build build)
 	{
 		UpdateGitHubClientCredentials();
-
+		BuildMonitor.LastRequest = $"GitHubClient.Actions.Workflows.Runs.ListByWorkflow({build.Owner.Name}, {build.Repository.Name}, {build.Id})";
 		var runs = await GitHubClient.Actions.Workflows.Runs.ListByWorkflow(build.Owner.Name, build.Repository.Name, long.Parse(build.Id, CultureInfo.InvariantCulture));
 		foreach (var gitHubRun in runs.WorkflowRuns)
 		{
@@ -86,7 +93,7 @@ internal class GitHub : BuildProvider
 	internal override async Task SyncRunAsync(Run run)
 	{
 		UpdateGitHubClientCredentials();
-
+		BuildMonitor.LastRequest = $"GitHubClient.Actions.Workflows.Runs.Get({run.Owner.Name}, {run.Repository.Name}, {run.Id})";
 		var gitHubRun = await GitHubClient.Actions.Workflows.Runs.Get(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture));
 		UpdateRunFromWorkflow(run, gitHubRun);
 	}
@@ -113,5 +120,6 @@ internal class GitHub : BuildProvider
 		};
 
 		run.Build.UpdateFromRun(run);
+		BuildMonitor.QueueSaveAppData();
 	}
 }

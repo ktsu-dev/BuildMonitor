@@ -1,4 +1,4 @@
-﻿// Ignore Spelling: App
+// Ignore Spelling: App
 
 namespace ktsu.io.BuildMonitor;
 
@@ -12,7 +12,7 @@ internal class RunSync
 	private const int SyncIntervalMin = 10;
 	private const int SyncIntervalMax = 60;
 
-	internal bool ShouldSync => SyncTimer.Elapsed.TotalSeconds >= SyncIntervalCurrent;
+	internal bool ShouldSync => Run.IsOngoing && SyncTimer.Elapsed.TotalSeconds >= SyncIntervalCurrent;
 
 	internal RunSync() => SyncTimer.Start();
 
