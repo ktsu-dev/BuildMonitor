@@ -3,8 +3,8 @@ namespace ktsu.io.BuildMonitor;
 using ktsu.io.StrongStrings;
 
 
-public sealed record class OwnerName : StrongStringAbstract<OwnerName> { }
-public sealed record class OwnerId : StrongStringAbstract<OwnerId> { }
+internal sealed record class OwnerName : StrongStringAbstract<OwnerName> { }
+internal sealed record class OwnerId : StrongStringAbstract<OwnerId> { }
 
 internal class Owner
 {

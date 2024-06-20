@@ -2,8 +2,8 @@ namespace ktsu.io.BuildMonitor;
 
 using ktsu.io.StrongStrings;
 
-public sealed record class BuildName : StrongStringAbstract<BuildName> { }
-public sealed record class BuildId : StrongStringAbstract<BuildId> { }
+internal sealed record class BuildName : StrongStringAbstract<BuildName> { }
+internal sealed record class BuildId : StrongStringAbstract<BuildId> { }
 
 internal class Build
 {
@@ -19,7 +19,8 @@ internal class Build
 	public DateTimeOffset LastUpdated { get; set; }
 	public TimeSpan LastDuration => LastUpdated - LastStarted;
 	public RunStatus LastStatus { get; set; }
-	public TimeSpan CalculateEstimatedDuration()
+	internal bool IsOngoing => Runs.Count > 0 && LastStatus is RunStatus.Pending or RunStatus.Running;
+	internal TimeSpan CalculateEstimatedDuration()
 	{
 		var recentRuns = Runs.Values.OrderByDescending(r => r.Started).Skip(1).Take(NumRecentRuns).ToList();
 		return recentRuns.Count == 0
@@ -27,8 +28,15 @@ internal class Build
 			: TimeSpan.FromSeconds(recentRuns.Average(r => r.Duration.TotalSeconds));
 	}
 
-	public Run CreateRun(RunName name) => CreateRun(name, (RunId)(string)name);
-	public Run CreateRun(RunName name, RunId id)
+	internal TimeSpan CalculateETA()
+	{
+		var estimate = CalculateEstimatedDuration();
+		var duration = IsOngoing ? DateTimeOffset.UtcNow - LastStarted : LastDuration;
+		return duration < estimate ? estimate - duration : TimeSpan.Zero;
+	}
+
+	internal Run CreateRun(RunName name) => CreateRun(name, (RunId)(string)name);
+	internal Run CreateRun(RunName name, RunId id)
 	{
 		return new()
 		{
@@ -39,5 +47,15 @@ internal class Build
 			Owner = Owner,
 			Enabled = true
 		};
+	}
+
+	internal void UpdateFromRun(Run run)
+	{
+		if (run.LastUpdated > LastUpdated)
+		{
+			LastUpdated = run.LastUpdated;
+			LastStarted = run.Started;
+			LastStatus = run.Status;
+		}
 	}
 }

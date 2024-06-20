@@ -96,5 +96,5 @@ internal abstract class BuildProvider
 	internal abstract Task SyncRepositoriesAsync(Owner owner);
 	internal abstract Task SyncBuildsAsync(Repository repository);
 	internal abstract Task SyncRunsAsync(Build build);
-	internal abstract Task SyncRunsAsync(Repository repository);
+	internal abstract Task SyncRunAsync(Run run);
 }

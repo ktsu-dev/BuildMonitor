@@ -2,8 +2,8 @@ namespace ktsu.io.BuildMonitor;
 
 using ktsu.io.StrongStrings;
 
-public sealed record class RepositoryName : StrongStringAbstract<RepositoryName> { }
-public sealed record class RepositoryId : StrongStringAbstract<RepositoryId> { }
+internal sealed record class RepositoryName : StrongStringAbstract<RepositoryName> { }
+internal sealed record class RepositoryId : StrongStringAbstract<RepositoryId> { }
 
 internal class Repository
 {

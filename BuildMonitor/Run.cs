@@ -2,10 +2,10 @@ namespace ktsu.io.BuildMonitor;
 
 using ktsu.io.StrongStrings;
 
-public sealed record class RunName : StrongStringAbstract<RunName> { }
-public sealed record class RunId : StrongStringAbstract<RunId> { }
+internal sealed record class RunName : StrongStringAbstract<RunName> { }
+internal sealed record class RunId : StrongStringAbstract<RunId> { }
 
-public enum RunStatus
+internal enum RunStatus
 {
 	Pending,
 	Running,
@@ -26,4 +26,13 @@ internal class Run
 	public DateTimeOffset Started { get; set; }
 	public DateTimeOffset LastUpdated { get; set; }
 	public TimeSpan Duration => LastUpdated - Started;
+
+	internal bool IsOngoing => Status is RunStatus.Pending or RunStatus.Running;
+
+	internal TimeSpan CalculateETA()
+	{
+		var estimate = Build.CalculateEstimatedDuration();
+		var duration = IsOngoing ? DateTimeOffset.UtcNow - Started : Duration;
+		return duration < estimate ? estimate - duration : TimeSpan.Zero;
+	}
 }

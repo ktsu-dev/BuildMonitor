@@ -8,27 +8,21 @@ using ImGuiNET;
 using ktsu.io.ImGuiApp;
 using ktsu.io.ImGuiWidgets;
 
-internal enum SyncStage
-{
-	NotStarted,
-	Repositories,
-	Builds,
-	Runs,
-	Finished,
-}
-
 internal static class BuildMonitor
 {
 	internal static AppData AppData { get; set; } = new();
 	private static bool ShouldSaveAppData { get; set; }
 
-	private static Stopwatch RefreshTimer { get; } = new Stopwatch();
+	private static Stopwatch ProviderRefreshTimer { get; } = new Stopwatch();
 
-	private const int RefreshTimeout = 30;
+	private const int ProviderRefreshTimeout = 300;
 
-	private static Queue<Task> SyncQueue { get; } = [];
-	private static SyncStage SyncStage { get; set; }
 	internal static object SyncLock { get; } = new();
+
+	private static Dictionary<BuildId, BuildSync> BuildSyncCollection { get; } = [];
+	internal static Dictionary<RunId, RunSync> RunSyncCollection { get; } = [];
+
+	private static Task SyncTask { get; set; } = new(() => { });
 
 	private static void Main()
 	{
@@ -55,20 +49,24 @@ internal static class BuildMonitor
 		{
 			QueueSaveAppData();
 		}
+
+		SyncTask = RunSyncQueue();
 	}
 
 	private static void Tick(float dt)
 	{
-		lock (SyncLock)
+		if (SyncTask.IsCompleted)
 		{
-			foreach (var (_, provider) in AppData.BuildProviders)
+			if (SyncTask.IsFaulted && SyncTask.Exception is not null)
 			{
-				provider.Tick();
+				throw SyncTask.Exception;
 			}
 
-			RunSyncQueue();
-			PruneSyncQueue();
+			SyncTask = RunSyncQueue();
+		}
 
+		lock (SyncLock)
+		{
 			var builds = AppData.BuildProviders
 				.SelectMany(p => p.Value.Owners)
 				.SelectMany(o => o.Value.Repositories)
@@ -90,9 +88,9 @@ internal static class BuildMonitor
 
 				foreach (var (_, build) in builds)
 				{
-					bool isRunning = build.Runs.Count > 0 && build.LastStatus is RunStatus.Pending or RunStatus.Running;
+					bool isOngoing = build.Runs.Count > 0 && build.IsOngoing;
 					var estimate = build.CalculateEstimatedDuration();
-					var duration = isRunning ? DateTimeOffset.UtcNow - build.LastStarted : build.LastDuration;
+					var duration = isOngoing ? DateTimeOffset.UtcNow - build.LastStarted : build.LastDuration;
 					var eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
 					double progress = duration.TotalSeconds / estimate.TotalSeconds;
 
@@ -131,11 +129,11 @@ internal static class BuildMonitor
 					{
 						ShowBuildHistory(build);
 					}
-					if (ImGui.TableNextColumn() && isRunning)
+					if (ImGui.TableNextColumn() && isOngoing)
 					{
 						ImGui.ProgressBar((float)progress, new(0, ImGui.GetFrameHeight()), $"{progress:P0}");
 					}
-					if (ImGui.TableNextColumn() && isRunning)
+					if (ImGui.TableNextColumn() && isOngoing)
 					{
 						string format = @"hh\:mm\:ss";
 						if (eta.Days > 0)
@@ -184,91 +182,82 @@ internal static class BuildMonitor
 		};
 	}
 
-	private static void RunSyncQueue()
+	private static async Task RunSyncQueue()
 	{
-		switch (SyncStage)
+		if (ProviderRefreshTimer.Elapsed.TotalSeconds >= ProviderRefreshTimeout)
 		{
-			case SyncStage.NotStarted:
-				if (SyncQueue.Count == 0 && (RefreshTimer.Elapsed.TotalSeconds >= RefreshTimeout || !RefreshTimer.IsRunning))
-				{
-					SyncStage = SyncStage.Repositories;
-					foreach (var (_, provider) in AppData.BuildProviders)
-					{
-						foreach (var (_, owner) in provider.Owners)
-						{
-							SyncQueue.Enqueue(provider.SyncRepositoriesAsync(owner));
-						}
-					}
-				}
-				break;
-			case SyncStage.Repositories:
-				if (SyncQueue.Count == 0)
-				{
-					SyncStage = SyncStage.Builds;
-					foreach (var (_, provider) in AppData.BuildProviders)
-					{
-						foreach (var (_, owner) in provider.Owners)
-						{
-							foreach (var (_, repository) in owner.Repositories)
-							{
-								SyncQueue.Enqueue(provider.SyncBuildsAsync(repository));
-							}
-						}
-					}
-				}
-				break;
-			case SyncStage.Builds:
-				if (SyncQueue.Count == 0)
-				{
-					SyncStage = SyncStage.Runs;
-					foreach (var (_, provider) in AppData.BuildProviders)
-					{
-						foreach (var (_, owner) in provider.Owners)
-						{
-							foreach (var (_, repository) in owner.Repositories)
-							{
-								SyncQueue.Enqueue(provider.SyncRunsAsync(repository));
-								foreach (var (_, build) in repository.Builds)
-								{
-									SyncQueue.Enqueue(provider.SyncRunsAsync(build));
-								}
-							}
-						}
-					}
-				}
-				break;
-			case SyncStage.Runs:
-				if (SyncQueue.Count == 0)
-				{
-					SyncStage = SyncStage.Finished;
-				}
-				break;
-			case SyncStage.Finished:
-				QueueSaveAppData();
-				RefreshTimer.Restart();
-				SyncStage = SyncStage.NotStarted;
-				break;
-			default:
-				break;
-		}
-	}
-
-	private static void PruneSyncQueue()
-	{
-		while (SyncQueue.Count > 0)
-		{
-			var peek = SyncQueue.Peek();
-			if (peek.IsCompleted)
+			List<KeyValuePair<BuildProviderName, BuildProvider>> providers;
+			lock (SyncLock)
 			{
-				if (peek.IsFaulted && peek.Exception is not null)
-				{
-					throw peek.Exception;
-				}
-				_ = SyncQueue.Dequeue();
+				providers = [.. AppData.BuildProviders];
 			}
-			else
+			foreach (var (_, provider) in providers)
 			{
-				break;
+				List<KeyValuePair<OwnerName, Owner>> owners;
+				lock (SyncLock)
+				{
+					owners = [.. provider.Owners];
+				}
+				foreach (var (_, owner) in owners)
+				{
+					await provider.SyncRepositoriesAsync(owner);
+					List<KeyValuePair<RepositoryId, Repository>> repositories;
+					lock (SyncLock)
+					{
+						repositories = [.. owner.Repositories];
+					}
+					foreach (var (_, repository) in repositories)
+					{
+						await provider.SyncBuildsAsync(repository);
+						List<KeyValuePair<BuildId, Build>> builds;
+						lock (SyncLock)
+						{
+							builds = [.. repository.Builds];
+						}
+						foreach (var (_, build) in builds)
+						{
+							lock (SyncLock)
+							{
+								_ = BuildSyncCollection.TryAdd(build.Id, new()
+								{
+									Build = build,
+								});
+							}
+						}
+					}
+				}
+			}
+		}
+
+		List<KeyValuePair<BuildId, BuildSync>> buildSyncs;
+		lock (SyncLock)
+		{
+			buildSyncs = BuildSyncCollection.Where(b => b.Value.ShouldSync).ToList();
+		}
+
+		foreach (var (buildId, buildSync) in buildSyncs)
+		{
+			await buildSync.Sync();
+		}
+
+		List<KeyValuePair<RunId, RunSync>> runSyncs;
+		lock (SyncLock)
+		{
+			runSyncs = RunSyncCollection.Where(b => b.Value.ShouldSync).ToList();
+		}
+
+		foreach (var (runId, runSync) in runSyncs)
+		{
+			await runSync.Sync();
+		}
+
+		List<KeyValuePair<RunId, RunSync>> completedRunSyncs;
+		lock (SyncLock)
+		{
+			completedRunSyncs = RunSyncCollection.Where(b => !b.Value.Run.IsOngoing).ToList();
+			foreach (var (runId, runSync) in completedRunSyncs)
+			{
+				_ = RunSyncCollection.Remove(runId);
 			}
 		}
 	}
