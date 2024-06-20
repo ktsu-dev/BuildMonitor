@@ -1,5 +1,6 @@
 namespace ktsu.io.BuildMonitor;
 
+using System.Collections.Concurrent;
 using ktsu.io.StrongStrings;
 
 internal sealed record class BuildName : StrongStringAbstract<BuildName> { }
@@ -14,12 +15,12 @@ internal class Build
 	public Owner Owner { get; set; } = new();
 	public Repository Repository { get; set; } = new();
 	public bool Enabled { get; set; }
-	public Dictionary<RunId, Run> Runs { get; init; } = [];
+	public ConcurrentDictionary<RunId, Run> Runs { get; init; } = [];
 	public DateTimeOffset LastStarted { get; set; }
 	public DateTimeOffset LastUpdated { get; set; }
 	public TimeSpan LastDuration => LastUpdated - LastStarted;
 	public RunStatus LastStatus { get; set; }
-	internal bool IsOngoing => Runs.Count > 0 && LastStatus is RunStatus.Pending or RunStatus.Running;
+	internal bool IsOngoing => !Runs.IsEmpty && LastStatus is RunStatus.Pending or RunStatus.Running;
 	internal TimeSpan CalculateEstimatedDuration()
 	{
 		var recentRuns = Runs.Values.OrderByDescending(r => r.Started).Skip(1).Take(NumRecentRuns).ToList();

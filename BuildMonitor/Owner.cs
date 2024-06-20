@@ -1,5 +1,6 @@
 namespace ktsu.io.BuildMonitor;
 
+using System.Collections.Concurrent;
 using ktsu.io.StrongStrings;
 
 
@@ -12,7 +13,7 @@ internal class Owner
 	public OwnerId Id { get; init; } = new();
 	public BuildProvider BuildProvider { get; init; } = null!; // only instantiate this via the Create method
 	public bool Enabled { get; set; }
-	public Dictionary<RepositoryId, Repository> Repositories { get; init; } = [];
+	public ConcurrentDictionary<RepositoryId, Repository> Repositories { get; init; } = [];
 
 	internal Repository CreateRepository(RepositoryName name) => CreateRepository(name, (RepositoryId)(string)name);
 	internal Repository CreateRepository(RepositoryName name, RepositoryId id)

@@ -7,24 +7,24 @@ using System.Diagnostics;
 internal class RunSync
 {
 	internal Run Run { get; set; } = new();
-	private Stopwatch SyncTimer { get; } = new Stopwatch();
-	private int SyncIntervalCurrent { get; set; } = SyncIntervalMin;
-	private const int SyncIntervalMin = 10;
-	private const int SyncIntervalMax = 60;
+	private Stopwatch UpdateTimer { get; } = new Stopwatch();
+	private int UpdateIntervalCurrent { get; set; } = UpdateIntervalMin;
+	private const int UpdateIntervalMin = 10;
+	private const int UpdateIntervalMax = 60;
 
-	internal bool ShouldSync => Run.IsOngoing && SyncTimer.Elapsed.TotalSeconds >= SyncIntervalCurrent;
+	internal bool ShouldUpdate => Run.IsOngoing && UpdateTimer.Elapsed.TotalSeconds >= UpdateIntervalCurrent;
 
-	internal RunSync() => SyncTimer.Start();
+	internal RunSync() => UpdateTimer.Start();
 
-	internal async Task Sync()
+	internal async Task UpdateAsync()
 	{
-		await Run.Owner.BuildProvider.SyncRunAsync(Run);
+		await Run.Owner.BuildProvider.UpdateRunAsync(Run);
 
 		if (Run.IsOngoing)
 		{
-			SyncIntervalCurrent = (int)Run.CalculateETA().TotalSeconds;
-			SyncIntervalCurrent = Math.Clamp(SyncIntervalCurrent, SyncIntervalMin, SyncIntervalMax);
-			SyncTimer.Restart();
+			UpdateIntervalCurrent = (int)Run.CalculateETA().TotalSeconds;
+			UpdateIntervalCurrent = Math.Clamp(UpdateIntervalCurrent, UpdateIntervalMin, UpdateIntervalMax);
+			UpdateTimer.Restart();
 		}
 	}
 }
