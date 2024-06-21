@@ -3,46 +3,22 @@
 # Add steps that publish symbols, save build artifacts, and more:
 # https://docs.microsoft.com/azure/devops/pipelines/apps/windows/dot-net
 
+pr:
+- main
+
 pool:
   vmImage: 'windows-latest'
 
 steps:
 - task: NuGetToolInstaller@1
-
-- task: CmdLine@2
-  inputs:
-    script: dotnet tool update dotnet-script --global
-
-- task: CmdLine@2
-  inputs:
-    script: dotnet tool update dotnet-coverage --global
-
-- task: CmdLine@2
-  inputs:
-    script: dotnet tool update dotnet-sonarscanner --global
-
-- task: CmdLine@2
-  inputs:
-    script: |
-      iwr -useb get.scoop.sh -outfile 'install.ps1'
-      .\install.ps1 -RunAsAdmin
-      scoop update
-      scoop bucket add extras
-      scoop install nsis
-      makensis -VERSION
-      makensis -HDRINFO
+- script: dotnet tool update dotnet-script --global
+- script: dotnet tool update dotnet-coverage --global
+- script: dotnet tool update dotnet-sonarscanner --global
 
 - task: NuGetCommand@2
   inputs:
     restoreSolution: '**/*.sln'
 
-- task: CmdLine@2
-  inputs:
-    script: dotnet build --no-incremental --no-restore
-- task: CmdLine@2
-  inputs:
-    script: dotnet-coverage collect "dotnet test" -f xml -o "coverage.xml"
-
-- task: CmdLine@2
-  inputs:
-    script: dotnet publish -o ./publish --self-contained -r win-x64 -f net8.0
+- script: dotnet build --no-incremental --no-restore
+- script: dotnet-coverage collect "dotnet test --no-restore --no-build" -f xml -o "coverage.xml"
+- script: dotnet publish -o ./publish --no-restore --no-build --self-contained -r win-x64 -f net8.0
