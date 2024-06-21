@@ -34,7 +34,7 @@ steps:
 
 - task: NuGetCommand@2
   inputs:
-    restoreSolution: '$(solution)'
+    restoreSolution: '**/*.sln'
 
 - task: CmdLine@2
   inputs:
