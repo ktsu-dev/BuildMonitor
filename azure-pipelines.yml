@@ -19,7 +19,7 @@ steps:
 - script: dotnet tool update dotnet-sonarscanner --global
   displayName: Install dotnet-sonarscanner
 
-- script: dotnet restore --no-incremental  -r win-x64 -f net8.0
+- script: dotnet restore -r win-x64 -f net8.0
   displayName: Restore
 
 - script: dotnet build --no-restore --no-incremental  -r win-x64 -f net8.0
