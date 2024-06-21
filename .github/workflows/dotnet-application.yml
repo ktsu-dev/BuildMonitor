@@ -10,6 +10,6 @@ permissions:
   contents: write
   
 jobs:
-  build-dotnet-library:
+  build-dotnet-application:
     uses: ktsu-io/workflows/.github/workflows/build-dotnet-application.yml@main
     secrets: inherit
