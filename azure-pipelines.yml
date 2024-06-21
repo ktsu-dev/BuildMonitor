@@ -38,8 +38,7 @@ steps:
 
 - task: CmdLine@2
   inputs:
-    script: dotnet build --no-incremental --no-restore -r win-x64 -f net8.0
-
+    script: dotnet build --no-incremental --no-restore
 - task: CmdLine@2
   inputs:
     script: dotnet-coverage collect "dotnet test" -f xml -o "coverage.xml"
