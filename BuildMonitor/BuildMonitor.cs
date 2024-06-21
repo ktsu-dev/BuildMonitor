@@ -25,7 +25,7 @@ internal static class BuildMonitor
 
 	private static Task UpdateTask { get; set; } = new(() => { });
 
-	internal static string LastRequest { get; set; } = string.Empty;
+	internal static ConcurrentDictionary<string, DateTimeOffset> ActiveRequests { get; set; } = [];
 
 	private static void Main()
 	{
@@ -74,7 +74,12 @@ internal static class BuildMonitor
 			.SelectMany(r => r.Value.Builds)
 			.OrderByDescending(b => b.Value.LastStarted);
 
-		ImGui.TextUnformatted(LastRequest);
+		//foreach (var (name, startTime) in ActiveRequests)
+		//{
+		//	string format = @"hh\:mm\:ss";
+		//	var duration = DateTimeOffset.UtcNow - startTime;
+		//	ImGui.TextUnformatted($"{name} {duration.ToString(format, CultureInfo.InvariantCulture)}");
+		//}
 
 		if (ImGui.BeginTable(Strings.Builds, 8, ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.RowBg))
 		{
@@ -285,5 +290,12 @@ internal static class BuildMonitor
 	private static void ShowPopupsIfRequired()
 	{
 		// none yet
+	}
+
+	internal static async Task MakeRequestAsync(string name, Func<Task> action)
+	{
+		_ = ActiveRequests.TryAdd(name, DateTimeOffset.UtcNow);
+		await action.Invoke();
+		_ = ActiveRequests.TryRemove(name, out _);
 	}
 }
