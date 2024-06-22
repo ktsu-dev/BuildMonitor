@@ -33,10 +33,6 @@ steps:
       $AUTHORS = Get-Content -Path AUTHORS -Raw
       $AUTHORS = $AUTHORS.Trim()
       Write-Host "##vso[task.setvariable variable=AUTHORS;]$AUTHORS"
-      
-      $LICENSE = Get-Content -Path LICENSE -Raw
-      $LICENSE = $LICENSE.Trim()
-      Write-Host "##vso[task.setvariable variable=LICENSE;]$LICENSE"
 
       $YEAR = Get-Date -Format "yyyy"
       Write-Host "##vso[task.setvariable variable=YEAR;]$YEAR"
@@ -70,7 +66,7 @@ steps:
     /DAUTHORS="$(AUTHORS)"
     /DVERSION="$(VERSION)"
     /DDESCRIPTION="$(DESCRIPTION)"
-    /DLICENSE="$(LICENSE)"
+    /DLICENSE="LICENSE"
     /DCOPYRIGHT="$(AUTHORS) © $(YEAR)"
     /DYEAR="$(YEAR)"
     /DMAIN_APP_EXE="$(AUTHORS).$(APPNAME).exe"
