@@ -13,7 +13,8 @@ variables:
   buildConfiguration: 'Release'
   RUNTIME: 'win-x64'
   FRAMEWORK: 'net8.0'
-  APPNAME: ${{ split(Build.Repository.Name, '/')[1] }}
+  APPNAME: ${{ split($(Build.Repository.Name), '/')[1] }}
+  BRANCH: $(Build.SourceBranchName)
 
 steps:
 - task: PowerShell@2
@@ -58,13 +59,13 @@ steps:
 - script: dotnet-coverage collect "dotnet test --nologo --verbosity normal --no-build" -f xml -o "coverage.xml"
   displayName: Test
 
-- script: dotnet publish $(Build.Repository.Name)/$(Build.Repository.Name).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework $(FRAMEWORK) --output ./publish
+- script: dotnet publish $(APPNAME)/$(APPNAME).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework $(FRAMEWORK) --output ./publish
   displayName: Publish
 
 - script: >
     makensis
     /DNAME="$(APPNAME)"
-    /DINSTALLERNAME="setup-$(APPNAME)-$(VERSION)-$(Build.SourceBranchName)-$(RUNTIME).exe"
+    /DINSTALLERNAME="setup-$(APPNAME)-$(BRANCH)-$(VERSION)-$(RUNTIME).exe"
     /DPLATFORM="$(AUTHORS)"
     /DAUTHORS="$(AUTHORS)"
     /DVERSION="$(VERSION)"
