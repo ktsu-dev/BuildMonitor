@@ -65,7 +65,7 @@ steps:
 - script: dotnet tool update dotnet-sonarscanner --global
   displayName: Install dotnet-sonarscanner
 
-- script: dotnet restore --nologo --verbosity normal --configuration $(buildConfiguration) --runtime $(RUNTIME)
+- script: dotnet restore --nologo --verbosity normal --runtime $(RUNTIME)
   displayName: Restore
 
 - script: dotnet build --nologo --verbosity normal --no-restore --no-incremental --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework $(FRAMEWORK)
