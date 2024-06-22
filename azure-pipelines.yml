@@ -15,7 +15,7 @@ variables:
   framework: 'net8.0'
 
 steps:
-- name: Read Vars
+- displayName: Read Vars
   task: PowerShell@2
   inputs:
     targetType: 'inline'
@@ -39,28 +39,28 @@ steps:
       $YEAR = Get-Date -Format "yyyy"
       Write-Host "##vso[task.setvariable variable=YEAR;]$YEAR"
 
-- name: Install dotnet-script
+- displayName: Install dotnet-script
   script: dotnet tool update dotnet-script --global
 
-- name: Install dotnet-coverage
+- displayName: Install dotnet-coverage
   script: dotnet tool update dotnet-coverage --global
 
-- name: Install dotnet-sonarscanner
+- displayName: Install dotnet-sonarscanner
   script: dotnet tool update dotnet-sonarscanner --global
 
-- name: Restore
+- displayName: Restore
   script: dotnet restore --nologo --verbosity normal --runtime $(runtime)
 
-- name: Build
+- displayName: Build
   script: dotnet build --nologo --verbosity normal --no-restore --no-incremental --configuration $(buildConfiguration) --runtime $(runtime) --framework $(framework)
 
-- name: Test
+- displayName: Test
   script: dotnet-coverage collect "dotnet test --nologo --verbosity normal --no-build" -f xml -o "coverage.xml"
 
-- name: Publish
+- displayName: Publish
   script: dotnet publish $(Build.Repository.Name)/$(Build.Repository.Name).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(runtime) --framework $(framework) --output ./publish
 
-- name: Create Installer
+- displayName: Create Installer
   script: >
     makensis
     /DNAME="$(Build.Repository.Name)"
