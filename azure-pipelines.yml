@@ -13,7 +13,6 @@ variables:
   buildConfiguration: 'Release'
   RUNTIME: 'win-x64'
   FRAMEWORK: 'net8.0'
-  APPNAME: $[split(${{ Build.Repository.Name }}, '/')[1]]
   BRANCH: $(Build.SourceBranchName)
 
 steps:
@@ -22,6 +21,8 @@ steps:
   inputs:
     targetType: 'inline'
     script: |
+      Write-Host "##vso[task.setvariable variable=APPNAME;]$[split($(Build.Repository.Name), '/')[1]]"
+      
       $VERSION = Get-Content -Path VERSION -Raw
       $VERSION = $VERSION.Trim()
       Write-Host "##vso[task.setvariable variable=VERSION;]$VERSION"
