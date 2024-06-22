@@ -75,6 +75,9 @@ steps:
 - script: dotnet publish $(APPNAME)/$(APPNAME).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework $(FRAMEWORK) --output $(PUBLISH_PATH)
   displayName: Publish
 
+- script: mkdir -p $(OUTPUT_PATH)
+  displayName: Create installer directory
+
 - script: >
     makensis
     /NOCD
