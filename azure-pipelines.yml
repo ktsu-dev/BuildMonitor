@@ -37,6 +37,20 @@ steps:
       $YEAR = Get-Date -Format "yyyy"
       Write-Host "##vso[task.setvariable variable=YEAR;]$YEAR"
 
+- task: PowerShell@2
+  displayName: Make installer name if main branch
+  condition: eq(variables['Build.SourceBranchName'], 'main')
+  inputs:
+    targetType: 'inline'
+    script: Write-Host "##vso[task.setvariable variable=INSTALLER_NAME;]setup-$(APPNAME)-$(VERSION)-$(RUNTIME).exe"
+
+- task: PowerShell@2
+  displayName: Make installer name if not main branch
+  condition: not(eq(variables['Build.SourceBranchName'], 'main'))
+  inputs:
+    targetType: 'inline'
+    script: Write-Host "##vso[task.setvariable variable=INSTALLER_NAME;]setup-$(APPNAME)-$(BRANCH)-$(VERSION)-$(RUNTIME).exe"
+
 - script: dotnet tool update dotnet-script --global
   displayName: Install dotnet-script
 
@@ -61,7 +75,7 @@ steps:
 - script: >
     makensis
     /DNAME="$(APPNAME)"
-    /DINSTALLERNAME="setup-$(APPNAME)-$(BRANCH)-$(VERSION)-$(RUNTIME).exe"
+    /DINSTALLER_NAME="$(INSTALLER_NAME)"
     /DPLATFORM="$(AUTHORS)"
     /DAUTHORS="$(AUTHORS)"
     /DVERSION="$(VERSION)"
