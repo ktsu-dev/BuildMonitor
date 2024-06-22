@@ -118,19 +118,23 @@ steps:
     ArtifactName: '$(INSTALLER_NAME)'
     publishLocation: 'Container'
 
-- task: GitHubRelease@1
-  continueOnError: true
+- task: GitHubReleasePublish@1
   inputs:
-    gitHubConnection: 'GitHub - matt-edmondson'
-    repositoryName: '$(Build.Repository.Name)'
-    action: 'create'
-    target: '$(Build.SourceVersion)'
-    tagSource: 'userSpecifiedTag'
-    tag: '$(VERSION)'
-    releaseNotesSource: 'inline'
-    assets: '$(OUTPUT_PATH)/*'
-    changeLogCompareToRelease: 'lastFullRelease'
-    changeLogType: 'commitBased'
+    githubEndpoint: 'GitHub - matt-edmondson'
+    manuallySetRepository: true
+    githubOwner: '$(AUTHORS_KEY)'
+    githubRepositoryName: '$(APPNAME)'
+    githubTag: 'v$(VERSION)'
+    githubReleaseDraft: false
+    githubReleasePrerelease: false
+    githubIgnoreAssets: false
+    githubReleaseAsset: '$(OUTPUT_PATH)/*'
+    githubReuseRelease: true
+    githubReuseDraftOnly: false
+    githubSkipDuplicatedAssets: true
+    githubEditRelease: false
+    githubDeleteEmptyTag: false
+    githubTargetCommitsh: '$(Build.SourceVersion)'
 
 - task: SonarCloudPublish@2
   continueOnError: true
