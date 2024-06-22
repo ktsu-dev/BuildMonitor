@@ -17,11 +17,11 @@ variables:
 
 steps:
 - task: PowerShell@2
-  displayName: Read Vars
+  displayName: Init Vars
   inputs:
     targetType: 'inline'
     script: |
-      Write-Host "##vso[task.setvariable variable=APPNAME;]$[split($(Build.Repository.Name), '/')[1]]"
+      Write-Host "##vso[task.setvariable variable=APPNAME;]${{ split(${{Build.Repository.Name}}, '/')[1]] }}"
       
       $VERSION = Get-Content -Path VERSION -Raw
       $VERSION = $VERSION.Trim()
