@@ -15,8 +15,8 @@ variables:
   framework: 'net8.0'
 
 steps:
-- displayName: Read Vars
-  task: PowerShell@2
+- task: PowerShell@2
+  displayName: Read Vars
   inputs:
     targetType: 'inline'
     script: |
@@ -39,29 +39,28 @@ steps:
       $YEAR = Get-Date -Format "yyyy"
       Write-Host "##vso[task.setvariable variable=YEAR;]$YEAR"
 
-- displayName: Install dotnet-script
-  script: dotnet tool update dotnet-script --global
+- script: dotnet tool update dotnet-script --global
+  displayName: Install dotnet-script
 
-- displayName: Install dotnet-coverage
-  script: dotnet tool update dotnet-coverage --global
+- script: dotnet tool update dotnet-coverage --global
+  displayName: Install dotnet-coverage
 
-- displayName: Install dotnet-sonarscanner
-  script: dotnet tool update dotnet-sonarscanner --global
+- script: dotnet tool update dotnet-sonarscanner --global
+  displayName: Install dotnet-sonarscanner
 
-- displayName: Restore
-  script: dotnet restore --nologo --verbosity normal --runtime $(runtime)
+- script: dotnet restore --nologo --verbosity normal --runtime $(runtime)
+  displayName: Restore
 
-- displayName: Build
-  script: dotnet build --nologo --verbosity normal --no-restore --no-incremental --configuration $(buildConfiguration) --runtime $(runtime) --framework $(framework)
+- script: dotnet build --nologo --verbosity normal --no-restore --no-incremental --configuration $(buildConfiguration) --runtime $(runtime) --framework $(framework)
+  displayName: Build
 
-- displayName: Test
-  script: dotnet-coverage collect "dotnet test --nologo --verbosity normal --no-build" -f xml -o "coverage.xml"
+- script: dotnet-coverage collect "dotnet test --nologo --verbosity normal --no-build" -f xml -o "coverage.xml"
+displayName: Test
 
-- displayName: Publish
-  script: dotnet publish $(Build.Repository.Name)/$(Build.Repository.Name).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(runtime) --framework $(framework) --output ./publish
+- script: dotnet publish $(Build.Repository.Name)/$(Build.Repository.Name).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(runtime) --framework $(framework) --output ./publish
+displayName: Publish
 
-- displayName: Create Installer
-  script: >
+- script: >
     makensis
     /DNAME="$(Build.Repository.Name)"
     /DINSTALLERNAME="setup-$(Build.Repository.Name)-$(VERSION)-$(Build.SourceBranchName)-$(runtime).exe"
@@ -76,4 +75,5 @@ steps:
     /DWEB_SITE="$(Build.Repository.Uri)"
     /DPUBLISH_PATH="$(Build.Repository.LocalPath)/publish"
     setup.nsi
+  displayName: Create Installer
   
