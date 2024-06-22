@@ -16,6 +16,7 @@ variables:
   BRANCH: $(Build.SourceBranchName)
   APPNAME: $[ split(variables['Build.Repository.Name'], '/')[1] ]
   PUBLISH_PATH: '$(Build.StagingDirectory)\publish'
+  OUTPUT_PATH: '$(Build.StagingDirectory)\installer'
 
 steps:
 - task: PowerShell@2
@@ -64,7 +65,7 @@ steps:
 - script: dotnet tool update dotnet-sonarscanner --global
   displayName: Install dotnet-sonarscanner
 
-- script: dotnet restore --nologo --verbosity normal --runtime $(RUNTIME)
+- script: dotnet restore --nologo --verbosity normal --configuration $(buildConfiguration) --runtime $(RUNTIME)
   displayName: Restore
 
 - script: dotnet build --nologo --verbosity normal --no-restore --no-incremental --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework $(FRAMEWORK)
@@ -90,6 +91,7 @@ steps:
     /DMAIN_APP_EXE="$(AUTHORS).$(APPNAME).exe"
     /DWEB_SITE="$(Build.Repository.Uri)"
     /DPUBLISH_PATH="$(PUBLISH_PATH)"
+    /DOUTPUT_PATH="$(OUTPUT_PATH)"
     setup.nsi
   displayName: Create Installer
   

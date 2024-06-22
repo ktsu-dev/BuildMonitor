@@ -1,5 +1,5 @@
-!define APP_NAME $(NAME)
-!define COMP_NAME $(AUTHORS)
+!define APP_NAME ${NAME}
+!define COMP_NAME ${AUTHORS}
 !define INSTALL_TYPE "SetShellVarContext current"
 !define REG_ROOT "HKCU"
 !define REG_APP_PATH "Software\Microsoft\Windows\CurrentVersion\App Paths\${MAIN_APP_EXE}"
@@ -19,7 +19,7 @@ VIAddVersionKey "FileVersion"  "${VERSION}"
 SetCompressor ZLIB
 Name "${APP_NAME}"
 Caption "${APP_NAME}"
-OutFile "${INSTALLER_NAME}"
+OutFile "${OUTPUT_PATH}/${INSTALLER_NAME}"
 BrandingText "${APP_NAME}"
 XPStyle on
 InstallDirRegKey "${REG_ROOT}" "${REG_APP_PATH}" ""
