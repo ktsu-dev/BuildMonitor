@@ -13,10 +13,10 @@ variables:
   buildConfiguration: 'Release'
   RUNTIME: 'win-x64'
   FRAMEWORK: 'net8.0'
-  BRANCH: $(Build.SourceBranchName)
-  APPNAME: $[ split(variables['Build.Repository.Name'], '/')[1] ]
-  PUBLISH_PATH: '$(Build.SourceDirectory)\publish'
-  OUTPUT_PATH: '$(Build.SourceDirectory)\installer'
+  BRANCH: $[variables['Build.SourceBranchName']]
+  APPNAME: $[split(variables['Build.Repository.Name'], '/')[1]]
+  PUBLISH_PATH: $(variables['Build.SourceDirectory'])\publish
+  OUTPUT_PATH: $(variables['Build.SourceDirectory'])\installer
 
 steps:
 - task: PowerShell@2
