@@ -9,24 +9,71 @@ pr:
 pool:
   vmImage: 'windows-latest'
 
+variables:
+  buildConfiguration: 'Release'
+  runtime: 'win-x64'
+  framework: 'net8.0'
+
 steps:
-- script: dotnet tool update dotnet-script --global
-  displayName: Install dotnet-script
+- name: Read Vars
+  task: PowerShell@2
+  inputs:
+    targetType: 'inline'
+    script: |
+      $VERSION = Get-Content -Path VERSION -Raw
+      $VERSION = $VERSION.Trim()
+      Write-Host "##vso[task.setvariable variable=VERSION;]$VERSION"
 
-- script: dotnet tool update dotnet-coverage --global
-  displayName: Install dotnet-coverage
+      $DESCRIPTION = Get-Content -Path DESCRIPTION -Raw
+      $DESCRIPTION = $DESCRIPTION.Trim()
+      Write-Host "##vso[task.setvariable variable=DESCRIPTION;]$DESCRIPTION"
 
-- script: dotnet tool update dotnet-sonarscanner --global
-  displayName: Install dotnet-sonarscanner
+      $AUTHORS = Get-Content -Path AUTHORS -Raw
+      $AUTHORS = $AUTHORS.Trim()
+      Write-Host "##vso[task.setvariable variable=AUTHORS;]$AUTHORS"
+      
+      $LICENSE = Get-Content -Path LICENSE -Raw
+      $LICENSE = $LICENSE.Trim()
+      Write-Host "##vso[task.setvariable variable=LICENSE;]$LICENSE"
 
-- script: dotnet restore -r win-x64
-  displayName: Restore
+      $YEAR = Get-Date -Format "yyyy"
+      Write-Host "##vso[task.setvariable variable=YEAR;]$YEAR"
 
-- script: dotnet build --no-restore --no-incremental -c Release -r win-x64 -f net8.0
-  displayName: Build
+- name: Install dotnet-script
+  script: dotnet tool update dotnet-script --global
 
-- script: dotnet-coverage collect "dotnet test --no-restore --no-build" -f xml -o "coverage.xml"
-  displayName: Test
+- name: Install dotnet-coverage
+  script: dotnet tool update dotnet-coverage --global
 
-- script: dotnet publish -o ./publish --no-restore --no-build --self-contained -c Release -r win-x64 -f net8.0
-  displayName: Publish
+- name: Install dotnet-sonarscanner
+  script: dotnet tool update dotnet-sonarscanner --global
+
+- name: Restore
+  script: dotnet restore --nologo --verbosity normal --runtime $(runtime)
+
+- name: Build
+  script: dotnet build --nologo --verbosity normal --no-restore --no-incremental --configuration $(buildConfiguration) --runtime $(runtime) --framework $(framework)
+
+- name: Test
+  script: dotnet-coverage collect "dotnet test --nologo --verbosity normal --no-build" -f xml -o "coverage.xml"
+
+- name: Publish
+  script: dotnet publish $(Build.Repository.Name)/$(Build.Repository.Name).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(runtime) --framework $(framework) --output ./publish
+
+- name: Create Installer
+  script: >
+  makensis
+  /DNAME="$(Build.Repository.Name)"
+  /DINSTALLERNAME="setup-$(Build.Repository.Name)-$(VERSION)-$(Build.SourceBranchName)-$(runtime).exe"
+  /DPLATFORM="$(AUTHORS)"
+  /DAUTHORS="$(AUTHORS)"
+  /DVERSION="$(VERSION)"
+  /DDESCRIPTION="$(DESCRIPTION)"
+  /DLICENSE="$(LICENSE)"
+  /DCOPYRIGHT="$(AUTHORS) © $(YEAR)"
+  /DYEAR="$(YEAR)"
+  /DMAIN_APP_EXE="$(AUTHORS).$(Build.Repository.Name).exe"
+  /DWEB_SITE="$(Build.Repository.Uri)"
+  /DPUBLISH_PATH="$(Build.Repository.LocalPath)/publish"
+  setup.nsi
+  
