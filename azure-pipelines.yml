@@ -13,7 +13,7 @@ variables:
   buildConfiguration: 'Release'
   RUNTIME: 'win-x64'
   FRAMEWORK: 'net8.0'
-  APPNAME: ${{ split($(Build.Repository.Name), '/')[1] }}
+  APPNAME: $[split($(Build.Repository.Name), '/')[1]]
   BRANCH: $(Build.SourceBranchName)
 
 steps:
