@@ -39,12 +39,17 @@ steps:
       Write-Host "##vso[task.setvariable variable=YEAR;]$YEAR"
 
 - task: PowerShell@2
+  displayName: Make installer version
+  inputs:
+    targetType: 'inline'
+    script: Write-Host "##vso[task.setvariable variable=INSTALLER_VERSION;]$[ split($(VERSION), '-')[0] ]"
+
+- task: PowerShell@2
   displayName: Make installer name if main branch
   condition: eq(variables['Build.SourceBranchName'], 'main')
   inputs:
     targetType: 'inline'
     script: Write-Host "##vso[task.setvariable variable=INSTALLER_NAME;]$(APPNAME)-$(VERSION)-$(RUNTIME).exe"
-
 - task: PowerShell@2
   displayName: Make installer name if not main branch
   condition: not(eq(variables['Build.SourceBranchName'], 'main'))
@@ -79,7 +84,7 @@ steps:
     /DINSTALLER_NAME="$(INSTALLER_NAME)"
     /DPLATFORM="$(AUTHORS)"
     /DAUTHORS="$(AUTHORS)"
-    /DVERSION="$(VERSION)"
+    /DVERSION="$(INSTALLER_VERSION)"
     /DDESCRIPTION="$(DESCRIPTION)"
     /DLICENSE="LICENSE"
     /DCOPYRIGHT="$(AUTHORS) © $(YEAR)"
