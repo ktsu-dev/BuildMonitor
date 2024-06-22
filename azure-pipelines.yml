@@ -129,8 +129,8 @@ steps:
     githubReleaseDraft: false
     githubReleasePrerelease: false
     githubIgnoreAssets: false
-    githubReleaseAsset: '$(OUTPUT_PATH)/*'
-    githubReuseRelease: true
+    githubReleaseAsset: '$(OUTPUT_PATH)\$(INSTALLER_NAME)'
+    githubReuseRelease: false
     githubReuseDraftOnly: false
     githubSkipDuplicatedAssets: true
     githubEditRelease: true
