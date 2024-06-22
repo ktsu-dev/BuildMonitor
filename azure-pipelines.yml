@@ -55,10 +55,10 @@ steps:
   displayName: Build
 
 - script: dotnet-coverage collect "dotnet test --nologo --verbosity normal --no-build" -f xml -o "coverage.xml"
-displayName: Test
+  displayName: Test
 
 - script: dotnet publish $(Build.Repository.Name)/$(Build.Repository.Name).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(runtime) --framework $(framework) --output ./publish
-displayName: Publish
+  displayName: Publish
 
 - script: >
     makensis
