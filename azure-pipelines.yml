@@ -15,8 +15,9 @@ variables:
   FRAMEWORK: 'net8.0'
   BRANCH: $[variables['Build.SourceBranchName']]
   APPNAME: $[split(variables['Build.Repository.Name'], '/')[1]]
-  PUBLISH_PATH: $(variables['Build.SourceDirectory'])\publish
-  OUTPUT_PATH: $(variables['Build.SourceDirectory'])\installer
+  PUBLISH_PATH: $[format('{0}\publish\', variables['Build.SourceDirectory'])]
+  OUTPUT_PATH: $[format('{0}\installer\', variables['Build.SourceDirectory'])]
+  YEAR: $[format('{0:yyyy}', pipeline.startTime)]
 
 steps:
 - task: PowerShell@2
@@ -38,9 +39,6 @@ steps:
       $AUTHORS = Get-Content -Path AUTHORS -Raw
       $AUTHORS = $AUTHORS.Trim()
       Write-Host "##vso[task.setvariable variable=AUTHORS;]$AUTHORS"
-
-      $YEAR = Get-Date -Format "yyyy"
-      Write-Host "##vso[task.setvariable variable=YEAR;]$YEAR"
 
 - task: PowerShell@2
   displayName: Make installer name if main branch
