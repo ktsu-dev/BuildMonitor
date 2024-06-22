@@ -15,8 +15,8 @@ variables:
   FRAMEWORK: 'net8.0'
   BRANCH: $[variables['Build.SourceBranchName']]
   APPNAME: $[split(variables['Build.Repository.Name'], '/')[1]]
-  PUBLISH_PATH: .\publish\
-  OUTPUT_PATH: .\installer\
+  PUBLISH_PATH: '.\publish\'
+  OUTPUT_PATH: '.\installer\'
   YEAR: $[format('{0:yyyy}', pipeline.startTime)]
 
 steps:
@@ -79,18 +79,18 @@ steps:
     makensis
     /NOCD
     /v4
-    /DNAME="$(APPNAME)"
-    /DINSTALLER_NAME="$(INSTALLER_NAME)"
+    /DNAME=$(APPNAME)
+    /DINSTALLER_NAME=$(INSTALLER_NAME)
     /DAUTHORS="$(AUTHORS)"
-    /DVERSION="$(INSTALLER_VERSION).0"
+    /DVERSION=$(INSTALLER_VERSION).0
     /DDESCRIPTION="$(DESCRIPTION)"
-    /DLICENSE="LICENSE"
+    /DLICENSE=LICENSE
     /DCOPYRIGHT="$(AUTHORS) © $(YEAR)"
-    /DYEAR="$(YEAR)"
-    /DMAIN_APP_EXE="$(AUTHORS).$(APPNAME).exe"
-    /DWEB_SITE="$(Build.Repository.Uri)"
-    /DPUBLISH_PATH="$(PUBLISH_PATH)"
-    /DOUTPUT_PATH="$(OUTPUT_PATH)"
+    /DYEAR=$(YEAR)
+    /DMAIN_APP_EXE=$(AUTHORS).$(APPNAME).exe
+    /DWEB_SITE=$(Build.Repository.Uri)
+    /DPUBLISH_PATH=$(PUBLISH_PATH)
+    /DOUTPUT_PATH=$(OUTPUT_PATH)
     setup.nsi
   displayName: Create Installer
   
