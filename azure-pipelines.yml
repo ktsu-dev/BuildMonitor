@@ -62,18 +62,18 @@ steps:
 
 - name: Create Installer
   script: >
-  makensis
-  /DNAME="$(Build.Repository.Name)"
-  /DINSTALLERNAME="setup-$(Build.Repository.Name)-$(VERSION)-$(Build.SourceBranchName)-$(runtime).exe"
-  /DPLATFORM="$(AUTHORS)"
-  /DAUTHORS="$(AUTHORS)"
-  /DVERSION="$(VERSION)"
-  /DDESCRIPTION="$(DESCRIPTION)"
-  /DLICENSE="$(LICENSE)"
-  /DCOPYRIGHT="$(AUTHORS) © $(YEAR)"
-  /DYEAR="$(YEAR)"
-  /DMAIN_APP_EXE="$(AUTHORS).$(Build.Repository.Name).exe"
-  /DWEB_SITE="$(Build.Repository.Uri)"
-  /DPUBLISH_PATH="$(Build.Repository.LocalPath)/publish"
-  setup.nsi
+    makensis
+    /DNAME="$(Build.Repository.Name)"
+    /DINSTALLERNAME="setup-$(Build.Repository.Name)-$(VERSION)-$(Build.SourceBranchName)-$(runtime).exe"
+    /DPLATFORM="$(AUTHORS)"
+    /DAUTHORS="$(AUTHORS)"
+    /DVERSION="$(VERSION)"
+    /DDESCRIPTION="$(DESCRIPTION)"
+    /DLICENSE="$(LICENSE)"
+    /DCOPYRIGHT="$(AUTHORS) © $(YEAR)"
+    /DYEAR="$(YEAR)"
+    /DMAIN_APP_EXE="$(AUTHORS).$(Build.Repository.Name).exe"
+    /DWEB_SITE="$(Build.Repository.Uri)"
+    /DPUBLISH_PATH="$(Build.Repository.LocalPath)/publish"
+    setup.nsi
   
