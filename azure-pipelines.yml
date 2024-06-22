@@ -29,6 +29,10 @@ steps:
       $VERSION = $VERSION.Trim()
       Write-Host "##vso[task.setvariable variable=VERSION;]$VERSION"
 
+      $RELEASE = Get-Content -Path RELEASE -Raw
+      $RELEASE = $RELEASE.Trim()
+      Write-Host "##vso[task.setvariable variable=RELEASE;]$RELEASE"
+
       $INSTALLER_VERSION = $VERSION.Split('-')[0]
       Write-Host "##vso[task.setvariable variable=INSTALLER_VERSION;]$INSTALLER_VERSION"
 
@@ -112,13 +116,8 @@ steps:
     setup.nsi
   displayName: Create Installer
   
-- task: PublishBuildArtifacts@1
-  inputs:
-    PathtoPublish: '$(OUTPUT_PATH)\$(INSTALLER_NAME)'
-    ArtifactName: '$(INSTALLER_NAME)'
-    publishLocation: 'Container'
-
 - task: GitHubReleasePublish@1
+  condition: not(eq(variables['VERSION'], variables['RELEASE']))
   inputs:
     githubEndpoint: 'GitHub - matt-edmondson'
     manuallySetRepository: true
@@ -136,6 +135,23 @@ steps:
     githubEditRelease: true
     githubDeleteEmptyTag: false
     githubTargetCommitsh: '$(Build.SourceVersion)'
+
+- task: PowerShell@2
+  displayName: Update release version
+  condition: not(eq(variables['VERSION'], variables['RELEASE']))
+  inputs:
+    targetType: 'inline'
+    script: $VERSION | Set-Content -Path RELEASE
+
+- script: |
+    git config user.name "Azure Pipeline"
+    git config user.email "ado@ktsu.io"
+  
+    git add RELEASE
+    git commit -m "Update RELEASE from $(RELEASE) to $(VERSION)"
+    git push origin main
+  condition: not(eq(variables['VERSION'], variables['RELEASE']))
+  displayName: Commit updated release version
 
 - task: SonarCloudPublish@2
   continueOnError: true
