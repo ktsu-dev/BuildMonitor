@@ -85,7 +85,7 @@ steps:
     /DYEAR="$(YEAR)"
     /DMAIN_APP_EXE="$(AUTHORS).$(APPNAME).exe"
     /DWEB_SITE="$(Build.Repository.Uri)"
-    /DPUBLISH_PATH="publish"
+    /DPUBLISH_PATH="$(Build.ArtifactStagingDirectory)/publish"
     setup.nsi
   displayName: Create Installer
   
