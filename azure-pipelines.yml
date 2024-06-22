@@ -146,7 +146,7 @@ steps:
 - script: |
     git config user.name "Azure Pipeline"
     git config user.email "ado@ktsu.io"
-  
+    git checkout main --
     git add RELEASE
     git commit -m "Update RELEASE from $(RELEASE) to $(VERSION)"
     git push origin main
