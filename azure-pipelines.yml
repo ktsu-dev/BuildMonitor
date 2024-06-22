@@ -40,6 +40,9 @@ steps:
       $AUTHORS = $AUTHORS.Trim()
       Write-Host "##vso[task.setvariable variable=AUTHORS;]$AUTHORS"
 
+      $AUTHORS_KEY = $AUTHORS.Replace('.', '-')
+      Write-Host "##vso[task.setvariable variable=AUTHORS_KEY;]$AUTHORS_KEY"
+
 - task: PowerShell@2
   displayName: Make installer name if main branch
   condition: eq(variables['Build.SourceBranchName'], 'main')
@@ -65,12 +68,24 @@ steps:
 
 - script: dotnet restore --nologo --verbosity normal --runtime $(RUNTIME)
   displayName: Restore
+- task: SonarCloudPrepare@2
+  inputs:
+    SonarCloud: 'SonarCloud'
+    organization: '$(AUTHORS)'
+    scannerMode: 'MSBuild'
+    projectKey: '$(AUTHORS_KEY)_$(APPNAME)'
+    projectName: '$(APPNAME)'
+    projectVersion: '$(VERSION)'
 
 - script: dotnet build --nologo --verbosity normal --no-restore --no-incremental --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework $(FRAMEWORK)
   displayName: Build
 
 - script: dotnet-coverage collect "dotnet test --nologo --verbosity normal --no-build" -f xml -o "coverage.xml"
   displayName: Test
+
+- task: SonarCloudAnalyze@2
+  inputs:
+    jdkversion: 'JAVA_HOME_21_X64'
 
 - script: dotnet publish $(APPNAME)/$(APPNAME).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework $(FRAMEWORK) --output $(PUBLISH_PATH)
   displayName: Publish
@@ -102,3 +117,7 @@ steps:
     PathtoPublish: '$(OUTPUT_PATH)\$(INSTALLER_NAME)'
     ArtifactName: '$(INSTALLER_NAME)'
     publishLocation: 'Container'
+
+- task: SonarCloudPublish@2
+  inputs:
+    pollingTimeoutSec: '300'
