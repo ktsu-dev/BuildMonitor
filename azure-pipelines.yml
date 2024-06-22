@@ -71,7 +71,7 @@ steps:
 - task: SonarCloudPrepare@2
   inputs:
     SonarCloud: 'SonarCloud'
-    organization: '$(AUTHORS)'
+    organization: '$(AUTHORS_KEY)'
     scannerMode: 'MSBuild'
     projectKey: '$(AUTHORS_KEY)_$(APPNAME)'
     projectName: '$(APPNAME)'
