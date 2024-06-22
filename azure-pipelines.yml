@@ -119,6 +119,7 @@ steps:
     publishLocation: 'Container'
 
 - task: GitHubRelease@1
+  continueOnError: true
   inputs:
     gitHubConnection: 'GitHub - matt-edmondson'
     repositoryName: '$(Build.Repository.Name)'
@@ -132,5 +133,6 @@ steps:
     changeLogType: 'commitBased'
 
 - task: SonarCloudPublish@2
+  continueOnError: true
   inputs:
     pollingTimeoutSec: '300'
