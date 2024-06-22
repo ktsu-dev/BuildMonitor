@@ -125,6 +125,7 @@ steps:
     githubOwner: '$(AUTHORS_KEY)'
     githubRepositoryName: '$(APPNAME)'
     githubTag: 'v$(VERSION)'
+    githubReleaseTitle: 'v$(VERSION)'
     githubReleaseDraft: false
     githubReleasePrerelease: false
     githubIgnoreAssets: false
@@ -132,7 +133,7 @@ steps:
     githubReuseRelease: true
     githubReuseDraftOnly: false
     githubSkipDuplicatedAssets: true
-    githubEditRelease: false
+    githubEditRelease: true
     githubDeleteEmptyTag: false
     githubTargetCommitsh: '$(Build.SourceVersion)'
 
