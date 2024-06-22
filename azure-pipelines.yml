@@ -27,6 +27,9 @@ steps:
       $VERSION = $VERSION.Trim()
       Write-Host "##vso[task.setvariable variable=VERSION;]$VERSION"
 
+      $INSTALLER_VERSION = $VERSION.Split('-')[0]
+      Write-Host "##vso[task.setvariable variable=INSTALLER_VERSION;]$INSTALLER_VERSION"
+
       $DESCRIPTION = Get-Content -Path DESCRIPTION -Raw
       $DESCRIPTION = $DESCRIPTION.Trim()
       Write-Host "##vso[task.setvariable variable=DESCRIPTION;]$DESCRIPTION"
@@ -79,7 +82,7 @@ steps:
     /DINSTALLER_NAME="$(INSTALLER_NAME)"
     /DPLATFORM="$(AUTHORS)"
     /DAUTHORS="$(AUTHORS)"
-    /DVERSION="$($[ split($(VERSION), '-')[0]).0"
+    /DVERSION="$($INSTALLER_VERSION).0"
     /DDESCRIPTION="$(DESCRIPTION)"
     /DLICENSE="LICENSE"
     /DCOPYRIGHT="$(AUTHORS) © $(YEAR)"
