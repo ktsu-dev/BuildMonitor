@@ -15,7 +15,7 @@ variables:
   FRAMEWORK: 'net8.0'
   BRANCH: $(Build.SourceBranchName)
   APPNAME: $[ split(variables['Build.Repository.Name'], '/')[1] ]
-  PUBLISH_PATH: '$(Build.StagingDirectory)/publish'
+  PUBLISH_PATH: '$(Build.StagingDirectory)\publish'
 
 steps:
 - task: PowerShell@2
