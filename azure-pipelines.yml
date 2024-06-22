@@ -118,6 +118,18 @@ steps:
     ArtifactName: '$(INSTALLER_NAME)'
     publishLocation: 'Container'
 
+- task: GitHubRelease@1
+  inputs:
+    gitHubConnection: 'GitHub - matt-edmondson'
+    repositoryName: '$(Build.Repository.Name)'
+    action: 'create'
+    target: '$(Build.SourceVersion)'
+    tagSource: 'userSpecifiedTag'
+    tag: '$(VERSION)'
+    assets: '$(OUTPUT_PATH)/*'
+    changeLogCompareToRelease: 'lastFullRelease'
+    changeLogType: 'commitBased'
+
 - task: SonarCloudPublish@2
   inputs:
     pollingTimeoutSec: '300'
