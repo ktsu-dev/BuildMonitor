@@ -15,6 +15,7 @@ variables:
   FRAMEWORK: 'net8.0'
   BRANCH: $(Build.SourceBranchName)
   APPNAME: $[ split(variables['Build.Repository.Name'], '/')[1] ]
+  PUBLISH_PATH: '$(Build.StagingDirectory)/publish'
 
 steps:
 - task: PowerShell@2
@@ -69,7 +70,7 @@ steps:
 - script: dotnet-coverage collect "dotnet test --nologo --verbosity normal --no-build" -f xml -o "coverage.xml"
   displayName: Test
 
-- script: dotnet publish $(APPNAME)/$(APPNAME).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework $(FRAMEWORK) --output ./publish
+- script: dotnet publish $(APPNAME)/$(APPNAME).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework $(FRAMEWORK) --output $(PUBLISH_PATH)
   displayName: Publish
 
 - script: >
@@ -85,7 +86,7 @@ steps:
     /DYEAR="$(YEAR)"
     /DMAIN_APP_EXE="$(AUTHORS).$(APPNAME).exe"
     /DWEB_SITE="$(Build.Repository.Uri)"
-    /DPUBLISH_PATH="$(Build.ArtifactStagingDirectory)/publish"
+    /DPUBLISH_PATH="$(PUBLISH_PATH)"
     setup.nsi
   displayName: Create Installer
   
