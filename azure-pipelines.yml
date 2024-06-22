@@ -78,7 +78,7 @@ steps:
 - script: >
     makensis
     /NOCD
-    /v 4
+    /v4
     /DNAME="$(APPNAME)"
     /DINSTALLER_NAME="$(INSTALLER_NAME)"
     /DAUTHORS="$(AUTHORS)"
