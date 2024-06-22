@@ -42,14 +42,14 @@ steps:
   condition: eq(variables['Build.SourceBranchName'], 'main')
   inputs:
     targetType: 'inline'
-    script: Write-Host "##vso[task.setvariable variable=INSTALLER_NAME;]setup-$(APPNAME)-$(VERSION)-$(RUNTIME).exe"
+    script: Write-Host "##vso[task.setvariable variable=INSTALLER_NAME;]$(APPNAME)-$(VERSION)-$(RUNTIME).exe"
 
 - task: PowerShell@2
   displayName: Make installer name if not main branch
   condition: not(eq(variables['Build.SourceBranchName'], 'main'))
   inputs:
     targetType: 'inline'
-    script: Write-Host "##vso[task.setvariable variable=INSTALLER_NAME;]setup-$(APPNAME)-$(BRANCH)-$(VERSION)-$(RUNTIME).exe"
+    script: Write-Host "##vso[task.setvariable variable=INSTALLER_NAME;]$(APPNAME)-$(BRANCH)-$(VERSION)-$(RUNTIME).exe"
 
 - script: dotnet tool update dotnet-script --global
   displayName: Install dotnet-script
@@ -85,7 +85,7 @@ steps:
     /DYEAR="$(YEAR)"
     /DMAIN_APP_EXE="$(AUTHORS).$(APPNAME).exe"
     /DWEB_SITE="$(Build.Repository.Uri)"
-    /DPUBLISH_PATH="$(APPNAME)/publish"
+    /DPUBLISH_PATH="publish"
     setup.nsi
   displayName: Create Installer
   

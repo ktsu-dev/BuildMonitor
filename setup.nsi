@@ -71,7 +71,7 @@ ${INSTALL_TYPE}
 SetOverwrite ifnewer
 SetOutPath "$INSTDIR"
 
-File /r "${PUBLISH_PATH}\*"
+File /r "${PUBLISH_PATH}/*"
 
 SectionEnd
 
