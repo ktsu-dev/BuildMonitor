@@ -126,6 +126,7 @@ steps:
     target: '$(Build.SourceVersion)'
     tagSource: 'userSpecifiedTag'
     tag: '$(VERSION)'
+    releaseNotesSource: 'inline'
     assets: '$(OUTPUT_PATH)/*'
     changeLogCompareToRelease: 'lastFullRelease'
     changeLogType: 'commitBased'
