@@ -15,8 +15,8 @@ variables:
   FRAMEWORK: 'net8.0'
   BRANCH: $(Build.SourceBranchName)
   APPNAME: $[ split(variables['Build.Repository.Name'], '/')[1] ]
-  PUBLISH_PATH: '$(Build.ArtifactStagingDirectory)\publish'
-  OUTPUT_PATH: '$(Build.ArtifactStagingDirectory)\installer'
+  PUBLISH_PATH: '$(Build.SourceDirectory)\publish'
+  OUTPUT_PATH: '$(Build.SourceDirectory)\installer'
 
 steps:
 - task: PowerShell@2
@@ -79,9 +79,10 @@ steps:
 
 - script: >
     makensis
+    /NOCD
+    /v 4
     /DNAME="$(APPNAME)"
     /DINSTALLER_NAME="$(INSTALLER_NAME)"
-    /DPLATFORM="$(AUTHORS)"
     /DAUTHORS="$(AUTHORS)"
     /DVERSION="$(INSTALLER_VERSION).0"
     /DDESCRIPTION="$(DESCRIPTION)"
@@ -97,6 +98,6 @@ steps:
   
 - task: PublishBuildArtifacts@1
   inputs:
-    PathtoPublish: '$(Build.ArtifactStagingDirectory)\$(OUTPUT_PATH)\$(INSTALLER_NAME)'
+    PathtoPublish: '$(OUTPUT_PATH)\$(INSTALLER_NAME)'
     ArtifactName: '$(INSTALLER_NAME)'
     publishLocation: 'Container'
