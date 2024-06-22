@@ -26,22 +26,22 @@ steps:
     targetType: 'inline'
     script: |
       $VERSION = Get-Content -Path VERSION -Raw
-      $VERSION = $VERSION.Trim()
+      if($VERSION) { $VERSION = $VERSION.Trim() } else $VERSION = ""
       Write-Host "##vso[task.setvariable variable=VERSION;]$VERSION"
 
       $RELEASE = Get-Content -Path RELEASE -Raw
-      $RELEASE = $RELEASE.Trim()
+      if($RELEASE) { $RELEASE = $RELEASE.Trim() } else $RELEASE = ""
       Write-Host "##vso[task.setvariable variable=RELEASE;]$RELEASE"
 
       $INSTALLER_VERSION = $VERSION.Split('-')[0]
       Write-Host "##vso[task.setvariable variable=INSTALLER_VERSION;]$INSTALLER_VERSION"
 
       $DESCRIPTION = Get-Content -Path DESCRIPTION -Raw
-      $DESCRIPTION = $DESCRIPTION.Trim()
+      if($DESCRIPTION) { $DESCRIPTION = $DESCRIPTION.Trim() } else $DESCRIPTION = ""
       Write-Host "##vso[task.setvariable variable=DESCRIPTION;]$DESCRIPTION"
 
       $AUTHORS = Get-Content -Path AUTHORS -Raw
-      $AUTHORS = $AUTHORS.Trim()
+      if($AUTHORS) { $AUTHORS = $AUTHORS.Trim() } else $AUTHORS = ""
       Write-Host "##vso[task.setvariable variable=AUTHORS;]$AUTHORS"
 
       $AUTHORS_KEY = $AUTHORS.Replace('.', '-')
