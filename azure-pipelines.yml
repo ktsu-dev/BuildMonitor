@@ -139,7 +139,7 @@ steps:
 - script: |
     git config user.name "Azure Pipeline"
     git config user.email "ado@ktsu.io"
-    git switch -v -
+    git switch -
   condition: not(eq(variables['VERSION'], variables['RELEASE']))
   displayName: Prepare to cupdate release version
 - task: PowerShell@2
