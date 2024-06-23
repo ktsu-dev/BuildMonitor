@@ -28,6 +28,7 @@ InstallDir "$PROGRAMFILES\${APP_NAME}"
 ######################################################################
 
 !include "MUI.nsh"
+!include "DotNetCore.nsh"
 
 !define MUI_ABORTWARNING
 !define MUI_UNABORTWARNING
@@ -57,6 +58,8 @@ InstallDir "$PROGRAMFILES\${APP_NAME}"
 !insertmacro MUI_UNPAGE_CONFIRM
 
 !insertmacro MUI_UNPAGE_INSTFILES
+
+!insertmacro CheckDotNetCore 8.0
 
 !insertmacro MUI_UNPAGE_FINISH
 
