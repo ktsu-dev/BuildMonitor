@@ -23,7 +23,7 @@ OutFile "${OUTPUT_PATH}/${INSTALLER_NAME}"
 BrandingText "${APP_NAME}"
 XPStyle on
 InstallDirRegKey "${REG_ROOT}" "${REG_APP_PATH}" ""
-InstallDir "$PROGRAMFILES\${APP_NAME}"
+InstallDir "$PROGRAMFILES64\${APP_NAME}"
 
 ######################################################################
 
