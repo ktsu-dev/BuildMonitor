@@ -150,7 +150,7 @@ steps:
     githubReleaseDraft: false
     githubReleasePrerelease: false
     githubIgnoreAssets: false
-    githubReleaseAsset: '$(OUTPUT_PATH)\$(INSTALLER_NAME)'
+    githubReleaseAsset: '$(OUTPUT_PATH)\$(APPNAME)-$(RELEASE_NAME).exe'
     githubReuseRelease: false
     githubReuseDraftOnly: false
     githubSkipDuplicatedAssets: true
