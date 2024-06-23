@@ -20,6 +20,21 @@ variables:
   YEAR: $[format('{0:yyyy}', pipeline.startTime)]
 
 steps:
+- checkout: self
+  clean: true
+  persistCredentials: true
+  fetchDepth: 0
+  fetchTags: true
+  lfs: true
+  submodules: 'recursive'
+
+- script: |
+    git config user.name "Azure Pipeline"
+    git config user.email "ado@ktsu.io"
+    git fetch --all
+    git branch -D `basename $(Build.SourceBranch)` || true
+    git switch `basename $(Build.SourceBranch)`
+
 - task: PowerShell@2
   displayName: Init Vars
   inputs:
@@ -136,12 +151,6 @@ steps:
     githubDeleteEmptyTag: false
     githubTargetCommitsh: '$(Build.SourceVersion)'
 
-- script: |
-    git config user.name "Azure Pipeline"
-    git config user.email "ado@ktsu.io"
-    git switch -
-  condition: not(eq(variables['VERSION'], variables['RELEASE']))
-  displayName: Prepare to cupdate release version
 - task: PowerShell@2
   displayName: Update release version
   condition: not(eq(variables['VERSION'], variables['RELEASE']))
@@ -150,9 +159,9 @@ steps:
     script: $VERSION | Set-Content -Path RELEASE
 
 - script: |
-    git add -v RELEASE
-    git commit -v -m "Update RELEASE from $(RELEASE) to $(VERSION)"
-    git push -v
+    git add RELEASE
+    git commit -m "Update RELEASE from $(RELEASE) to $(VERSION)"
+    git push
   condition: not(eq(variables['VERSION'], variables['RELEASE']))
   displayName: Commit updated release version
 
