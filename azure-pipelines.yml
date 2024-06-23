@@ -161,7 +161,7 @@ steps:
 
 - script: |
     git add RELEASE
-    git commit -m "Update RELEASE from $(RELEASE) to $(VERSION)"
+    git commit -m "[skip ci] Update RELEASE from $(RELEASE) to $(VERSION)"
     git push
   condition: not(eq(variables['VERSION'], variables['RELEASE']))
   displayName: Commit updated release version
