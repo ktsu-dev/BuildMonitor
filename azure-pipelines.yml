@@ -41,20 +41,23 @@ steps:
   inputs:
     targetType: 'inline'
     script: |
+      if(!Test-Path VERSION -PathType Leaf) { New-Item -Path . -Name "VERSION" -ItemType "file" -Value "1.0.0.alpha.1"}
       $VERSION = Get-Content -Path VERSION -Raw
       if($VERSION) { $VERSION = $VERSION.Trim() } else { $VERSION = "" }
       Write-Host "##vso[task.setvariable variable=VERSION;]$VERSION"
 
-      New-Item -Path . -Name "RELEASES" -ItemType "file"
+      if(!Test-Path RELEASES -PathType Leaf) { New-Item -Path . -Name "RELEASES" -ItemType "file" }
       Get-Content -Path RELEASES | ForEach-Object { Write-Host "##vso[task.setvariable variable=$__RELEASED;]true" }
 
       $INSTALLER_VERSION = $VERSION.Split('-')[0]
       Write-Host "##vso[task.setvariable variable=INSTALLER_VERSION;]$INSTALLER_VERSION"
 
+      if(!Test-Path DESCRIPTION -PathType Leaf) { New-Item -Path . -Name "DESCRIPTION" -ItemType "file" -Value "$(APPNAME)"}
       $DESCRIPTION = Get-Content -Path DESCRIPTION -Raw
       if($DESCRIPTION) { $DESCRIPTION = $DESCRIPTION.Trim() } else { $DESCRIPTION = "" }
       Write-Host "##vso[task.setvariable variable=DESCRIPTION;]$DESCRIPTION"
 
+      if(!Test-Path AUTHORS -PathType Leaf) { New-Item -Path . -Name "AUTHORS" -ItemType "file" }
       $AUTHORS = Get-Content -Path AUTHORS -Raw
       if($AUTHORS) { $AUTHORS = $AUTHORS.Trim() } else { $AUTHORS = "" }
       Write-Host "##vso[task.setvariable variable=AUTHORS;]$AUTHORS"
