@@ -32,8 +32,8 @@ steps:
     git config user.name "Azure Pipeline"
     git config user.email "ado@ktsu.io"
     git fetch --all
-    git branch -D `basename $(Build.SourceBranch)` || true
-    git switch `basename $(Build.SourceBranch)`
+    git branch -D $(BRANCH) || true
+    git switch $(BRANCH)
 
 - task: PowerShell@2
   displayName: Init Vars
