@@ -136,6 +136,12 @@ steps:
     githubDeleteEmptyTag: false
     githubTargetCommitsh: '$(Build.SourceVersion)'
 
+- script: |
+    git config user.name "Azure Pipeline"
+    git config user.email "ado@ktsu.io"
+    git switch -v -
+  condition: not(eq(variables['VERSION'], variables['RELEASE']))
+  displayName: Prepare to cupdate release version
 - task: PowerShell@2
   displayName: Update release version
   condition: not(eq(variables['VERSION'], variables['RELEASE']))
@@ -144,8 +150,6 @@ steps:
     script: $VERSION | Set-Content -Path RELEASE
 
 - script: |
-    git config user.name "Azure Pipeline"
-    git config user.email "ado@ktsu.io"
     git add -v RELEASE
     git commit -v -m "Update RELEASE from $(RELEASE) to $(VERSION)"
     git push -v
