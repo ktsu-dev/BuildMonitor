@@ -44,9 +44,7 @@ steps:
       if($VERSION) { $VERSION = $VERSION.Trim() } else { $VERSION = "" }
       Write-Host "##vso[task.setvariable variable=VERSION;]$VERSION"
 
-      $RELEASE = Get-Content -Path RELEASE -Raw
-      if($RELEASE) { $RELEASE = $RELEASE.Trim() } else { $RELEASE = "" }
-      Write-Host "##vso[task.setvariable variable=RELEASE;]$RELEASE"
+      Get-Content -Path RELEASES | ForEach-Object { Write-Host "##vso[task.setvariable variable=$__RELEASED;]true" }
 
       $INSTALLER_VERSION = $VERSION.Split('-')[0]
       Write-Host "##vso[task.setvariable variable=INSTALLER_VERSION;]$INSTALLER_VERSION"
@@ -63,107 +61,115 @@ steps:
       Write-Host "##vso[task.setvariable variable=AUTHORS_KEY;]$AUTHORS_KEY"
 
 - task: PowerShell@2
-  displayName: Make installer name if main branch
-  condition: eq(variables['Build.SourceBranchName'], 'main')
+  displayName: Make release name
   inputs:
     targetType: 'inline'
-    script: Write-Host "##vso[task.setvariable variable=INSTALLER_NAME;]$(APPNAME)-$(VERSION)-$(RUNTIME).exe"
+    script: Write-Host "##vso[task.setvariable variable=RELEASE_NAME;]$(VERSION)-$(RUNTIME)"
 
 - task: PowerShell@2
-  displayName: Make installer name if not main branch
-  condition: not(eq(variables['Build.SourceBranchName'], 'main'))
+  displayName: Append branch to release name
+  condition: not(eq(variables['BRANCH'], 'main'))
   inputs:
     targetType: 'inline'
-    script: Write-Host "##vso[task.setvariable variable=INSTALLER_NAME;]$(APPNAME)-$(BRANCH)-$(VERSION)-$(RUNTIME).exe"
+    script: Write-Host "##vso[task.setvariable variable=RELEASE_NAME;]$(RELEASE_NAME)-$(BRANCH)"
 
-- script: dotnet tool update dotnet-script --global
-  displayName: Install dotnet-script
-
-- script: dotnet tool update dotnet-coverage --global
-  displayName: Install dotnet-coverage
-
-- script: dotnet tool update dotnet-sonarscanner --global
-  displayName: Install dotnet-sonarscanner
-
-- script: dotnet restore --nologo --verbosity normal --runtime $(RUNTIME)
-  displayName: Restore
-- task: SonarCloudPrepare@2
+- task: PowerShell@2
+  displayName: Test if current version has already been released
+  condition: not(eq(variables['$(RELEASE_NAME)_RELEASED'], 'true'))
   inputs:
-    SonarCloud: 'SonarCloud'
-    organization: '$(AUTHORS_KEY)'
-    scannerMode: 'MSBuild'
-    projectKey: '$(AUTHORS_KEY)_$(APPNAME)'
-    projectName: '$(APPNAME)'
-    projectVersion: '$(VERSION)'
+    targetType: 'inline'
+    script: Write-Host "##vso[task.setvariable variable=SHOULD_RELEASE;]true"
 
-- script: dotnet build --nologo --verbosity normal --no-restore --no-incremental --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework $(FRAMEWORK)
-  displayName: Build
+# - script: dotnet tool update dotnet-script --global
+#   displayName: Install dotnet-script
 
-- script: dotnet-coverage collect "dotnet test --nologo --verbosity normal --no-build" -f xml -o "coverage.xml"
-  displayName: Test
+# - script: dotnet tool update dotnet-coverage --global
+#   displayName: Install dotnet-coverage
 
-- task: SonarCloudAnalyze@2
-  inputs:
-    jdkversion: 'JAVA_HOME_21_X64'
+# - script: dotnet tool update dotnet-sonarscanner --global
+#   displayName: Install dotnet-sonarscanner
 
-- script: dotnet publish $(APPNAME)/$(APPNAME).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework $(FRAMEWORK) --output $(PUBLISH_PATH)
-  displayName: Publish
+# - script: dotnet restore --nologo --verbosity normal --runtime $(RUNTIME)
+#   displayName: Restore
+# - task: SonarCloudPrepare@2
+#   inputs:
+#     SonarCloud: 'SonarCloud'
+#     organization: '$(AUTHORS_KEY)'
+#     scannerMode: 'MSBuild'
+#     projectKey: '$(AUTHORS_KEY)_$(APPNAME)'
+#     projectName: '$(APPNAME)'
+#     projectVersion: '$(VERSION)'
 
-- script: mkdir -p $(OUTPUT_PATH)
-  displayName: Create installer directory
+# - script: dotnet build --nologo --verbosity normal --no-restore --no-incremental --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework $(FRAMEWORK)
+#   displayName: Build
 
-- script: >
-    makensis
-    /NOCD
-    /v4
-    /DNAME=$(APPNAME)
-    /DINSTALLER_NAME=$(INSTALLER_NAME)
-    /DAUTHORS="$(AUTHORS)"
-    /DVERSION=$(INSTALLER_VERSION).0
-    /DDESCRIPTION="$(DESCRIPTION)"
-    /DLICENSE=LICENSE
-    /DCOPYRIGHT="$(AUTHORS) © $(YEAR)"
-    /DYEAR=$(YEAR)
-    /DMAIN_APP_EXE=$(AUTHORS).$(APPNAME).exe
-    /DWEB_SITE=$(Build.Repository.Uri)
-    /DPUBLISH_PATH=$(PUBLISH_PATH)
-    /DOUTPUT_PATH=$(OUTPUT_PATH)
-    setup.nsi
-  displayName: Create Installer
+# - script: dotnet-coverage collect "dotnet test --nologo --verbosity normal --no-build" -f xml -o "coverage.xml"
+#   displayName: Test
+
+# - task: SonarCloudAnalyze@2
+#   inputs:
+#     jdkversion: 'JAVA_HOME_21_X64'
+
+# - script: dotnet publish $(APPNAME)/$(APPNAME).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework $(FRAMEWORK) --output $(PUBLISH_PATH)
+#   displayName: Publish
+
+# - script: mkdir -p $(OUTPUT_PATH)
+#   displayName: Create installer directory
+
+# - script: >
+#     makensis
+#     /NOCD
+#     /v4
+#     /DNAME=$(APPNAME)
+#     /DINSTALLER_NAME=$(APPNAME)-$(RELEASE_NAME).exe
+#     /DAUTHORS="$(AUTHORS)"
+#     /DVERSION=$(INSTALLER_VERSION).0
+#     /DDESCRIPTION="$(DESCRIPTION)"
+#     /DLICENSE=LICENSE
+#     /DCOPYRIGHT="$(AUTHORS) © $(YEAR)"
+#     /DYEAR=$(YEAR)
+#     /DMAIN_APP_EXE=$(AUTHORS).$(APPNAME).exe
+#     /DWEB_SITE=$(Build.Repository.Uri)
+#     /DPUBLISH_PATH=$(PUBLISH_PATH)
+#     /DOUTPUT_PATH=$(OUTPUT_PATH)
+#     setup.nsi
+#   displayName: Create Installer
   
-- task: GitHubReleasePublish@1
-  condition: not(eq(variables['VERSION'], variables['RELEASE']))
-  continueOnError: true
-  inputs:
-    githubEndpoint: 'GitHub - matt-edmondson'
-    manuallySetRepository: true
-    githubOwner: '$(AUTHORS_KEY)'
-    githubRepositoryName: '$(APPNAME)'
-    githubTag: 'v$(VERSION)'
-    githubReleaseTitle: 'v$(VERSION)'
-    githubReleaseDraft: false
-    githubReleasePrerelease: false
-    githubIgnoreAssets: false
-    githubReleaseAsset: '$(OUTPUT_PATH)\$(INSTALLER_NAME)'
-    githubReuseRelease: false
-    githubReuseDraftOnly: false
-    githubSkipDuplicatedAssets: true
-    githubEditRelease: true
-    githubDeleteEmptyTag: false
-    githubTargetCommitsh: '$(Build.SourceVersion)'
+# - task: GitHubReleasePublish@1
+#   condition: not(eq(variables['SHOULD_RELEASE'], 'true'))
+#   continueOnError: true
+#   inputs:
+#     githubEndpoint: 'GitHub - matt-edmondson'
+#     manuallySetRepository: true
+#     githubOwner: '$(AUTHORS_KEY)'
+#     githubRepositoryName: '$(APPNAME)'
+#     githubTag: '$(RELEASE_NAME)'
+#     githubReleaseTitle: '$(RELEASE_NAME)'
+#     githubReleaseDraft: false
+#     githubReleasePrerelease: false
+#     githubIgnoreAssets: false
+#     githubReleaseAsset: '$(OUTPUT_PATH)\$(INSTALLER_NAME)'
+#     githubReuseRelease: false
+#     githubReuseDraftOnly: false
+#     githubSkipDuplicatedAssets: true
+#     githubEditRelease: true
+#     githubDeleteEmptyTag: false
+#     githubTargetCommitsh: '$(Build.SourceVersion)'
 
 - task: PowerShell@2
   displayName: Update release version
-  condition: not(eq(variables['VERSION'], variables['RELEASE']))
+  condition: not(eq(variables['SHOULD_RELEASE'], 'true'))
   inputs:
     targetType: 'inline'
-    script: New-Item -Path . -Name "RELEASE" -ItemType "file" -Value "$(VERSION)" -Force
+    script: |
+      New-Item -Path . -Name "RELEASES" -ItemType "file"
+      Add-Content -Path ".\RELEASES" -Value "$(RELEASE_NAME)"
 
 - script: |
     git add RELEASE
-    git commit -m "[skip ci] Update RELEASE from $(RELEASE) to $(VERSION)"
+    git commit -m "[skip ci] Update RELEASE from $(RELEASE) to $(RELEASE_NAME)"
     git push
-  condition: not(eq(variables['VERSION'], variables['RELEASE']))
+  condition: not(eq(variables['SHOULD_RELEASE'], 'true'))
   displayName: Commit updated release version
 
 - task: SonarCloudPublish@2
