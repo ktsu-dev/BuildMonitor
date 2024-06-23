@@ -121,6 +121,7 @@ WriteRegStr ${REG_ROOT} "${UNINSTALL_PATH}"  "URLInfoAbout" "${WEB_SITE}"
 SectionEnd
 
 ######################################################################
+RequestExecutionLevel admin
 
 Section Uninstall
 ${INSTALL_TYPE}
