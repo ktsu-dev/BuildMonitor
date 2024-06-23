@@ -59,8 +59,6 @@ InstallDir "$PROGRAMFILES\${APP_NAME}"
 
 !insertmacro MUI_UNPAGE_INSTFILES
 
-!insertmacro CheckDotNetCore 8.0
-
 !insertmacro MUI_UNPAGE_FINISH
 
 !insertmacro MUI_LANGUAGE "English"
@@ -75,6 +73,8 @@ SetOverwrite ifnewer
 SetOutPath "$INSTDIR"
 
 File /r "${PUBLISH_PATH}\*"
+
+!insertmacro CheckDotNetCore 8.0
 
 SectionEnd
 
