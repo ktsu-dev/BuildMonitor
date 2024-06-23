@@ -44,6 +44,7 @@ steps:
       if($VERSION) { $VERSION = $VERSION.Trim() } else { $VERSION = "" }
       Write-Host "##vso[task.setvariable variable=VERSION;]$VERSION"
 
+      New-Item -Path . -Name "RELEASES" -ItemType "file"
       Get-Content -Path RELEASES | ForEach-Object { Write-Host "##vso[task.setvariable variable=$__RELEASED;]true" }
 
       $INSTALLER_VERSION = $VERSION.Split('-')[0]
@@ -162,7 +163,6 @@ steps:
   inputs:
     targetType: 'inline'
     script: |
-      New-Item -Path . -Name "RELEASES" -ItemType "file"
       Add-Content -Path ".\RELEASES" -Value "$(RELEASE_NAME)"
 
 - script: |
