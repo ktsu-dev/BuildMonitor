@@ -34,6 +34,7 @@ steps:
     git fetch --all
     git branch -D $(BRANCH) || true
     git switch $(BRANCH)
+  displayName: Configure git
 
 - task: PowerShell@2
   displayName: Init Vars
@@ -137,7 +138,7 @@ steps:
 #   displayName: Create Installer
   
 # - task: GitHubReleasePublish@1
-#   condition: not(eq(variables['SHOULD_RELEASE'], 'true'))
+#   condition: eq(variables['SHOULD_RELEASE'], 'true')
 #   continueOnError: true
 #   inputs:
 #     githubEndpoint: 'GitHub - matt-edmondson'
@@ -159,20 +160,20 @@ steps:
 
 - task: PowerShell@2
   displayName: Update release version
-  condition: not(eq(variables['SHOULD_RELEASE'], 'true'))
+  condition: eq(variables['SHOULD_RELEASE'], 'true')
   inputs:
     targetType: 'inline'
     script: |
       Add-Content -Path ".\RELEASES" -Value "$(RELEASE_NAME)"
 
 - script: |
-    git add RELEASE
-    git commit -m "[skip ci] Update RELEASE from $(RELEASE) to $(RELEASE_NAME)"
+    git add RELEASES
+    git commit -m "[skip ci] Add $(RELEASE_NAME) to RELEASES"
     git push
-  condition: not(eq(variables['SHOULD_RELEASE'], 'true'))
+  condition: eq(variables['SHOULD_RELEASE'], 'true')
   displayName: Commit updated release version
 
-- task: SonarCloudPublish@2
-  continueOnError: true
-  inputs:
-    pollingTimeoutSec: '300'
+# - task: SonarCloudPublish@2
+#   continueOnError: true
+#   inputs:
+#     pollingTimeoutSec: '300'
