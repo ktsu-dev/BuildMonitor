@@ -146,9 +146,9 @@ steps:
 - script: |
     git config user.name "Azure Pipeline"
     git config user.email "ado@ktsu.io"
-    git add RELEASE
-    git commit -m "Update RELEASE from $(RELEASE) to $(VERSION)"
-    git push origin main
+    git add -v RELEASE
+    git commit -v -m "Update RELEASE from $(RELEASE) to $(VERSION)"
+    git push -v
   condition: not(eq(variables['VERSION'], variables['RELEASE']))
   displayName: Commit updated release version
 
