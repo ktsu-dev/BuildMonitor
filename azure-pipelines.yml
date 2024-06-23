@@ -156,7 +156,7 @@ steps:
   condition: not(eq(variables['VERSION'], variables['RELEASE']))
   inputs:
     targetType: 'inline'
-    script: $VERSION | Set-Content -Path RELEASE
+    script: New-Item -Path . -Name "RELEASE" -ItemType "file" -Value "$(VERSION)" -Force
 
 - script: |
     git add RELEASE
