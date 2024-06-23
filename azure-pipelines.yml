@@ -133,6 +133,7 @@ steps:
   
 - task: GitHubReleasePublish@1
   condition: not(eq(variables['VERSION'], variables['RELEASE']))
+  continueOnError: true
   inputs:
     githubEndpoint: 'GitHub - matt-edmondson'
     manuallySetRepository: true
