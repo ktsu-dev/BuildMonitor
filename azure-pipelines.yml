@@ -48,7 +48,7 @@ steps:
       if(!(Test-Path RELEASES -PathType Leaf)) { New-Item -Path . -Name "RELEASES" -ItemType "file" }
       Get-Content -Path RELEASES | ForEach-Object {
         if($_) {
-          Write-Host "##vso[task.setvariable variable=RELEASED_$_"
+          Write-Host "##vso[task.setvariable variable=RELEASED_$_;]true"
         }
       }
 
