@@ -89,7 +89,7 @@ steps:
     targetType: 'inline'
     script: |
       $RELEASE_KEY = "$(RELEASE_NAME)".Replace('.', '_').Replace('-', '_')
-      Write-Host "##vso[task.setvariable variable=RELEASE_KEY;]$(RELEASE_KEY)"
+      Write-Host "##vso[task.setvariable variable=RELEASE_KEY;]$RELEASE_KEY"
 
 - task: PowerShell@2
   displayName: Test if current version has already been released
