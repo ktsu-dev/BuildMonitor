@@ -48,9 +48,7 @@ steps:
       if(!(Test-Path RELEASES -PathType Leaf)) { New-Item -Path . -Name "RELEASES" -ItemType "file" }
       Get-Content -Path RELEASES | ForEach-Object {
         if($_) {
-
-          Write-Host "##vso[task.setvariable variable=$_" -NoNewline
-          Write-Host "_RELEASED;]true"
+          Write-Host "##vso[task.setvariable variable=RELEASED_$_"
         }
       }
 
@@ -93,7 +91,7 @@ steps:
 
 - task: PowerShell@2
   displayName: Test if current version has already been released
-  condition: not(eq(variables['$(RELEASE_KEY)_RELEASED'], 'true'))
+  condition: not(eq(variables['RELEASED_$(RELEASE_KEY)'], 'true'))
   inputs:
     targetType: 'inline'
     script: Write-Host "##vso[task.setvariable variable=SHOULD_RELEASE;]true"
