@@ -62,6 +62,8 @@
     <AnalysisLevel>latest-all</AnalysisLevel>
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
+    <PublishReadyToRun>true</PublishReadyToRun>
+    <PublishSingleFile>true</PublishSingleFile>
     <RunSettingsFilePath>$([System.IO.Path]::Combine($(SolutionDirectory), ".runsettings").Trim())</RunSettingsFilePath>
     <EditorConfigFilePath>$([System.IO.Path]::Combine($(SolutionDirectory), ".editorconfig").Trim())</EditorConfigFilePath>
     <GitAttributesFilePath>$([System.IO.Path]::Combine($(SolutionDirectory), ".gitattributes").Trim())</GitAttributesFilePath>
