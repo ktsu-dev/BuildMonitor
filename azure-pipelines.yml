@@ -89,6 +89,11 @@ steps:
     targetType: 'inline'
     script: Write-Host "##vso[task.setvariable variable=SHOULD_RELEASE;]true"
 
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    useGlobalJson: true
+
 - script: dotnet tool update dotnet-script --global
   displayName: Install dotnet-script
 
@@ -117,9 +122,9 @@ steps:
 
 - task: SonarCloudAnalyze@2
   inputs:
-    jdkversion: 'JAVA_HOME_21_X64'
+    jdkversion: 'JAVA_HOME_17_X64'
 
-- script: dotnet publish $(APPNAME)/$(APPNAME).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(RUNTIME) --output $(PUBLISH_PATH)
+- script: dotnet publish $(APPNAME)/$(APPNAME).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework net8.0 --output $(PUBLISH_PATH)
   displayName: Publish
 
 - script: mkdir -p $(OUTPUT_PATH)
