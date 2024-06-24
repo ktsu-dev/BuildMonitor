@@ -1,6 +1,6 @@
 // Ignore Spelling: workflow workflows
 
-namespace ktsu.io.BuildMonitor;
+namespace ktsu.BuildMonitor;
 
 using System.Globalization;
 using System.Threading.Tasks;

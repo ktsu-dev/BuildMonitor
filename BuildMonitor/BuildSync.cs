@@ -1,6 +1,6 @@
 // Ignore Spelling: App
 
-namespace ktsu.io.BuildMonitor;
+namespace ktsu.BuildMonitor;
 
 using System.Diagnostics;
 

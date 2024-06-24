@@ -1,4 +1,4 @@
-namespace ktsu.io.BuildMonitor;
+namespace ktsu.BuildMonitor;
 
 using System.Collections.Concurrent;
 using ktsu.io.StrongStrings;
