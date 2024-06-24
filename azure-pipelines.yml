@@ -46,7 +46,12 @@ steps:
       Write-Host "##vso[task.setvariable variable=VERSION;]$VERSION"
 
       if(!(Test-Path RELEASES -PathType Leaf)) { New-Item -Path . -Name "RELEASES" -ItemType "file" }
-      Get-Content -Path RELEASES | ForEach-Object { Write-Host "##vso[task.setvariable variable=$__RELEASED;]true" }
+      Get-Content -Path RELEASES | ForEach-Object {
+        if($_) {
+          Write-Host "##vso[task.setvariable variable=$_" -NoNewline
+          Write-Host "_RELEASED;]true"
+        }
+      }
 
       $INSTALLER_VERSION = $VERSION.Split('-')[0]
       Write-Host "##vso[task.setvariable variable=INSTALLER_VERSION;]$INSTALLER_VERSION"
@@ -84,6 +89,11 @@ steps:
     targetType: 'inline'
     script: Write-Host "##vso[task.setvariable variable=SHOULD_RELEASE;]true"
 
+- task: UseDotNet@2
+  inputs:
+    packageType: 'sdk'
+    useGlobalJson: true
+
 - script: dotnet tool update dotnet-script --global
   displayName: Install dotnet-script
 
@@ -112,9 +122,9 @@ steps:
 
 - task: SonarCloudAnalyze@2
   inputs:
-    jdkversion: 'JAVA_HOME_21_X64'
+    jdkversion: 'JAVA_HOME_17_X64'
 
-- script: dotnet publish $(APPNAME)/$(APPNAME).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(RUNTIME) --output $(PUBLISH_PATH)
+- script: dotnet publish $(APPNAME)/$(APPNAME).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework net8.0 --output $(PUBLISH_PATH)
   displayName: Publish
 
 - script: mkdir -p $(OUTPUT_PATH)
