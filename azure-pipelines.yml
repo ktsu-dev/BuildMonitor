@@ -56,6 +56,7 @@ steps:
         New-Item -Path . -Name "AUTHORS" -ItemType "file" -Value "ktsu.io"
       }
 
+      $RUNTIME = "$(RUNTIME)"
       $VERSION = (Get-Content -Path VERSION -Raw).Trim()
       $INSTALLER_VERSION = $VERSION.Split('-')[0]
       $VERSION_KEY = $VERSION.Replace('.', '_').Replace('-', '_')
@@ -64,11 +65,11 @@ steps:
       $AUTHORS_KEY = $AUTHORS.Replace('.', '-')
       $BRANCH_KEY = "$(BRANCH)".Replace('.', '_').Replace('-', '_')
 
-      if("$(BRANCH_KEY)" == "main") {
-        $RELEASE_NAME = [string]::Join('-', $VERSION, "$(RUNTIME)")
+      if($BRANCH_KEY == "main") {
+        $RELEASE_NAME = [string]::Join('-', $VERSION, $RUNTIME)
       }
       else {
-        $RELEASE_NAME = [string]::Join('-', $VERSION, $BRANCH_KEY, "$(RUNTIME)")
+        $RELEASE_NAME = [string]::Join('-', $VERSION, $BRANCH_KEY, $RUNTIME)
       }
 
       $RELEASE_KEY = $RELEASE_NAME.Replace('.', '_').Replace('-', '_')
