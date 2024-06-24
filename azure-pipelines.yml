@@ -65,7 +65,7 @@ steps:
       $AUTHORS_KEY = $AUTHORS.Replace('.', '-')
       $BRANCH_KEY = "$(BRANCH)".Replace('.', '_').Replace('-', '_')
 
-      if($BRANCH_KEY == "main") {
+      if($BRANCH_KEY -eq "main") {
         $RELEASE_NAME = [string]::Join('-', $VERSION, $RUNTIME)
       }
       else {
@@ -75,7 +75,7 @@ steps:
       $RELEASE_KEY = $RELEASE_NAME.Replace('.', '_').Replace('-', '_')
 
       Get-Content -Path RELEASES | ForEach-Object {
-        if($_ == $RELEASE_KEY) {
+        if($_ -eq $RELEASE_KEY) {
           $SHOULD_RELEASE = "false"
         }
         else {
