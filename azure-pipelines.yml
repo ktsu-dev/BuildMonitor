@@ -46,10 +46,8 @@ steps:
       Write-Host "##vso[task.setvariable variable=VERSION;]$VERSION"
 
       if(!(Test-Path RELEASES -PathType Leaf)) { New-Item -Path . -Name "RELEASES" -ItemType "file" }
-      Get-Content -Path RELEASES | ForEach-Object
-      {
-        if($_)
-        {
+      Get-Content -Path RELEASES | ForEach-Object {
+        if($_) {
           Write-Host "##vso[task.setvariable variable=$_" -NoNewline
           Write-Host "_RELEASED;]true"
         }
