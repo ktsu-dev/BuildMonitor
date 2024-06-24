@@ -48,6 +48,7 @@ steps:
       if(!(Test-Path RELEASES -PathType Leaf)) { New-Item -Path . -Name "RELEASES" -ItemType "file" }
       Get-Content -Path RELEASES | ForEach-Object {
         if($_) {
+
           Write-Host "##vso[task.setvariable variable=$_" -NoNewline
           Write-Host "_RELEASED;]true"
         }
@@ -83,8 +84,16 @@ steps:
     script: Write-Host "##vso[task.setvariable variable=RELEASE_NAME;]$(RELEASE_NAME)-$(BRANCH)"
 
 - task: PowerShell@2
+  displayName: Make release key
+  inputs:
+    targetType: 'inline'
+    script: |
+      $RELEASE_KEY = "$(RELEASE_NAME)".Replace('.', '_').Replace('-', '_')
+      Write-Host "##vso[task.setvariable variable=RELEASE_KEY;]$(RELEASE_KEY)"
+
+- task: PowerShell@2
   displayName: Test if current version has already been released
-  condition: not(eq(variables['$(RELEASE_NAME)_RELEASED'], 'true'))
+  condition: not(eq(variables['$(RELEASE_KEY)_RELEASED'], 'true'))
   inputs:
     targetType: 'inline'
     script: Write-Host "##vso[task.setvariable variable=SHOULD_RELEASE;]true"
@@ -171,19 +180,19 @@ steps:
     githubTargetCommitsh: '$(Build.SourceVersion)'
 
 - task: PowerShell@2
-  displayName: Update release version
+  displayName: Update release keys
   condition: eq(variables['SHOULD_RELEASE'], 'true')
   inputs:
     targetType: 'inline'
     script: |
-      Add-Content -Path ".\RELEASES" -Value "$(RELEASE_NAME)"
+      Add-Content -Path ".\RELEASES" -Value "$(RELEASE_KEY)"
 
 - script: |
     git add RELEASES
-    git commit -m "[skip ci] Add $(RELEASE_NAME) to RELEASES"
+    git commit -m "[skip ci] Add $(RELEASE_KEY) to RELEASES"
     git push
   condition: eq(variables['SHOULD_RELEASE'], 'true')
-  displayName: Commit updated release version
+  displayName: Commit updated release keys
 
 - task: SonarCloudPublish@2
   continueOnError: true
