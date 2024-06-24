@@ -40,61 +40,58 @@ steps:
   inputs:
     targetType: 'inline'
     script: |
-      if(!(Test-Path VERSION -PathType Leaf)) { New-Item -Path . -Name "VERSION" -ItemType "file" -Value "1.0.0.alpha.1"}
-      $VERSION = Get-Content -Path VERSION -Raw
-      if($VERSION) { $VERSION = $VERSION.Trim() } else { $VERSION = "" }
-      Write-Host "##vso[task.setvariable variable=VERSION;]$VERSION"
+      if(!(Test-Path VERSION -PathType Leaf)) {
+        New-Item -Path . -Name "VERSION" -ItemType "file" -Value "1.0.0.alpha.1"
+      }
 
-      if(!(Test-Path RELEASES -PathType Leaf)) { New-Item -Path . -Name "RELEASES" -ItemType "file" }
+      if(!(Test-Path RELEASES -PathType Leaf)) {
+        New-Item -Path . -Name "RELEASES" -ItemType "file"
+      }
+
+      if(!(Test-Path DESCRIPTION -PathType Leaf)) {
+        New-Item -Path . -Name "DESCRIPTION" -ItemType "file" -Value "$(APPNAME)"
+      }
+
+      if(!(Test-Path AUTHORS -PathType Leaf)) {
+        New-Item -Path . -Name "AUTHORS" -ItemType "file" -Value "ktsu.io"
+      }
+
+      $VERSION = (Get-Content -Path VERSION -Raw).Trim()
+      $INSTALLER_VERSION = $VERSION.Split('-')[0]
+      $VERSION_KEY = $VERSION.Replace('.', '_').Replace('-', '_')
+      $DESCRIPTION = (Get-Content -Path DESCRIPTION -Raw).Trim()
+      $AUTHORS = (Get-Content -Path AUTHORS -Raw).Trim()
+      $AUTHORS_KEY = $AUTHORS.Replace('.', '-')
+      $BRANCH_KEY = "$(BRANCH)".Replace('.', '_').Replace('-', '_')
+
+      if("$(BRANCH_KEY)" == "main") {
+        $RELEASE_NAME = [string]::Join('-', $VERSION, "$(RUNTIME)")
+      }
+      else {
+        $RELEASE_NAME = [string]::Join('-', $VERSION, $BRANCH_KEY, "$(RUNTIME)")
+      }
+
+      $RELEASE_KEY = $RELEASE_NAME.Replace('.', '_').Replace('-', '_')
+
       Get-Content -Path RELEASES | ForEach-Object {
-        if($_) {
-          Write-Host "##vso[task.setvariable variable=RELEASED_$_;]true"
+        if($_ == $RELEASE_KEY) {
+          $SHOULD_RELEASE = "false"
+        }
+        else {
+          $SHOULD_RELEASE = "true"
         }
       }
 
-      $INSTALLER_VERSION = $VERSION.Split('-')[0]
-      Write-Host "##vso[task.setvariable variable=INSTALLER_VERSION;]$INSTALLER_VERSION"
-
-      if(!(Test-Path DESCRIPTION -PathType Leaf)) { New-Item -Path . -Name "DESCRIPTION" -ItemType "file" -Value "$(APPNAME)"}
-      $DESCRIPTION = Get-Content -Path DESCRIPTION -Raw
-      if($DESCRIPTION) { $DESCRIPTION = $DESCRIPTION.Trim() } else { $DESCRIPTION = "" }
-      Write-Host "##vso[task.setvariable variable=DESCRIPTION;]$DESCRIPTION"
-
-      if(!(Test-Path AUTHORS -PathType Leaf)) { New-Item -Path . -Name "AUTHORS" -ItemType "file" }
-      $AUTHORS = Get-Content -Path AUTHORS -Raw
-      if($AUTHORS) { $AUTHORS = $AUTHORS.Trim() } else { $AUTHORS = "" }
-      Write-Host "##vso[task.setvariable variable=AUTHORS;]$AUTHORS"
-
-      $AUTHORS_KEY = $AUTHORS.Replace('.', '-')
-      Write-Host "##vso[task.setvariable variable=AUTHORS_KEY;]$AUTHORS_KEY"
-
-- task: PowerShell@2
-  displayName: Make release name
-  inputs:
-    targetType: 'inline'
-    script: Write-Host "##vso[task.setvariable variable=RELEASE_NAME;]$(VERSION)-$(RUNTIME)"
-
-- task: PowerShell@2
-  displayName: Append branch to release name
-  condition: not(eq(variables['BRANCH'], 'main'))
-  inputs:
-    targetType: 'inline'
-    script: Write-Host "##vso[task.setvariable variable=RELEASE_NAME;]$(RELEASE_NAME)-$(BRANCH)"
-
-- task: PowerShell@2
-  displayName: Make release key
-  inputs:
-    targetType: 'inline'
-    script: |
-      $RELEASE_KEY = "$(RELEASE_NAME)".Replace('.', '_').Replace('-', '_')
+      Write-Host "##vso[task.setvariable variable=VERSION;]$VERSION"
+      Write-Host "##vso[task.setvariable variable=VERSION_KEY;]$VERSION_KEY"
+      Write-Host "##vso[task.setvariable variable=BRANCH_KEY;]$BRANCH_KEY"
+      Write-Host "##vso[task.setvariable variable=RELEASE_NAME;]$RELEASE_NAME"
       Write-Host "##vso[task.setvariable variable=RELEASE_KEY;]$RELEASE_KEY"
-
-- task: PowerShell@2
-  displayName: Test if current version has already been released
-  condition: not(eq(variables['RELEASED_$(RELEASE_KEY)'], 'true'))
-  inputs:
-    targetType: 'inline'
-    script: Write-Host "##vso[task.setvariable variable=SHOULD_RELEASE;]true"
+      Write-Host "##vso[task.setvariable variable=INSTALLER_VERSION;]$INSTALLER_VERSION"
+      Write-Host "##vso[task.setvariable variable=AUTHORS;]$AUTHORS"
+      Write-Host "##vso[task.setvariable variable=AUTHORS_KEY;]$AUTHORS_KEY"
+      Write-Host "##vso[task.setvariable variable=DESCRIPTION;]$DESCRIPTION"
+      Write-Host "##vso[task.setvariable variable=SHOULD_RELEASE;]$SHOULD_RELEASE"
 
 - task: UseDotNet@2
   inputs:
@@ -112,6 +109,7 @@ steps:
 
 - script: dotnet restore --nologo --verbosity normal --runtime $(RUNTIME)
   displayName: Restore
+
 - task: SonarCloudPrepare@2
   inputs:
     SonarCloud: 'SonarCloud'
