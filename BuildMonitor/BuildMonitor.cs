@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using ImGuiNET;
+using ktsu.io.Extensions;
 using ktsu.io.ImGuiApp;
 using ktsu.io.ImGuiWidgets;
 
@@ -67,6 +68,10 @@ internal static class BuildMonitor
 			UpdateTask = UpdateAsync();
 		}
 
+		foreach (var (name, buildProvider) in AppData.BuildProviders)
+		{
+			buildProvider.Tick();
+		}
 
 		var builds = AppData.BuildProviders
 			.SelectMany(p => p.Value.Owners)
@@ -115,7 +120,16 @@ internal static class BuildMonitor
 
 				if (ImGui.TableNextColumn())
 				{
-					ImGui.TextUnformatted(build.Name);
+					string displayName = build.Name;
+					if (displayName.EndsWithOrdinal(".yml"))
+					{
+						displayName = displayName.RemoveSuffix(".yml");
+					}
+					if (displayName.StartsWithOrdinal(".github/workflows/"))
+					{
+						displayName = displayName.RemovePrefix(".github/workflows/");
+					}
+					ImGui.TextUnformatted(displayName);
 				}
 
 				if (ImGui.TableNextColumn())
