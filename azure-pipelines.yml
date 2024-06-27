@@ -53,7 +53,7 @@ steps:
       }
 
       if(!(Test-Path AUTHORS -PathType Leaf)) {
-        New-Item -Path . -Name "AUTHORS" -ItemType "file" -Value "ktsu.io"
+        New-Item -Path . -Name "AUTHORS" -ItemType "file" -Value "ktsu"
       }
 
       $RUNTIME = "$(RUNTIME)"
@@ -111,14 +111,14 @@ steps:
 - script: dotnet restore --nologo --verbosity normal --runtime $(RUNTIME)
   displayName: Restore
 
-- task: SonarCloudPrepare@2
-  inputs:
-    SonarCloud: 'SonarCloud'
-    organization: '$(AUTHORS_KEY)'
-    scannerMode: 'MSBuild'
-    projectKey: '$(AUTHORS_KEY)_$(APPNAME)'
-    projectName: '$(APPNAME)'
-    projectVersion: '$(VERSION)'
+# - task: SonarCloudPrepare@2
+#   inputs:
+#     SonarCloud: 'SonarCloud'
+#     organization: '$(AUTHORS_KEY)'
+#     scannerMode: 'MSBuild'
+#     projectKey: '$(AUTHORS_KEY)_$(APPNAME)'
+#     projectName: '$(APPNAME)'
+#     projectVersion: '$(VERSION)'
 
 - script: dotnet build --nologo --verbosity normal --no-restore --no-incremental --configuration $(buildConfiguration) --runtime $(RUNTIME)
   displayName: Build
@@ -126,9 +126,9 @@ steps:
 - script: dotnet-coverage collect "dotnet test --nologo --verbosity normal --no-build" -f xml -o "coverage.xml"
   displayName: Test
 
-- task: SonarCloudAnalyze@2
-  inputs:
-    jdkversion: 'JAVA_HOME_17_X64'
+# - task: SonarCloudAnalyze@2
+#   inputs:
+#     jdkversion: 'JAVA_HOME_17_X64'
 
 - script: dotnet publish $(APPNAME)/$(APPNAME).csproj --nologo --verbosity normal --no-build --self-contained --configuration $(buildConfiguration) --runtime $(RUNTIME) --framework net8.0 --output $(PUBLISH_PATH)
   displayName: Publish
@@ -159,7 +159,7 @@ steps:
   condition: eq(variables['SHOULD_RELEASE'], 'true')
   continueOnError: true
   inputs:
-    githubEndpoint: 'GitHub - matt-edmondson'
+    githubEndpoint: 'ktsu.dev'
     manuallySetRepository: true
     githubOwner: '$(AUTHORS_KEY)'
     githubRepositoryName: '$(APPNAME)'
@@ -191,7 +191,7 @@ steps:
   condition: eq(variables['SHOULD_RELEASE'], 'true')
   displayName: Commit updated release keys
 
-- task: SonarCloudPublish@2
-  continueOnError: true
-  inputs:
-    pollingTimeoutSec: '300'
+# - task: SonarCloudPublish@2
+#   continueOnError: true
+#   inputs:
+#     pollingTimeoutSec: '300'
