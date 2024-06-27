@@ -74,12 +74,10 @@ steps:
 
       $RELEASE_KEY = $RELEASE_NAME.Replace('.', '_').Replace('-', '_')
 
+      $SHOULD_RELEASE = "true"
       Get-Content -Path RELEASES | ForEach-Object {
         if($_ -eq $RELEASE_KEY) {
           $SHOULD_RELEASE = "false"
-        }
-        else {
-          $SHOULD_RELEASE = "true"
         }
       }
 
