@@ -74,7 +74,7 @@ SetOutPath "$INSTDIR"
 
 File /r "${PUBLISH_PATH}\*"
 
-!insertmacro CheckDotNetCore 8.0
+#!insertmacro CheckDotNetCore 8.0
 
 SectionEnd
 
