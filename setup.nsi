@@ -74,7 +74,10 @@ SetOutPath "$INSTDIR"
 
 File /r "${PUBLISH_PATH}\*"
 
-#!insertmacro CheckDotNetCore 8.0
+inetc::get "https://aka.ms/vs/17/release/vc_redist.x64.exe" vcredist.exe
+DetailPrint "Installing Visual Studio Redistributable package..."
+ExecWait '"vcredist.exe" /q /norestart'
+Delete "vcredist.exe"
 
 SectionEnd
 
