@@ -94,4 +94,18 @@
     <PackageReference Include="MSTest.TestFramework" Version="3.4.3" />
   </ItemGroup>
 
+  <Target Name="DownloadRedistFile" BeforeTargets="Build">
+    <DownloadFile
+        SourceUrl="https://aka.ms/vs/17/release/vc_redist.x64.exe"
+        DestinationFolder="$(MSBuildProjectDirectory)">
+      <Output TaskParameter="DownloadedFile" ItemName="Content" />
+    </DownloadFile>
+  </Target>
+  
+  <Target Name="CopyRedistFile" AfterTargets="ComputeFilesToPublish">
+    <ItemGroup>
+      <ResolvedFileToPublish Include="$(MSBuildProjectDirectory)\VC_redist.x64.exe" RelativePath="vcredist.exe" />
+    </ItemGroup>
+  </Target>
+
 </Project>
