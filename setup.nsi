@@ -28,7 +28,6 @@ InstallDir "$PROGRAMFILES64\${APP_NAME}"
 ######################################################################
 
 !include "MUI.nsh"
-!include "DotNetCore.nsh"
 
 !define MUI_ABORTWARNING
 !define MUI_UNABORTWARNING
