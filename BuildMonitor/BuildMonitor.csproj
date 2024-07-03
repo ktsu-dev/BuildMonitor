@@ -10,7 +10,7 @@
     <PackageReference Include="ktsu.io.Extensions" Version="1.0.1" />
     <PackageReference Include="ktsu.io.ImGuiApp" Version="1.0.0-alpha.15" />
     <PackageReference Include="ktsu.io.ImGuiWidgets" Version="1.0.0-alpha.28" />
-    <PackageReference Include="Octokit" Version="13.0.0" />
+    <PackageReference Include="Octokit" Version="13.0.1" />
   </ItemGroup>
 
 </Project>
