@@ -1,6 +1,6 @@
 namespace ktsu.BuildMonitor;
 
-using ktsu.io.StrongStrings;
+using ktsu.StrongStrings;
 
 internal sealed record class RunName : StrongStringAbstract<RunName> { }
 internal sealed record class RunId : StrongStringAbstract<RunId> { }

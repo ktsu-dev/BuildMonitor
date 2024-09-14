@@ -6,9 +6,9 @@ using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
 using ImGuiNET;
-using ktsu.io.Extensions;
-using ktsu.io.ImGuiApp;
-using ktsu.io.ImGuiWidgets;
+using ktsu.Extensions;
+using ktsu.ImGuiApp;
+using ktsu.ImGuiWidgets;
 
 internal static class BuildMonitor
 {

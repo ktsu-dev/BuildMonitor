@@ -3,8 +3,8 @@ namespace ktsu.BuildMonitor;
 using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
 using ImGuiNET;
-using ktsu.io.ImGuiWidgets;
-using ktsu.io.StrongStrings;
+using ktsu.ImGuiWidgets;
+using ktsu.StrongStrings;
 
 public sealed record class BuildProviderName : StrongStringAbstract<BuildProviderName> { }
 public sealed record class BuildProviderAccountId : StrongStringAbstract<BuildProviderAccountId> { }

@@ -30,7 +30,7 @@ steps:
 
 - script: |
     git config user.name "Azure Pipeline"
-    git config user.email "ado@ktsu.io"
+    git config user.email "ado@ktsu.dev"
     git fetch --all
     git branch -D $(BRANCH) || true
     git switch $(BRANCH)
