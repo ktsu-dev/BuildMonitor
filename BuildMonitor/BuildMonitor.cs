@@ -9,6 +9,7 @@ using ImGuiNET;
 using ktsu.Extensions;
 using ktsu.ImGuiApp;
 using ktsu.ImGuiWidgets;
+using ktsu.ImGuiStyler;
 
 internal static class BuildMonitor
 {
@@ -110,7 +111,7 @@ internal static class BuildMonitor
 				ImGui.TableNextRow();
 				if (ImGui.TableNextColumn())
 				{
-					ColorIndicator.Show(GetStatusColor(build.LastStatus), true);
+					ImGuiWidgets.ColorIndicator(GetStatusColor(build.LastStatus), true);
 				}
 
 				if (ImGui.TableNextColumn())
@@ -187,7 +188,7 @@ internal static class BuildMonitor
 		foreach (var run in runs)
 		{
 			ImGui.SameLine();
-			ColorIndicator.Show(GetStatusColor(run.Status), true);
+			ImGuiWidgets.ColorIndicator(GetStatusColor(run.Status), true);
 		}
 	}
 
