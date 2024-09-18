@@ -75,5 +75,6 @@
     <TreatWarningsAsErrors>True</TreatWarningsAsErrors>
     <EnforceCodeStyleInBuild>True</EnforceCodeStyleInBuild>
     <InvariantGlobalization>true</InvariantGlobalization>
+
   </PropertyGroup>
 </Project>

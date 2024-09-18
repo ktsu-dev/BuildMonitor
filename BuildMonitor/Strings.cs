@@ -4,7 +4,7 @@ using Humanizer;
 
 internal static class Strings
 {
-	internal static string FullyQualifiedApplicationName { get; } = $"{nameof(ktsu)}.{nameof(io)}.{nameof(BuildMonitor)}";
+	internal static string FullyQualifiedApplicationName { get; } = $"{nameof(ktsu)}.{nameof(BuildMonitor)}";
 	internal static string ApplicationName { get; } = nameof(BuildMonitor).Titleize();
 	internal static string File { get; } = nameof(File).Titleize();
 	internal static string Exit { get; } = nameof(Exit).Titleize();

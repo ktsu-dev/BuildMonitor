@@ -3,8 +3,8 @@
 namespace ktsu.BuildMonitor;
 
 using System.Collections.Concurrent;
-using ktsu.io.AppDataStorage;
-using ktsu.io.ImGuiApp;
+using ktsu.AppDataStorage;
+using ktsu.ImGuiApp;
 
 internal class AppData : AppData<AppData>
 {

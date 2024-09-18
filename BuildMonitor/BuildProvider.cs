@@ -3,8 +3,8 @@ namespace ktsu.BuildMonitor;
 using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
 using ImGuiNET;
-using ktsu.io.ImGuiWidgets;
-using ktsu.io.StrongStrings;
+using ktsu.ImGuiPopups;
+using ktsu.StrongStrings;
 
 public sealed record class BuildProviderName : StrongStringAbstract<BuildProviderName> { }
 public sealed record class BuildProviderAccountId : StrongStringAbstract<BuildProviderAccountId> { }
@@ -24,7 +24,7 @@ internal abstract class BuildProvider
 	private bool ShouldShowAccountIdPopup { get; set; }
 	private bool ShouldShowTokenPopup { get; set; }
 	private bool ShouldShowAddOwnerPopup { get; set; }
-	private PopupInputString PopupInputString { get; } = new();
+	private ImGuiPopups.InputString PopupInputString { get; } = new();
 
 	internal Owner CreateOwner(OwnerName name)
 	{
