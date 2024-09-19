@@ -96,5 +96,5 @@ internal abstract class BuildProvider
 	internal abstract Task UpdateRepositoriesAsync(Owner owner);
 	internal abstract Task UpdateBuildsAsync(Repository repository);
 	internal abstract Task UpdateBuildAsync(Build build);
-	internal abstract Task UpdateRunAsync(Run run);
+	internal abstract Task UpdateRunAsync(Build build, Run run);
 }

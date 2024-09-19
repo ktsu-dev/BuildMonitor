@@ -81,41 +81,54 @@ internal class GitHub : BuildProvider
 				var runId = (RunId)gitHubRun.Id.ToString(CultureInfo.InvariantCulture);
 				var runName = (RunName)gitHubRun.Name;
 				var run = build.Runs.GetOrCreate(runId, build.CreateRun(runName, runId));
-				UpdateRunFromWorkflow(run, gitHubRun);
+				UpdateRunFromWorkflow(build, run, gitHubRun);
 			}
 		});
 	}
 
-	internal override async Task UpdateRunAsync(Run run)
+	internal override async Task UpdateRunAsync(Build build, Run run)
 	{
 		UpdateGitHubClientCredentials();
 		await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}/{run.Name}", async () =>
 		{
 			var gitHubRun = await GitHubRuns.Get(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture));
-			UpdateRunFromWorkflow(run, gitHubRun);
+			UpdateRunFromWorkflow(build, run, gitHubRun);
 		});
 	}
 
-	private static void UpdateRunFromWorkflow(Run run, WorkflowRun gitHubRun)
+	private void UpdateRunFromWorkflow(Build build, Run run, WorkflowRun gitHubRun)
 	{
 		run.Started = gitHubRun.RunStartedAt;
 		run.LastUpdated = gitHubRun.UpdatedAt;
-		run.Status = gitHubRun.Conclusion switch
+
+		if (gitHubRun.Conclusion == WorkflowRunConclusion.Failure)
 		{
-			_ when gitHubRun.Status == WorkflowRunStatus.Requested => RunStatus.Pending,
-			_ when gitHubRun.Status == WorkflowRunStatus.Queued => RunStatus.Pending,
-			_ when gitHubRun.Status == WorkflowRunStatus.InProgress => RunStatus.Running,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Neutral => RunStatus.Success,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Success => RunStatus.Success,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Failure => RunStatus.Failure,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Cancelled => RunStatus.Canceled,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Skipped => RunStatus.Canceled,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.StartupFailure => RunStatus.Failure,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.TimedOut => RunStatus.Failure,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.ActionRequired => RunStatus.Failure,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Stale => RunStatus.Failure,
-			_ => throw new InvalidOperationException(),
-		};
+			string log = System.Text.Encoding.Default.GetString(GitHubRuns.GetAttemptLogs(build.Owner.Name, build.Name, gitHubRun.Id, gitHubRun.RunAttempt).Result);
+
+			if (log.Contains("Cancelled the workflow run"))
+			{
+				run.Status = RunStatus.Canceled;
+			}
+		}
+		else
+		{
+			run.Status = gitHubRun.Conclusion switch
+			{
+				_ when gitHubRun.Status == WorkflowRunStatus.Requested => RunStatus.Pending,
+				_ when gitHubRun.Status == WorkflowRunStatus.Queued => RunStatus.Pending,
+				_ when gitHubRun.Status == WorkflowRunStatus.InProgress => RunStatus.Running,
+				_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Neutral => RunStatus.Success,
+				_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Success => RunStatus.Success,
+				_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Failure => RunStatus.Failure,
+				_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Cancelled => RunStatus.Canceled,
+				_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Skipped => RunStatus.Canceled,
+				_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.StartupFailure => RunStatus.Failure,
+				_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.TimedOut => RunStatus.Failure,
+				_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.ActionRequired => RunStatus.Failure,
+				_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Stale => RunStatus.Failure,
+				_ => throw new InvalidOperationException(),
+			};
+		}
 
 		run.Build.UpdateFromRun(run);
 		BuildMonitor.QueueSaveAppData();
