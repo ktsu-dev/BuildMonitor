@@ -23,7 +23,7 @@ internal class Build
 	internal bool IsOngoing => !Runs.IsEmpty && LastStatus is RunStatus.Pending or RunStatus.Running;
 	internal TimeSpan CalculateEstimatedDuration()
 	{
-		var recentRuns = Runs.Values.OrderByDescending(r => r.Started).Skip(1).Take(NumRecentRuns).ToList();
+		var recentRuns = Runs.Values.Where(r => r.Status != RunStatus.Canceled).OrderByDescending(r => r.Started).Skip(1).Take(NumRecentRuns).ToList();
 		return recentRuns.Count == 0
 			? TimeSpan.Zero
 			: TimeSpan.FromSeconds(recentRuns.Average(r => r.Duration.TotalSeconds));

@@ -179,9 +179,10 @@ internal static class BuildMonitor
 		const int recentRuns = 5;
 
 		var runs = build.Runs.Values
-		.OrderByDescending(r => r.LastUpdated)
-		.Take(recentRuns)
-		.ToList();
+			.Where(r => r.Status != RunStatus.Canceled)
+			.OrderByDescending(r => r.LastUpdated)
+			.Take(recentRuns)
+			.ToList();
 
 		runs.Reverse();
 
