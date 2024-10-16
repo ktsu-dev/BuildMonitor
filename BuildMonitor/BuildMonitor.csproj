@@ -10,7 +10,7 @@
     <PackageReference Include="ktsu.Extensions" Version="1.0.20" />
     <PackageReference Include="ktsu.ImGuiApp" Version="1.0.0-alpha.53" />
     <PackageReference Include="ktsu.ImGuiPopups" Version="1.0.0-alpha.29" />
-    <PackageReference Include="ktsu.ImGuiWidgets" Version="1.0.0-alpha.65" />
+    <PackageReference Include="ktsu.ImGuiWidgets" Version="1.0.0-alpha.66" />
     <PackageReference Include="Octokit" Version="13.0.1" />
   </ItemGroup>
 
