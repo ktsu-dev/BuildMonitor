@@ -9,8 +9,8 @@
     <PackageReference Include="ktsu.AppDataStorage" Version="1.1.33" />
     <PackageReference Include="ktsu.Extensions" Version="1.0.25" />
     <PackageReference Include="ktsu.ImGuiApp" Version="1.0.0-alpha.66" />
-    <PackageReference Include="ktsu.ImGuiPopups" Version="1.0.0-alpha.47" />
-    <PackageReference Include="ktsu.ImGuiWidgets" Version="1.0.0-alpha.89" />
+    <PackageReference Include="ktsu.ImGuiPopups" Version="1.0.0-alpha.48" />
+    <PackageReference Include="ktsu.ImGuiWidgets" Version="1.0.0-alpha.91" />
     <PackageReference Include="Octokit" Version="13.0.1" />
   </ItemGroup>
 
