@@ -6,8 +6,8 @@
 
   <ItemGroup>
     <PackageReference Include="Humanizer.Core" Version="2.14.1" />
-    <PackageReference Include="ktsu.AppDataStorage" Version="1.1.48" />
-    <PackageReference Include="ktsu.Extensions" Version="1.0.34" />
+    <PackageReference Include="ktsu.AppDataStorage" Version="1.1.49" />
+    <PackageReference Include="ktsu.Extensions" Version="1.0.35" />
     <PackageReference Include="ktsu.ImGuiApp" Version="1.0.0-alpha.73" />
     <PackageReference Include="ktsu.ImGuiPopups" Version="1.0.0-alpha.62" />
     <PackageReference Include="ktsu.ImGuiWidgets" Version="1.0.0-alpha.106" />
