@@ -18,7 +18,7 @@ internal class RunSync
 
 	internal async Task UpdateAsync()
 	{
-		await Run.Owner.BuildProvider.UpdateRunAsync(Run);
+		await Run.Owner.BuildProvider.UpdateRunAsync(Run).ConfigureAwait(false);
 
 		if (Run.IsOngoing)
 		{

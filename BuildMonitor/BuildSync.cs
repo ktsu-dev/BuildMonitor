@@ -17,7 +17,7 @@ internal class BuildSync
 
 	internal async Task UpdateAsync()
 	{
-		await Build.Owner.BuildProvider.UpdateBuildAsync(Build);
+		await Build.Owner.BuildProvider.UpdateBuildAsync(Build).ConfigureAwait(false);
 
 		foreach (var (runId, run) in Build.Runs)
 		{

@@ -26,11 +26,16 @@ internal class GitHub : BuildProvider
 
 	internal override async Task UpdateRepositoriesAsync(Owner owner)
 	{
+		if (AccountId.IsEmpty() || Token.IsEmpty())
+		{
+			return;
+		}
+
 		UpdateGitHubClientCredentials();
 		await MakeGitHubRequestAsync($"{Name}/{owner.Name}", async () =>
 		{
-			var userRepositories = await GitHubRepository.GetAllForUser(owner.Name);
-			var organizationRepositories = await GitHubRepository.GetAllForOrg(owner.Name);
+			var userRepositories = await GitHubRepository.GetAllForUser(owner.Name).ConfigureAwait(false);
+			var organizationRepositories = await GitHubRepository.GetAllForOrg(owner.Name).ConfigureAwait(false);
 			var allRepositories = userRepositories.Concat(organizationRepositories);
 
 			foreach (var gitHubRepository in allRepositories)
@@ -43,39 +48,59 @@ internal class GitHub : BuildProvider
 					BuildMonitor.QueueSaveAppData();
 				}
 			}
-		});
+		}).ConfigureAwait(false);
 	}
 
 	internal override async Task UpdateBuildsAsync(Repository repository)
 	{
-		UpdateGitHubClientCredentials();
-		await MakeGitHubRequestAsync($"{Name}/{repository.Owner.Name}/{repository.Name}", async () =>
+		if (AccountId.IsEmpty() || Token.IsEmpty())
 		{
-			var workflows = await GitHubWorkflows.List(repository.Owner.Name, repository.Name);
-			foreach (var workflow in workflows.Workflows)
+			return;
+		}
+
+		UpdateGitHubClientCredentials();
+		try
+		{
+			await MakeGitHubRequestAsync($"{Name}/{repository.Owner.Name}/{repository.Name}", async () =>
 			{
-				var buildName = (BuildName)workflow.Name;
-				var buildId = (BuildId)workflow.Id.ToString(CultureInfo.InvariantCulture);
-				var build = repository.CreateBuild(buildName, buildId);
-				if (repository.Builds.TryAdd(buildId, build))
+				var workflows = await GitHubWorkflows.List(repository.Owner.Name, repository.Name).ConfigureAwait(false);
+				foreach (var workflow in workflows.Workflows)
 				{
-					BuildMonitor.QueueSaveAppData();
+					var buildName = (BuildName)workflow.Name;
+					var buildId = (BuildId)workflow.Id.ToString(CultureInfo.InvariantCulture);
+					var build = repository.CreateBuild(buildName, buildId);
+					if (repository.Builds.TryAdd(buildId, build))
+					{
+						BuildMonitor.QueueSaveAppData();
+					}
 				}
-			}
-		});
+			}).ConfigureAwait(false);
+		}
+		catch (NotFoundException)
+		{
+			// Repository not found
+			repository.Owner.Repositories.TryRemove(repository.Id, out _);
+		}
 	}
 
 	internal override async Task UpdateBuildAsync(Build build)
 	{
+		if (AccountId.IsEmpty() || Token.IsEmpty())
+		{
+			return;
+		}
+
 		UpdateGitHubClientCredentials();
-		await MakeGitHubRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/{build.Name}", async () =>
+		try
+		{
+			await MakeGitHubRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/{build.Name}", async () =>
 		{
 			var gitHubRuns = await GitHubRuns.ListByWorkflow(build.Owner.Name, build.Repository.Name, long.Parse(build.Id, CultureInfo.InvariantCulture), new(), new()
 			{
 				PageCount = 1,
 				StartPage = 1,
 				PageSize = 10,
-			});
+			}).ConfigureAwait(false);
 			foreach (var gitHubRun in gitHubRuns.WorkflowRuns)
 			{
 				var runId = (RunId)gitHubRun.Id.ToString(CultureInfo.InvariantCulture);
@@ -83,17 +108,37 @@ internal class GitHub : BuildProvider
 				var run = build.Runs.GetOrCreate(runId, build.CreateRun(runName, runId));
 				UpdateRunFromWorkflow(run, gitHubRun);
 			}
-		});
+		}).ConfigureAwait(false);
+		}
+		catch (NotFoundException)
+		{
+			// Build not found
+			build.Repository.Builds.TryRemove(build.Id, out _);
+		}
 	}
 
 	internal override async Task UpdateRunAsync(Run run)
 	{
-		UpdateGitHubClientCredentials();
-		await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}/{run.Name}", async () =>
+		if (AccountId.IsEmpty() || Token.IsEmpty())
 		{
-			var gitHubRun = await GitHubRuns.Get(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture));
-			UpdateRunFromWorkflow(run, gitHubRun);
-		});
+			return;
+		}
+
+		UpdateGitHubClientCredentials();
+
+		try
+		{
+			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}/{run.Name}", async () =>
+			{
+				var gitHubRun = await GitHubRuns.Get(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
+				UpdateRunFromWorkflow(run, gitHubRun);
+			}).ConfigureAwait(false);
+		}
+		catch (NotFoundException)
+		{
+			// Run not found
+			run.Build.Runs.TryRemove(run.Id, out _);
+		}
 	}
 
 	private static void UpdateRunFromWorkflow(Run run, WorkflowRun gitHubRun)
@@ -121,17 +166,31 @@ internal class GitHub : BuildProvider
 		BuildMonitor.QueueSaveAppData();
 	}
 
-	internal static async Task MakeGitHubRequestAsync(string name, Func<Task> action)
+	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0010:Add missing cases", Justification = "<Pending>")]
+	internal async Task MakeGitHubRequestAsync(string name, Func<Task> action)
 	{
+		await Task.Delay((int)RateLimitSleep.TotalMilliseconds).ConfigureAwait(false);
+
 		try
 		{
-			await BuildMonitor.MakeRequestAsync(name, action);
+			await BuildMonitor.MakeRequestAsync(name, action).ConfigureAwait(false);
+		}
+		catch (AuthorizationException)
+		{
+			OnAuthenticationFailure();
 		}
 		catch (ApiException e)
 		{
-			if (e.HttpResponse.StatusCode is System.Net.HttpStatusCode.Forbidden or System.Net.HttpStatusCode.TooManyRequests)
+			switch (e.HttpResponse?.StatusCode)
 			{
-				throw;
+				case System.Net.HttpStatusCode.Forbidden:
+					OnAuthenticationFailure();
+					break;
+				case System.Net.HttpStatusCode.TooManyRequests:
+					OnRateLimitExceeded();
+					break;
+				default:
+					throw;
 			}
 		}
 	}

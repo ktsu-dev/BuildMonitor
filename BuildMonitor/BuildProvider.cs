@@ -6,8 +6,17 @@ using ImGuiNET;
 using ktsu.ImGuiPopups;
 using ktsu.StrongStrings;
 
+/// <summary>
+/// Represents the name of a build provider.
+/// </summary>
 public sealed record class BuildProviderName : StrongStringAbstract<BuildProviderName> { }
+/// <summary>
+/// Represents the account ID of a build provider.
+/// </summary>
 public sealed record class BuildProviderAccountId : StrongStringAbstract<BuildProviderAccountId> { }
+/// <summary>
+/// Represents the token of a build provider.
+/// </summary>
 public sealed record class BuildProviderToken : StrongStringAbstract<BuildProviderToken> { }
 
 [JsonDerivedType(typeof(GitHub), nameof(GitHub))]
@@ -25,6 +34,7 @@ internal abstract class BuildProvider
 	private bool ShouldShowTokenPopup { get; set; }
 	private bool ShouldShowAddOwnerPopup { get; set; }
 	private ImGuiPopups.InputString PopupInputString { get; } = new();
+	protected TimeSpan RateLimitSleep { get; set; } = TimeSpan.FromMilliseconds(500);
 
 	internal Owner CreateOwner(OwnerName name)
 	{
@@ -66,8 +76,7 @@ internal abstract class BuildProvider
 			});
 			ShouldShowAccountIdPopup = false;
 		}
-
-		if (ShouldShowTokenPopup)
+		else if (ShouldShowTokenPopup)
 		{
 			PopupInputString.Open(Strings.SetToken, Strings.Token, string.Empty, (result) =>
 			{
@@ -76,8 +85,7 @@ internal abstract class BuildProvider
 			});
 			ShouldShowTokenPopup = false;
 		}
-
-		if (ShouldShowAddOwnerPopup)
+		else if (ShouldShowAddOwnerPopup)
 		{
 			PopupInputString.Open(Strings.AddOwner, Strings.OwnerName, string.Empty, (result) =>
 			{
@@ -92,6 +100,18 @@ internal abstract class BuildProvider
 
 		_ = PopupInputString.ShowIfOpen();
 	}
+
+	internal void OnAuthenticationFailure()
+	{
+		AccountId = new();
+		Token = new();
+		BuildMonitor.QueueSaveAppData();
+		//ShouldShowAccountIdPopup = true;
+		//ShouldShowTokenPopup = true;
+	}
+
+	[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "<Pending>")]
+	protected void OnRateLimitExceeded() => RateLimitSleep += TimeSpan.FromMilliseconds(100);
 
 	internal abstract Task UpdateRepositoriesAsync(Owner owner);
 	internal abstract Task UpdateBuildsAsync(Repository repository);

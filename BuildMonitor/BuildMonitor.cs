@@ -10,6 +10,7 @@ using ktsu.Extensions;
 using ktsu.ImGuiApp;
 using ktsu.ImGuiWidgets;
 using ktsu.ImGuiStyler;
+using ktsu.TextFilter;
 
 internal static class BuildMonitor
 {
@@ -18,7 +19,7 @@ internal static class BuildMonitor
 
 	private static Stopwatch ProviderRefreshTimer { get; } = new Stopwatch();
 
-	private const int ProviderRefreshTimeout = 300;
+	private static int ProviderRefreshTimeout { get; set; } = 300;
 
 	internal static object SyncLock { get; } = new();
 
@@ -56,6 +57,10 @@ internal static class BuildMonitor
 
 		UpdateTask = UpdateAsync();
 	}
+
+	private static string FilterRepository { get; set; } = string.Empty;
+	private static string FilterBuildName { get; set; } = string.Empty;
+	private static string FilterStatus { get; set; } = string.Empty;
 
 	private static void Tick(float dt)
 	{
@@ -100,8 +105,52 @@ internal static class BuildMonitor
 
 			ImGui.TableHeadersRow();
 
+			ImGui.TableNextColumn();
+
+			if (ImGui.TableNextColumn())
+			{
+				string input = FilterRepository;
+				ImGui.InputText("##FilterRepository", ref input, 256);
+				FilterRepository = input;
+			}
+
+			if (ImGui.TableNextColumn())
+			{
+				string input = FilterBuildName;
+				ImGui.InputText("##FilterBuildName", ref input, 256);
+				FilterBuildName = input;
+			}
+
+			if (ImGui.TableNextColumn())
+			{
+				string input = FilterStatus;
+				ImGui.InputText("##FilterStatus", ref input, 256);
+				FilterStatus = input;
+			}
+
+			ImGui.TableHeadersRow();
+
 			foreach (var (_, build) in builds)
 			{
+				bool shouldShow = true;
+				if (!string.IsNullOrEmpty(FilterRepository))
+				{
+					shouldShow &= TextFilter.IsMatch(build.Repository.Name, FilterRepository);
+				}
+				if (!string.IsNullOrEmpty(FilterBuildName))
+				{
+					shouldShow &= TextFilter.IsMatch(build.Name, FilterBuildName);
+				}
+				if (!string.IsNullOrEmpty(FilterStatus))
+				{
+					shouldShow &= TextFilter.IsMatch(build.LastStatus.ToString(), FilterStatus);
+				}
+
+				if (!shouldShow)
+				{
+					continue;
+				}
+
 				bool isOngoing = !build.Runs.IsEmpty && build.IsOngoing;
 				var estimate = build.CalculateEstimatedDuration();
 				var duration = isOngoing ? DateTimeOffset.UtcNow - build.LastStarted : build.LastDuration;
@@ -214,10 +263,10 @@ internal static class BuildMonitor
 			{
 				foreach (var (_, owner) in provider.Owners)
 				{
-					await provider.UpdateRepositoriesAsync(owner);
+					await provider.UpdateRepositoriesAsync(owner).ConfigureAwait(false);
 					foreach (var (_, repository) in owner.Repositories)
 					{
-						await provider.UpdateBuildsAsync(repository);
+						await provider.UpdateBuildsAsync(repository).ConfigureAwait(false);
 						foreach (var (_, build) in repository.Builds)
 						{
 							_ = BuildSyncCollection.TryAdd(build.Id, new()
@@ -232,9 +281,9 @@ internal static class BuildMonitor
 			ProviderRefreshTimer.Restart();
 		}
 
-		await UpdateBuildsAsync();
+		await UpdateBuildsAsync().ConfigureAwait(false);
 
-		await UpdateRunsAsync();
+		await UpdateRunsAsync().ConfigureAwait(false);
 
 		PruneCompletedRuns();
 	}
@@ -253,7 +302,7 @@ internal static class BuildMonitor
 		var runSyncs = RunSyncCollection.Where(b => b.Value.ShouldUpdate).ToList();
 		foreach (var (runId, runSync) in runSyncs)
 		{
-			await runSync.UpdateAsync();
+			await runSync.UpdateAsync().ConfigureAwait(false);
 		}
 	}
 
@@ -262,7 +311,7 @@ internal static class BuildMonitor
 		var buildSyncs = BuildSyncCollection.Where(b => b.Value.ShouldUpdate).ToList();
 		foreach (var (buildId, buildSync) in buildSyncs)
 		{
-			await buildSync.UpdateAsync();
+			await buildSync.UpdateAsync().ConfigureAwait(false);
 		}
 	}
 
@@ -311,7 +360,7 @@ internal static class BuildMonitor
 	internal static async Task MakeRequestAsync(string name, Func<Task> action)
 	{
 		_ = ActiveRequests.TryAdd(name, DateTimeOffset.UtcNow);
-		await action.Invoke();
+		await action.Invoke().ConfigureAwait(false);
 		_ = ActiveRequests.TryRemove(name, out _);
 	}
 }
