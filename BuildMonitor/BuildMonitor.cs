@@ -132,19 +132,7 @@ internal static class BuildMonitor
 
 			foreach (var (_, build) in builds)
 			{
-				bool shouldShow = true;
-				if (!string.IsNullOrEmpty(FilterRepository))
-				{
-					shouldShow &= TextFilter.IsMatch(build.Repository.Name, FilterRepository);
-				}
-				if (!string.IsNullOrEmpty(FilterBuildName))
-				{
-					shouldShow &= TextFilter.IsMatch(build.Name, FilterBuildName);
-				}
-				if (!string.IsNullOrEmpty(FilterStatus))
-				{
-					shouldShow &= TextFilter.IsMatch(build.LastStatus.ToString(), FilterStatus);
-				}
+				bool shouldShow = ShouldShowBuild(build);
 
 				if (!shouldShow)
 				{
@@ -170,15 +158,8 @@ internal static class BuildMonitor
 
 				if (ImGui.TableNextColumn())
 				{
-					string displayName = build.Name;
-					if (displayName.EndsWithOrdinal(".yml"))
-					{
-						displayName = displayName.RemoveSuffix(".yml");
-					}
-					if (displayName.StartsWithOrdinal(".github/workflows/"))
-					{
-						displayName = displayName.RemovePrefix(".github/workflows/");
-					}
+					string displayName = MakeBuildDisplayName(build);
+
 					ImGui.TextUnformatted(displayName);
 				}
 
@@ -189,11 +170,8 @@ internal static class BuildMonitor
 
 				if (ImGui.TableNextColumn())
 				{
-					string format = @"hh\:mm\:ss";
-					if (duration.Days > 0)
-					{
-						format = @"d\.hh\:mm\:ss";
-					}
+					string format = MakeDurationFormat(duration);
+
 					ImGui.TextUnformatted(duration.ToString(format, CultureInfo.InvariantCulture));
 				}
 
@@ -201,17 +179,16 @@ internal static class BuildMonitor
 				{
 					ShowBuildHistory(build);
 				}
+
 				if (ImGui.TableNextColumn() && isOngoing)
 				{
 					ImGui.ProgressBar((float)progress, new(0, ImGui.GetFrameHeight()), $"{progress:P0}");
 				}
+
 				if (ImGui.TableNextColumn() && isOngoing)
 				{
-					string format = @"hh\:mm\:ss";
-					if (eta.Days > 0)
-					{
-						format = @"d\.hh\:mm\:ss";
-					}
+					string format = MakeDurationFormat(eta);
+
 					ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString(format, CultureInfo.InvariantCulture) : "???");
 				}
 			}
@@ -221,6 +198,54 @@ internal static class BuildMonitor
 			ShowPopupsIfRequired();
 			SaveSettingsIfRequired();
 		}
+	}
+
+	private static string MakeDurationFormat(TimeSpan duration)
+	{
+		string format = @"hh\:mm\:ss";
+		if (duration.Days > 0)
+		{
+			format = @"d\.hh\:mm\:ss";
+		}
+
+		return format;
+	}
+
+	private static string MakeBuildDisplayName(Build build)
+	{
+		string displayName = build.Name;
+		if (displayName.EndsWithOrdinal(".yml"))
+		{
+			displayName = displayName.RemoveSuffix(".yml");
+		}
+
+		if (displayName.StartsWithOrdinal(".github/workflows/"))
+		{
+			displayName = displayName.RemovePrefix(".github/workflows/");
+		}
+
+		return displayName;
+	}
+
+	private static bool ShouldShowBuild(Build build)
+	{
+		bool shouldShow = true;
+		if (!string.IsNullOrEmpty(FilterRepository))
+		{
+			shouldShow &= TextFilter.IsMatch(build.Repository.Name, FilterRepository);
+		}
+
+		if (!string.IsNullOrEmpty(FilterBuildName))
+		{
+			shouldShow &= TextFilter.IsMatch(build.Name, FilterBuildName);
+		}
+
+		if (!string.IsNullOrEmpty(FilterStatus))
+		{
+			shouldShow &= TextFilter.IsMatch(build.LastStatus.ToString(), FilterStatus);
+		}
+
+		return shouldShow;
 	}
 
 	private static void ShowBuildHistory(Build build)

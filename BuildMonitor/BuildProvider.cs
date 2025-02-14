@@ -2,7 +2,9 @@ namespace ktsu.BuildMonitor;
 
 using System.Collections.Concurrent;
 using System.Text.Json.Serialization;
+
 using ImGuiNET;
+
 using ktsu.ImGuiPopups;
 using ktsu.StrongStrings;
 

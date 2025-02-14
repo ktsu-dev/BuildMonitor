@@ -4,7 +4,9 @@ namespace ktsu.BuildMonitor;
 
 using System.Globalization;
 using System.Threading.Tasks;
+
 using ktsu.Extensions;
+
 using Octokit;
 
 internal class GitHub : BuildProvider

@@ -1,6 +1,7 @@
 namespace ktsu.BuildMonitor;
 
 using System.Collections.Concurrent;
+
 using ktsu.StrongStrings;
 
 internal sealed record class RepositoryName : StrongStringAbstract<RepositoryName> { }

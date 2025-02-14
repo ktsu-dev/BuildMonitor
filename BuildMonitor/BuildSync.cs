@@ -26,6 +26,7 @@ internal class BuildSync
 				Run = run,
 			});
 		}
+
 		UpdateTimer.Restart();
 	}
 }

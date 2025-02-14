@@ -1,8 +1,8 @@
 namespace ktsu.BuildMonitor;
 
 using System.Collections.Concurrent;
-using ktsu.StrongStrings;
 
+using ktsu.StrongStrings;
 
 internal sealed record class OwnerName : StrongStringAbstract<OwnerName> { }
 internal sealed record class OwnerId : StrongStringAbstract<OwnerId> { }

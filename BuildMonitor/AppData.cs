@@ -1,8 +1,7 @@
-// Ignore Spelling: App
-
 namespace ktsu.BuildMonitor;
 
 using System.Collections.Concurrent;
+
 using ktsu.AppDataStorage;
 using ktsu.ImGuiApp;
 
