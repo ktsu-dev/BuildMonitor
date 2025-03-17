@@ -10,7 +10,7 @@
     <PackageReference Include="ktsu.Extensions" Version="1.4.0" />
     <PackageReference Include="ktsu.ImGuiApp" Version="1.1.0" />
     <PackageReference Include="ktsu.ImGuiPopups" Version="1.2.0" />
-    <PackageReference Include="ktsu.ImGuiWidgets" Version="1.4.0" />
+    <PackageReference Include="ktsu.ImGuiWidgets" Version="1.5.0" />
     <PackageReference Include="ktsu.TextFilter" Version="1.4.0" />
     <PackageReference Include="Microsoft.DotNet.ILCompiler" Version="9.0.3" />
     <PackageReference Include="Microsoft.NET.ILLink.Tasks" Version="9.0.1" />
