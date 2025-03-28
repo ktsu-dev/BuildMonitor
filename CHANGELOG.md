@@ -1,3 +1,10 @@
+## v1.1.0 (minor)
+
+Changes since v1.0.0:
+
+- [minor] Fix changelog tag reading in the case where there is only 1 tag present ([@matt-edmondson](https://github.com/matt-edmondson))
+- [minor] Update packages and fix versioning script ([@matt-edmondson](https://github.com/matt-edmondson))
+
 ## v1.0.0 (major)
 
 Changes since 0.0.0.0:
