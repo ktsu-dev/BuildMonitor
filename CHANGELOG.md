@@ -1,3 +1,8 @@
+## v1.2.4-pre.1 (prerelease)
+
+Changes since v1.2.3:
+
+- Sync scripts\PSBuild.psm1 ([@ktsu[bot]](https://github.com/ktsu[bot]))
 ## v1.2.3 (patch)
 
 Changes since v1.2.2:
@@ -23,9 +28,7 @@ Changes since v1.2.3-pre.1:
 - Sync .editorconfig ([@ktsu[bot]](https://github.com/ktsu[bot]))
 ## v1.2.3-pre.1 (prerelease)
 
-Changes since v1.2.2:
-
-- Bump ktsu.Extensions from 1.5.1 to 1.5.2 in the ktsu group ([@dependabot[bot]](https://github.com/dependabot[bot]))
+Incremental prerelease update.
 ## v1.2.2 (patch)
 
 Changes since v1.2.1:
