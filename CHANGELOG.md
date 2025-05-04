@@ -1,3 +1,9 @@
+## v1.2.3 (patch)
+
+Changes since v1.2.2:
+
+- Update DESCRIPTION.md to clarify application purpose and modify BuildMonitor.csproj to use ktsu.Sdk.App/1.8.0 ([@matt-edmondson](https://github.com/matt-edmondson))
+
 ## v1.2.2 (patch)
 
 Changes since v1.2.1:
