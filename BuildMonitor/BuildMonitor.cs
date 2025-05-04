@@ -1,4 +1,6 @@
-// Ignore Spelling: App
+// Copyright (c) ktsu.dev
+// All rights reserved.
+// Licensed under the MIT license.
 
 namespace ktsu.BuildMonitor;
 
@@ -8,8 +10,8 @@ using System.Globalization;
 using ImGuiNET;
 using ktsu.Extensions;
 using ktsu.ImGuiApp;
-using ktsu.ImGuiWidgets;
 using ktsu.ImGuiStyler;
+using ktsu.ImGuiWidgets;
 using ktsu.TextFilter;
 
 internal static class BuildMonitor
@@ -44,7 +46,7 @@ internal static class BuildMonitor
 
 	private static void Start()
 	{
-		bool needsSave = false;
+		var needsSave = false;
 
 		needsSave |= AppData.BuildProviders.TryAdd(GitHub.BuildProviderName, new GitHub());
 
@@ -109,21 +111,21 @@ internal static class BuildMonitor
 
 			if (ImGui.TableNextColumn())
 			{
-				string input = FilterRepository;
+				var input = FilterRepository;
 				ImGui.InputText("##FilterRepository", ref input, 256);
 				FilterRepository = input;
 			}
 
 			if (ImGui.TableNextColumn())
 			{
-				string input = FilterBuildName;
+				var input = FilterBuildName;
 				ImGui.InputText("##FilterBuildName", ref input, 256);
 				FilterBuildName = input;
 			}
 
 			if (ImGui.TableNextColumn())
 			{
-				string input = FilterStatus;
+				var input = FilterStatus;
 				ImGui.InputText("##FilterStatus", ref input, 256);
 				FilterStatus = input;
 			}
@@ -132,18 +134,18 @@ internal static class BuildMonitor
 
 			foreach (var (_, build) in builds)
 			{
-				bool shouldShow = ShouldShowBuild(build);
+				var shouldShow = ShouldShowBuild(build);
 
 				if (!shouldShow)
 				{
 					continue;
 				}
 
-				bool isOngoing = !build.Runs.IsEmpty && build.IsOngoing;
+				var isOngoing = !build.Runs.IsEmpty && build.IsOngoing;
 				var estimate = build.CalculateEstimatedDuration();
 				var duration = isOngoing ? DateTimeOffset.UtcNow - build.LastStarted : build.LastDuration;
 				var eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
-				double progress = duration.TotalSeconds / estimate.TotalSeconds;
+				var progress = duration.TotalSeconds / estimate.TotalSeconds;
 
 				ImGui.TableNextRow();
 				if (ImGui.TableNextColumn())
@@ -158,7 +160,7 @@ internal static class BuildMonitor
 
 				if (ImGui.TableNextColumn())
 				{
-					string displayName = MakeBuildDisplayName(build);
+					var displayName = MakeBuildDisplayName(build);
 
 					ImGui.TextUnformatted(displayName);
 				}
@@ -170,7 +172,7 @@ internal static class BuildMonitor
 
 				if (ImGui.TableNextColumn())
 				{
-					string format = MakeDurationFormat(duration);
+					var format = MakeDurationFormat(duration);
 
 					ImGui.TextUnformatted(duration.ToString(format, CultureInfo.InvariantCulture));
 				}
@@ -187,7 +189,7 @@ internal static class BuildMonitor
 
 				if (ImGui.TableNextColumn() && isOngoing)
 				{
-					string format = MakeDurationFormat(eta);
+					var format = MakeDurationFormat(eta);
 
 					ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString(format, CultureInfo.InvariantCulture) : "???");
 				}
@@ -202,7 +204,7 @@ internal static class BuildMonitor
 
 	private static string MakeDurationFormat(TimeSpan duration)
 	{
-		string format = @"hh\:mm\:ss";
+		var format = @"hh\:mm\:ss";
 		if (duration.Days > 0)
 		{
 			format = @"d\.hh\:mm\:ss";
@@ -229,7 +231,7 @@ internal static class BuildMonitor
 
 	private static bool ShouldShowBuild(Build build)
 	{
-		bool shouldShow = true;
+		var shouldShow = true;
 		if (!string.IsNullOrEmpty(FilterRepository))
 		{
 			shouldShow &= TextFilter.IsMatch(build.Repository.Name, FilterRepository);
