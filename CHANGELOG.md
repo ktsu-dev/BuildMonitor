@@ -1,6 +1,11 @@
+## v1.2.4-pre.3 (prerelease)
+
+Changes since v1.2.4-pre.2:
+
+- Update: - ktsu.Extensions to 1.5.3 - ktsu.ImGuiPopups to 1.3.2 - ktsu.TextFilter to 1.5.2 ([@dependabot[bot]](https://github.com/dependabot[bot]))
 ## v1.2.4-pre.2 (prerelease)
 
-Incremental prerelease update.
+Changes since v1.2.4-pre.1:
 ## v1.2.4-pre.1 (prerelease)
 
 Changes since v1.2.3:
