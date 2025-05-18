@@ -1,6 +1,6 @@
 MIT License
 
-https://github.com/ktsu-dev/ktsu-dev/BuildMonitor
+https://github.com/ktsu-dev/BuildMonitor
 
 Copyright (c) 2023-2025 ktsu-dev
 
