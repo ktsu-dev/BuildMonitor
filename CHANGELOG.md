@@ -1,6 +1,6 @@
-## v1.2.4-pre.16 (prerelease)
+## v1.2.4-pre.17 (prerelease)
 
-Changes since v1.2.4-pre.15:
+Changes since v1.2.4-pre.16:
 
 - Update azure-pipelines.yml for Azure Pipelines ([@matt-edmondson](https://github.com/matt-edmondson))
 - [minor] Update packages and fix versioning script ([@matt-edmondson](https://github.com/matt-edmondson))
