@@ -7,7 +7,7 @@ namespace ktsu.BuildMonitor;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Globalization;
-using ImGuiNET;
+using Hexa.NET.ImGui;
 using ktsu.Extensions;
 using ktsu.ImGuiApp;
 using ktsu.ImGuiStyler;
@@ -35,7 +35,15 @@ internal static class BuildMonitor
 	private static void Main()
 	{
 		AppData = AppData.LoadOrCreate();
-		ImGuiApp.Start(Strings.ApplicationName, AppData.WindowState, Start, Tick, ShowMenu, WindowResized);
+		ImGuiApp.Start(new ImGuiAppConfig
+		{
+			Title = Strings.ApplicationName,
+			InitialWindowState = AppData.WindowState,
+			OnStart = Start,
+			OnUpdate = Tick,
+			OnAppMenu = ShowMenu,
+			OnMoveOrResize = WindowResized
+		});
 	}
 
 	private static void WindowResized()
@@ -273,12 +281,12 @@ internal static class BuildMonitor
 	{
 		return status switch
 		{
-			RunStatus.Pending => Color.Gray,
-			RunStatus.Running => Color.Yellow,
-			RunStatus.Canceled => Color.Red,
-			RunStatus.Success => Color.Green,
-			RunStatus.Failure => Color.Red,
-			_ => Color.Gray,
+			RunStatus.Pending => Color.Palette.Neutral.Gray,
+			RunStatus.Running => Color.Palette.Basic.Yellow,
+			RunStatus.Canceled => Color.Palette.Basic.Red,
+			RunStatus.Success => Color.Palette.Basic.Green,
+			RunStatus.Failure => Color.Palette.Basic.Red,
+			_ => Color.Palette.Neutral.Gray,
 		};
 	}
 
