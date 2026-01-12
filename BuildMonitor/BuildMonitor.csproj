@@ -1,15 +1,24 @@
+<Project>
+  <Sdk Name="Microsoft.NET.Sdk" />
+  <Sdk Name="ktsu.Sdk" />
+  <Sdk Name="ktsu.Sdk.App" />
 
-<Project Sdk="ktsu.Sdk.App/1.8.0">
+  <PropertyGroup>
+    <TargetFramework>net9.0</TargetFramework>
+    <TargetFrameworks></TargetFrameworks>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Humanizer.Core" Version="3.0.1" />
-    <PackageReference Include="ktsu.AppDataStorage" Version="1.15.11" />
-    <PackageReference Include="ktsu.Extensions" Version="1.5.8" />
-    <PackageReference Include="ktsu.ImGuiApp" Version="2.1.7" />
-    <PackageReference Include="ktsu.ImGuiPopups" Version="1.3.5" />
-    <PackageReference Include="ktsu.ImGuiWidgets" Version="1.6.8" />
-    <PackageReference Include="ktsu.TextFilter" Version="1.5.4" />
-    <PackageReference Include="Octokit" Version="14.0.0" />
+    <PackageReference Include="Humanizer.Core" ExcludeAssets="analyzers" />
+    <PackageReference Include="ktsu.AppDataStorage" />
+    <PackageReference Include="ktsu.Extensions" />
+    <PackageReference Include="ktsu.ImGui.App" />
+    <PackageReference Include="ktsu.ImGui.Popups" />
+    <PackageReference Include="ktsu.ImGui.Widgets" />
+    <PackageReference Include="ktsu.Semantics.Strings" />
+    <PackageReference Include="ktsu.TextFilter" />
+    <PackageReference Include="Octokit" />
   </ItemGroup>
 
 </Project>
