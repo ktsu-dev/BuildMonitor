@@ -1,5 +1,7 @@
-## v1.2.5 (patch)
+## v1.2.6-pre.1 (prerelease)
 
-Changes since v1.2.4:
+Changes since v1.2.5:
 
-- Add handling for archived repositories in GitHub provider ([@matt-edmondson](https://github.com/matt-edmondson))
+- Bump the ktsu group with 4 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump MSTest.Sdk from 3.10.2 to 4.0.2 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump Polyfill from 8.8.0 to 9.7.0 ([@dependabot[bot]](https://github.com/dependabot[bot]))
