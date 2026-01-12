@@ -9,21 +9,21 @@ using System.Text.Json.Serialization;
 
 using Hexa.NET.ImGui;
 
-using ktsu.ImGuiPopups;
-using ktsu.StrongStrings;
+using ktsu.ImGui.Popups;
+using ktsu.Semantics.Strings;
 
 /// <summary>
 /// Represents the name of a build provider.
 /// </summary>
-public sealed record class BuildProviderName : StrongStringAbstract<BuildProviderName> { }
+public sealed record class BuildProviderName : SemanticString<BuildProviderName> { }
 /// <summary>
 /// Represents the account ID of a build provider.
 /// </summary>
-public sealed record class BuildProviderAccountId : StrongStringAbstract<BuildProviderAccountId> { }
+public sealed record class BuildProviderAccountId : SemanticString<BuildProviderAccountId> { }
 /// <summary>
 /// Represents the token of a build provider.
 /// </summary>
-public sealed record class BuildProviderToken : StrongStringAbstract<BuildProviderToken> { }
+public sealed record class BuildProviderToken : SemanticString<BuildProviderToken> { }
 
 [JsonDerivedType(typeof(GitHub), nameof(GitHub))]
 [JsonPolymorphic]
@@ -76,7 +76,7 @@ internal abstract class BuildProvider
 		{
 			PopupInputString.Open(Strings.SetAccountId, Strings.AccountId, AccountId, (result) =>
 			{
-				AccountId = (BuildProviderAccountId)result;
+				AccountId = result.As<BuildProviderAccountId>();
 				BuildMonitor.QueueSaveAppData();
 				ShouldShowTokenPopup = true;
 			});
@@ -86,7 +86,7 @@ internal abstract class BuildProvider
 		{
 			PopupInputString.Open(Strings.SetToken, Strings.Token, string.Empty, (result) =>
 			{
-				Token = (BuildProviderToken)result;
+				Token = result.As<BuildProviderToken>();
 				BuildMonitor.QueueSaveAppData();
 			});
 			ShouldShowTokenPopup = false;
@@ -95,7 +95,7 @@ internal abstract class BuildProvider
 		{
 			PopupInputString.Open(Strings.AddOwner, Strings.OwnerName, string.Empty, (result) =>
 			{
-				var ownerName = (OwnerName)result;
+				OwnerName ownerName = result.As<OwnerName>();
 				if (Owners.TryAdd(ownerName, CreateOwner(ownerName)))
 				{
 					BuildMonitor.QueueSaveAppData();

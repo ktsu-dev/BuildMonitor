@@ -6,12 +6,12 @@ namespace ktsu.BuildMonitor;
 
 using System.Collections.Concurrent;
 
-using ktsu.StrongStrings;
+using ktsu.Semantics.Strings;
 
-internal sealed record class RepositoryName : StrongStringAbstract<RepositoryName> { }
-internal sealed record class RepositoryId : StrongStringAbstract<RepositoryId> { }
+internal sealed record class RepositoryName : SemanticString<RepositoryName> { }
+internal sealed record class RepositoryId : SemanticString<RepositoryId> { }
 
-internal class Repository
+internal sealed class Repository
 {
 	public RepositoryName Name { get; set; } = new();
 	public RepositoryId Id { get; set; } = new();
@@ -19,7 +19,7 @@ internal class Repository
 	public bool Enabled { get; set; }
 	public ConcurrentDictionary<BuildId, Build> Builds { get; init; } = [];
 
-	internal Build CreateBuild(BuildName name) => CreateBuild(name, (BuildId)(string)name);
+	internal Build CreateBuild(BuildName name) => CreateBuild(name, name.As<BuildId>());
 	internal Build CreateBuild(BuildName name, BuildId id)
 	{
 		return new()

@@ -6,7 +6,7 @@ namespace ktsu.BuildMonitor;
 
 using System.Diagnostics;
 
-internal class RunSync
+internal sealed class RunSync
 {
 	internal Run Run { get; set; } = new();
 	private Stopwatch UpdateTimer { get; } = new Stopwatch();

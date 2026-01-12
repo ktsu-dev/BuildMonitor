@@ -4,10 +4,10 @@
 
 namespace ktsu.BuildMonitor;
 
-using ktsu.StrongStrings;
+using ktsu.Semantics.Strings;
 
-internal sealed record class RunName : StrongStringAbstract<RunName> { }
-internal sealed record class RunId : StrongStringAbstract<RunId> { }
+internal sealed record class RunName : SemanticString<RunName> { }
+internal sealed record class RunId : SemanticString<RunId> { }
 
 internal enum RunStatus
 {
@@ -18,7 +18,7 @@ internal enum RunStatus
 	Failure,
 }
 
-internal class Run
+internal sealed class Run
 {
 	public RunName Name { get; set; } = new();
 	public RunId Id { get; set; } = new();
@@ -35,8 +35,8 @@ internal class Run
 
 	internal TimeSpan CalculateETA()
 	{
-		var estimate = Build.CalculateEstimatedDuration();
-		var duration = IsOngoing ? DateTimeOffset.UtcNow - Started : Duration;
+		TimeSpan estimate = Build.CalculateEstimatedDuration();
+		TimeSpan duration = IsOngoing ? DateTimeOffset.UtcNow - Started : Duration;
 		return duration < estimate ? estimate - duration : TimeSpan.Zero;
 	}
 }

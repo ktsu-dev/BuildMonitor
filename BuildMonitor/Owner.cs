@@ -6,12 +6,12 @@ namespace ktsu.BuildMonitor;
 
 using System.Collections.Concurrent;
 
-using ktsu.StrongStrings;
+using ktsu.Semantics.Strings;
 
-internal sealed record class OwnerName : StrongStringAbstract<OwnerName> { }
-internal sealed record class OwnerId : StrongStringAbstract<OwnerId> { }
+internal sealed record class OwnerName : SemanticString<OwnerName> { }
+internal sealed record class OwnerId : SemanticString<OwnerId> { }
 
-internal class Owner
+internal sealed class Owner
 {
 	public OwnerName Name { get; init; } = new();
 	public OwnerId Id { get; init; } = new();
@@ -19,7 +19,7 @@ internal class Owner
 	public bool Enabled { get; set; }
 	public ConcurrentDictionary<RepositoryId, Repository> Repositories { get; init; } = [];
 
-	internal Repository CreateRepository(RepositoryName name) => CreateRepository(name, (RepositoryId)(string)name);
+	internal Repository CreateRepository(RepositoryName name) => CreateRepository(name, name.As<RepositoryId>());
 	internal Repository CreateRepository(RepositoryName name, RepositoryId id)
 	{
 		return new()

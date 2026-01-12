@@ -7,9 +7,9 @@ namespace ktsu.BuildMonitor;
 using System.Collections.Concurrent;
 
 using ktsu.AppDataStorage;
-using ktsu.ImGuiApp;
+using ktsu.ImGui.App;
 
-internal class AppData : AppData<AppData>
+internal sealed class AppData : AppData<AppData>
 {
 	public ImGuiAppWindowState WindowState { get; set; } = new();
 

@@ -6,7 +6,7 @@ namespace ktsu.BuildMonitor;
 
 using System.Diagnostics;
 
-internal class BuildSync
+internal sealed class BuildSync
 {
 	internal Build Build { get; set; } = new();
 	private Stopwatch UpdateTimer { get; } = new Stopwatch();
@@ -21,7 +21,7 @@ internal class BuildSync
 	{
 		await Build.Owner.BuildProvider.UpdateBuildAsync(Build).ConfigureAwait(false);
 
-		foreach (var (runId, run) in Build.Runs)
+		foreach ((RunId? runId, Run? run) in Build.Runs)
 		{
 			_ = BuildMonitor.RunSyncCollection.TryAdd(runId, new()
 			{

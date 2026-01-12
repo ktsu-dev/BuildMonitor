@@ -5,13 +5,13 @@
 namespace ktsu.BuildMonitor;
 
 using System.Collections.Concurrent;
+using System.Collections.Generic;
+using ktsu.Semantics.Strings;
 
-using ktsu.StrongStrings;
+internal sealed record class BuildName : SemanticString<BuildName> { }
+internal sealed record class BuildId : SemanticString<BuildId> { }
 
-internal sealed record class BuildName : StrongStringAbstract<BuildName> { }
-internal sealed record class BuildId : StrongStringAbstract<BuildId> { }
-
-internal class Build
+internal sealed class Build
 {
 	private const int NumRecentRuns = 10;
 
@@ -28,7 +28,7 @@ internal class Build
 	internal bool IsOngoing => !Runs.IsEmpty && LastStatus is RunStatus.Pending or RunStatus.Running;
 	internal TimeSpan CalculateEstimatedDuration()
 	{
-		var recentRuns = Runs.Values.Where(r => r.Status != RunStatus.Canceled).OrderByDescending(r => r.Started).Skip(1).Take(NumRecentRuns).ToList();
+		List<Run> recentRuns = [.. Runs.Values.Where(r => r.Status != RunStatus.Canceled).OrderByDescending(r => r.Started).Skip(1).Take(NumRecentRuns)];
 		return recentRuns.Count == 0
 			? TimeSpan.Zero
 			: TimeSpan.FromSeconds(recentRuns.Average(r => r.Duration.TotalSeconds));
@@ -36,12 +36,12 @@ internal class Build
 
 	internal TimeSpan CalculateETA()
 	{
-		var estimate = CalculateEstimatedDuration();
-		var duration = IsOngoing ? DateTimeOffset.UtcNow - LastStarted : LastDuration;
+		TimeSpan estimate = CalculateEstimatedDuration();
+		TimeSpan duration = IsOngoing ? DateTimeOffset.UtcNow - LastStarted : LastDuration;
 		return duration < estimate ? estimate - duration : TimeSpan.Zero;
 	}
 
-	internal Run CreateRun(RunName name) => CreateRun(name, (RunId)(string)name);
+	internal Run CreateRun(RunName name) => CreateRun(name, name.As<RunId>());
 	internal Run CreateRun(RunName name, RunId id)
 	{
 		return new()

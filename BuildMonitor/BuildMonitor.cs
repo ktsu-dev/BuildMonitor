@@ -5,13 +5,14 @@
 namespace ktsu.BuildMonitor;
 
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
 using Hexa.NET.ImGui;
 using ktsu.Extensions;
-using ktsu.ImGuiApp;
-using ktsu.ImGuiStyler;
-using ktsu.ImGuiWidgets;
+using ktsu.ImGui.App;
+using ktsu.ImGui.Styler;
+using ktsu.ImGui.Widgets;
 using ktsu.TextFilter;
 
 internal static class BuildMonitor
@@ -39,22 +40,22 @@ internal static class BuildMonitor
 		{
 			Title = Strings.ApplicationName,
 			InitialWindowState = AppData.WindowState,
-			OnStart = Start,
-			OnUpdate = Tick,
-			OnAppMenu = ShowMenu,
-			OnMoveOrResize = WindowResized
+			OnStart = OnStart,
+			OnRender = OnRender,
+			OnAppMenu = OnAppMenu,
+			OnMoveOrResize = OnMoveOrResize
 		});
 	}
 
-	private static void WindowResized()
+	private static void OnMoveOrResize()
 	{
 		AppData.WindowState = ImGuiApp.WindowState;
 		QueueSaveAppData();
 	}
 
-	private static void Start()
+	private static void OnStart()
 	{
-		var needsSave = false;
+		bool needsSave = false;
 
 		needsSave |= AppData.BuildProviders.TryAdd(GitHub.BuildProviderName, new GitHub());
 
@@ -68,11 +69,19 @@ internal static class BuildMonitor
 		UpdateTask = UpdateAsync();
 	}
 
-	private static string FilterRepository { get; set; } = string.Empty;
-	private static string FilterBuildName { get; set; } = string.Empty;
-	private static string FilterStatus { get; set; } = string.Empty;
+	private static string FilterRepository = string.Empty;
+	private static TextFilterType FilterRepositoryType = TextFilterType.Glob;
+	private static TextFilterMatchOptions FilterRepositoryMatchOptions = TextFilterMatchOptions.ByWordAny;
 
-	private static void Tick(float dt)
+	private static string FilterBuildName = string.Empty;
+	private static TextFilterType FilterBuildNameType = TextFilterType.Glob;
+	private static TextFilterMatchOptions FilterBuildNameMatchOptions = TextFilterMatchOptions.ByWordAny;
+
+	private static string FilterStatus = string.Empty;
+	private static TextFilterType FilterStatusType = TextFilterType.Glob;
+	private static TextFilterMatchOptions FilterStatusMatchOptions = TextFilterMatchOptions.ByWordAny;
+
+	private static void OnRender(float dt)
 	{
 		if (UpdateTask.IsCompleted)
 		{
@@ -84,12 +93,12 @@ internal static class BuildMonitor
 			UpdateTask = UpdateAsync();
 		}
 
-		foreach (var (name, buildProvider) in AppData.BuildProviders)
+		foreach ((BuildProviderName? name, BuildProvider? buildProvider) in AppData.BuildProviders)
 		{
 			buildProvider.Tick();
 		}
 
-		var builds = AppData.BuildProviders
+		IOrderedEnumerable<KeyValuePair<BuildId, Build>> builds = AppData.BuildProviders
 			.SelectMany(p => p.Value.Owners)
 			.SelectMany(o => o.Value.Repositories)
 			.SelectMany(r => r.Value.Builds)
@@ -115,45 +124,39 @@ internal static class BuildMonitor
 
 			ImGui.TableHeadersRow();
 
-			ImGui.TableNextColumn();
+			// Filter row
+			ImGui.TableNextRow();
+			ImGui.TableNextColumn(); // Skip status column
 
 			if (ImGui.TableNextColumn())
 			{
-				var input = FilterRepository;
-				ImGui.InputText("##FilterRepository", ref input, 256);
-				FilterRepository = input;
+				ImGuiWidgets.SearchBox("##FilterRepository", ref FilterRepository, ref FilterRepositoryType, ref FilterRepositoryMatchOptions);
 			}
 
 			if (ImGui.TableNextColumn())
 			{
-				var input = FilterBuildName;
-				ImGui.InputText("##FilterBuildName", ref input, 256);
-				FilterBuildName = input;
+				ImGuiWidgets.SearchBox("##FilterBuildName", ref FilterBuildName, ref FilterBuildNameType, ref FilterBuildNameMatchOptions);
 			}
 
 			if (ImGui.TableNextColumn())
 			{
-				var input = FilterStatus;
-				ImGui.InputText("##FilterStatus", ref input, 256);
-				FilterStatus = input;
+				ImGuiWidgets.SearchBox("##FilterStatus", ref FilterStatus, ref FilterStatusType, ref FilterStatusMatchOptions);
 			}
 
-			ImGui.TableHeadersRow();
-
-			foreach (var (_, build) in builds)
+			foreach ((BuildId _, Build? build) in builds)
 			{
-				var shouldShow = ShouldShowBuild(build);
+				bool shouldShow = ShouldShowBuild(build);
 
 				if (!shouldShow)
 				{
 					continue;
 				}
 
-				var isOngoing = !build.Runs.IsEmpty && build.IsOngoing;
-				var estimate = build.CalculateEstimatedDuration();
-				var duration = isOngoing ? DateTimeOffset.UtcNow - build.LastStarted : build.LastDuration;
-				var eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
-				var progress = duration.TotalSeconds / estimate.TotalSeconds;
+				bool isOngoing = !build.Runs.IsEmpty && build.IsOngoing;
+				TimeSpan estimate = build.CalculateEstimatedDuration();
+				TimeSpan duration = isOngoing ? DateTimeOffset.UtcNow - build.LastStarted : build.LastDuration;
+				TimeSpan eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
+				double progress = duration.TotalSeconds / estimate.TotalSeconds;
 
 				ImGui.TableNextRow();
 				if (ImGui.TableNextColumn())
@@ -168,7 +171,7 @@ internal static class BuildMonitor
 
 				if (ImGui.TableNextColumn())
 				{
-					var displayName = MakeBuildDisplayName(build);
+					string displayName = MakeBuildDisplayName(build);
 
 					ImGui.TextUnformatted(displayName);
 				}
@@ -180,7 +183,7 @@ internal static class BuildMonitor
 
 				if (ImGui.TableNextColumn())
 				{
-					var format = MakeDurationFormat(duration);
+					string format = MakeDurationFormat(duration);
 
 					ImGui.TextUnformatted(duration.ToString(format, CultureInfo.InvariantCulture));
 				}
@@ -197,7 +200,7 @@ internal static class BuildMonitor
 
 				if (ImGui.TableNextColumn() && isOngoing)
 				{
-					var format = MakeDurationFormat(eta);
+					string format = MakeDurationFormat(eta);
 
 					ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString(format, CultureInfo.InvariantCulture) : "???");
 				}
@@ -212,7 +215,7 @@ internal static class BuildMonitor
 
 	private static string MakeDurationFormat(TimeSpan duration)
 	{
-		var format = @"hh\:mm\:ss";
+		string format = @"hh\:mm\:ss";
 		if (duration.Days > 0)
 		{
 			format = @"d\.hh\:mm\:ss";
@@ -239,20 +242,22 @@ internal static class BuildMonitor
 
 	private static bool ShouldShowBuild(Build build)
 	{
-		var shouldShow = true;
+		bool shouldShow = true;
 		if (!string.IsNullOrEmpty(FilterRepository))
 		{
-			shouldShow &= TextFilter.IsMatch(build.Repository.Name, FilterRepository);
+			string displayRepository = $"{build.Owner.Name}/{build.Repository.Name}";
+			shouldShow &= TextFilter.IsMatch(displayRepository.ToUpperInvariant(), "*" + FilterRepository.ToUpperInvariant() + "*", FilterRepositoryType, FilterRepositoryMatchOptions);
 		}
 
 		if (!string.IsNullOrEmpty(FilterBuildName))
 		{
-			shouldShow &= TextFilter.IsMatch(build.Name, FilterBuildName);
+			string displayName = MakeBuildDisplayName(build);
+			shouldShow &= TextFilter.IsMatch(displayName.ToUpperInvariant(), "*" + FilterBuildName.ToUpperInvariant() + "*", FilterBuildNameType, FilterBuildNameMatchOptions);
 		}
 
 		if (!string.IsNullOrEmpty(FilterStatus))
 		{
-			shouldShow &= TextFilter.IsMatch(build.LastStatus.ToString(), FilterStatus);
+			shouldShow &= TextFilter.IsMatch(build.LastStatus.ToString().ToUpperInvariant(), "*" + FilterStatus.ToUpperInvariant() + "*", FilterStatusType, FilterStatusMatchOptions);
 		}
 
 		return shouldShow;
@@ -262,15 +267,14 @@ internal static class BuildMonitor
 	{
 		const int recentRuns = 5;
 
-		var runs = build.Runs.Values
+		List<Run> runs = [.. build.Runs.Values
 			.Where(r => r.Status != RunStatus.Canceled)
 			.OrderByDescending(r => r.LastUpdated)
-			.Take(recentRuns)
-			.ToList();
+			.Take(recentRuns)];
 
 		runs.Reverse();
 
-		foreach (var run in runs)
+		foreach (Run? run in runs)
 		{
 			ImGui.SameLine();
 			ImGuiWidgets.ColorIndicator(GetStatusColor(run.Status), true);
@@ -294,15 +298,15 @@ internal static class BuildMonitor
 	{
 		if (!ProviderRefreshTimer.IsRunning || ProviderRefreshTimer.Elapsed.TotalSeconds >= ProviderRefreshTimeout)
 		{
-			foreach (var (_, provider) in AppData.BuildProviders)
+			foreach ((BuildProviderName _, BuildProvider? provider) in AppData.BuildProviders)
 			{
-				foreach (var (_, owner) in provider.Owners)
+				foreach ((OwnerName _, Owner? owner) in provider.Owners)
 				{
 					await provider.UpdateRepositoriesAsync(owner).ConfigureAwait(false);
-					foreach (var (_, repository) in owner.Repositories)
+					foreach ((RepositoryId _, Repository? repository) in owner.Repositories)
 					{
 						await provider.UpdateBuildsAsync(repository).ConfigureAwait(false);
-						foreach (var (_, build) in repository.Builds)
+						foreach ((BuildId _, Build? build) in repository.Builds)
 						{
 							_ = BuildSyncCollection.TryAdd(build.Id, new()
 							{
@@ -325,8 +329,8 @@ internal static class BuildMonitor
 
 	private static void PruneCompletedRuns()
 	{
-		var completedRunSyncs = RunSyncCollection.Where(b => !b.Value.Run.IsOngoing).ToList();
-		foreach (var (runId, runSync) in completedRunSyncs)
+		List<KeyValuePair<RunId, RunSync>> completedRunSyncs = [.. RunSyncCollection.Where(b => !b.Value.Run.IsOngoing)];
+		foreach ((RunId? runId, RunSync? runSync) in completedRunSyncs)
 		{
 			_ = RunSyncCollection.Remove(runId, out _);
 		}
@@ -334,8 +338,8 @@ internal static class BuildMonitor
 
 	private static async Task UpdateRunsAsync()
 	{
-		var runSyncs = RunSyncCollection.Where(b => b.Value.ShouldUpdate).ToList();
-		foreach (var (runId, runSync) in runSyncs)
+		List<KeyValuePair<RunId, RunSync>> runSyncs = [.. RunSyncCollection.Where(b => b.Value.ShouldUpdate)];
+		foreach ((RunId? runId, RunSync? runSync) in runSyncs)
 		{
 			await runSync.UpdateAsync().ConfigureAwait(false);
 		}
@@ -343,14 +347,14 @@ internal static class BuildMonitor
 
 	private static async Task UpdateBuildsAsync()
 	{
-		var buildSyncs = BuildSyncCollection.Where(b => b.Value.ShouldUpdate).ToList();
-		foreach (var (buildId, buildSync) in buildSyncs)
+		List<KeyValuePair<BuildId, BuildSync>> buildSyncs = [.. BuildSyncCollection.Where(b => b.Value.ShouldUpdate)];
+		foreach ((BuildId? buildId, BuildSync? buildSync) in buildSyncs)
 		{
 			await buildSync.UpdateAsync().ConfigureAwait(false);
 		}
 	}
 
-	private static void ShowMenu()
+	private static void OnAppMenu()
 	{
 		if (ImGui.BeginMenu(Strings.File))
 		{
@@ -366,7 +370,7 @@ internal static class BuildMonitor
 		{
 			lock (SyncLock)
 			{
-				foreach (var (_, provider) in AppData.BuildProviders)
+				foreach ((BuildProviderName _, BuildProvider? provider) in AppData.BuildProviders)
 				{
 					provider.ShowMenu();
 				}

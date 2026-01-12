@@ -4,16 +4,17 @@
 
 namespace ktsu.BuildMonitor;
 
+using System.Collections.Generic;
 using System.Globalization;
 using System.Threading.Tasks;
 
 using ktsu.Extensions;
-
+using ktsu.Semantics.Strings;
 using Octokit;
 
-internal class GitHub : BuildProvider
+internal sealed class GitHub : BuildProvider
 {
-	internal static BuildProviderName BuildProviderName => (BuildProviderName)nameof(GitHub);
+	internal static BuildProviderName BuildProviderName => nameof(GitHub).As<BuildProviderName>();
 	internal override BuildProviderName Name => BuildProviderName;
 	private GitHubClient GitHubClient { get; } = new(new ProductHeaderValue(Strings.FullyQualifiedApplicationName));
 	private IRepositoriesClient GitHubRepository => GitHubClient.Repository;
@@ -38,15 +39,15 @@ internal class GitHub : BuildProvider
 		UpdateGitHubClientCredentials();
 		await MakeGitHubRequestAsync($"{Name}/{owner.Name}", async () =>
 		{
-			var userRepositories = await GitHubRepository.GetAllForUser(owner.Name).ConfigureAwait(false);
-			var organizationRepositories = await GitHubRepository.GetAllForOrg(owner.Name).ConfigureAwait(false);
-			var allRepositories = userRepositories.Concat(organizationRepositories);
+			IReadOnlyList<Octokit.Repository> userRepositories = await GitHubRepository.GetAllForUser(owner.Name).ConfigureAwait(false);
+			IReadOnlyList<Octokit.Repository> organizationRepositories = await GitHubRepository.GetAllForOrg(owner.Name).ConfigureAwait(false);
+			IEnumerable<Octokit.Repository> allRepositories = userRepositories.Concat(organizationRepositories);
 
-			foreach (var gitHubRepository in allRepositories)
+			foreach (Octokit.Repository? gitHubRepository in allRepositories)
 			{
-				var repositoryName = (RepositoryName)gitHubRepository.Name;
-				var repositoryId = (RepositoryId)gitHubRepository.Id.ToString(CultureInfo.InvariantCulture);
-				var repository = owner.CreateRepository(repositoryName, repositoryId);
+				RepositoryName repositoryName = gitHubRepository.Name.As<RepositoryName>();
+				RepositoryId repositoryId = gitHubRepository.Id.ToString(CultureInfo.InvariantCulture).As<RepositoryId>();
+				Repository repository = owner.CreateRepository(repositoryName, repositoryId);
 				if (owner.Repositories.TryAdd(repositoryId, repository))
 				{
 					BuildMonitor.QueueSaveAppData();
@@ -67,12 +68,12 @@ internal class GitHub : BuildProvider
 		{
 			await MakeGitHubRequestAsync($"{Name}/{repository.Owner.Name}/{repository.Name}", async () =>
 			{
-				var workflows = await GitHubWorkflows.List(repository.Owner.Name, repository.Name).ConfigureAwait(false);
-				foreach (var workflow in workflows.Workflows)
+				WorkflowsResponse workflows = await GitHubWorkflows.List(repository.Owner.Name, repository.Name).ConfigureAwait(false);
+				foreach (Workflow? workflow in workflows.Workflows)
 				{
-					var buildName = (BuildName)workflow.Name;
-					var buildId = (BuildId)workflow.Id.ToString(CultureInfo.InvariantCulture);
-					var build = repository.CreateBuild(buildName, buildId);
+					BuildName buildName = workflow.Name.As<BuildName>();
+					BuildId buildId = workflow.Id.ToString(CultureInfo.InvariantCulture).As<BuildId>();
+					Build build = repository.CreateBuild(buildName, buildId);
 					if (repository.Builds.TryAdd(buildId, build))
 					{
 						BuildMonitor.QueueSaveAppData();
@@ -99,17 +100,17 @@ internal class GitHub : BuildProvider
 		{
 			await MakeGitHubRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/{build.Name}", async () =>
 		{
-			var gitHubRuns = await GitHubRuns.ListByWorkflow(build.Owner.Name, build.Repository.Name, long.Parse(build.Id, CultureInfo.InvariantCulture), new(), new()
+			WorkflowRunsResponse gitHubRuns = await GitHubRuns.ListByWorkflow(build.Owner.Name, build.Repository.Name, long.Parse(build.Id, CultureInfo.InvariantCulture), new(), new()
 			{
 				PageCount = 1,
 				StartPage = 1,
 				PageSize = 10,
 			}).ConfigureAwait(false);
-			foreach (var gitHubRun in gitHubRuns.WorkflowRuns)
+			foreach (WorkflowRun? gitHubRun in gitHubRuns.WorkflowRuns)
 			{
-				var runId = (RunId)gitHubRun.Id.ToString(CultureInfo.InvariantCulture);
-				var runName = (RunName)gitHubRun.Name;
-				var run = build.Runs.GetOrCreate(runId, build.CreateRun(runName, runId));
+				RunId runId = gitHubRun.Id.ToString(CultureInfo.InvariantCulture).As<RunId>();
+				RunName runName = gitHubRun.Name.As<RunName>();
+				Run run = build.Runs.GetOrCreate(runId, build.CreateRun(runName, runId));
 				UpdateRunFromWorkflow(run, gitHubRun);
 			}
 		}).ConfigureAwait(false);
@@ -134,7 +135,7 @@ internal class GitHub : BuildProvider
 		{
 			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}/{run.Name}", async () =>
 			{
-				var gitHubRun = await GitHubRuns.Get(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
+				WorkflowRun gitHubRun = await GitHubRuns.Get(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
 				UpdateRunFromWorkflow(run, gitHubRun);
 			}).ConfigureAwait(false);
 		}
