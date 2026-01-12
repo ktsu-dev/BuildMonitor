@@ -45,8 +45,18 @@ internal sealed class GitHub : BuildProvider
 
 			foreach (Octokit.Repository? gitHubRepository in allRepositories)
 			{
-				RepositoryName repositoryName = gitHubRepository.Name.As<RepositoryName>();
 				RepositoryId repositoryId = gitHubRepository.Id.ToString(CultureInfo.InvariantCulture).As<RepositoryId>();
+
+				if (gitHubRepository.Archived)
+				{
+					if (owner.Repositories.TryRemove(repositoryId, out _))
+					{
+						BuildMonitor.QueueSaveAppData();
+					}
+					continue;
+				}
+
+				RepositoryName repositoryName = gitHubRepository.Name.As<RepositoryName>();
 				Repository repository = owner.CreateRepository(repositoryName, repositoryId);
 				if (owner.Repositories.TryAdd(repositoryId, repository))
 				{
