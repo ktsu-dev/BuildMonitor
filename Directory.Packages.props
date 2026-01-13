@@ -9,7 +9,7 @@
     <PackageVersion Include="ktsu.ImGui.App" Version="2.2.1" />
     <PackageVersion Include="ktsu.ImGui.Popups" Version="2.2.1" />
     <PackageVersion Include="ktsu.ImGui.Widgets" Version="2.2.1" />
-    <PackageVersion Include="ktsu.Semantics.Strings" Version="1.0.25" />
+    <PackageVersion Include="ktsu.Semantics.Strings" Version="1.0.26" />
     <PackageVersion Include="ktsu.TextFilter" Version="1.5.4" />
     <PackageVersion Include="Octokit" Version="14.0.0" />
     <PackageVersion Include="Polyfill" Version="9.6.0" />
