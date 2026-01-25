@@ -1,6 +1,6 @@
 {
   "sdk": {
-    "version": "9.0.301",
+    "version": "10.0.100",
     "rollForward": "latestFeature"
   },
   "msbuild-sdks": {
@@ -8,5 +8,8 @@
     "ktsu.Sdk": "2.2.1",
     "ktsu.Sdk.ConsoleApp": "2.2.1",
     "ktsu.Sdk.App": "2.2.1"
+  },
+  "test": {
+    "runner": "Microsoft.Testing.Platform"
   }
 }
