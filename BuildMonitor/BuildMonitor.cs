@@ -325,11 +325,13 @@ internal static class BuildMonitor
 		ImGui.TableNextRow();
 		if (ImGui.TableNextColumn())
 		{
-			ImGuiWidgets.ColorIndicator(GetStatusColor(latestRun.Status), true);
 			if (IsBuildUpdating(build))
 			{
-				ImGui.SameLine();
 				ImGuiWidgets.ColorIndicator(Color.Palette.Basic.Cyan, true);
+			}
+			else
+			{
+				ImGuiWidgets.ColorIndicator(GetStatusColor(latestRun.Status), true);
 			}
 		}
 
