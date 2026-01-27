@@ -271,6 +271,11 @@ internal static class BuildMonitor
 		if (ImGui.TableNextColumn())
 		{
 			ImGuiWidgets.ColorIndicator(GetStatusColor(latestRun.Status), true);
+			if (IsBuildUpdating(build))
+			{
+				ImGui.SameLine();
+				ImGuiWidgets.ColorIndicator(Color.Palette.Basic.Cyan, true);
+			}
 		}
 
 		if (ImGui.TableNextColumn())
@@ -315,6 +320,12 @@ internal static class BuildMonitor
 			string format = MakeDurationFormat(eta);
 			ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString(format, CultureInfo.InvariantCulture) : "???");
 		}
+	}
+
+	private static bool IsBuildUpdating(Build build)
+	{
+		string prefix = $"{build.Repository.Owner.BuildProvider.Name}/{build.Owner.Name}/{build.Repository.Name}/{build.Name}";
+		return ActiveRequests.Keys.Any(k => k.StartsWithOrdinal(prefix));
 	}
 
 	private static ImColor GetStatusColor(RunStatus status)
