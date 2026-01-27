@@ -114,7 +114,8 @@ internal static class BuildMonitor
 	private static float GetColumnWidth(int index)
 	{
 		string columnName = ColumnNames[index];
-		if (AppData.ColumnWidths.TryGetValue(columnName, out float width))
+		if (AppData.ColumnWidths.TryGetValue(columnName, out float width) &&
+			width >= 1f && width <= 10000f && float.IsFinite(width))
 		{
 			return width;
 		}
@@ -122,19 +123,19 @@ internal static class BuildMonitor
 		return DefaultColumnWidths[index];
 	}
 
-	private static unsafe void SaveColumnWidths()
+	private static void SaveColumnWidths()
 	{
-		ImGuiTablePtr table = ImGuiP.GetCurrentTable();
-		if (table.Handle == null)
-		{
-			return;
-		}
-
 		bool changed = false;
 		for (int i = 0; i < ColumnNames.Length; i++)
 		{
-			float currentWidth = table.Columns.Data[i].WidthGiven;
+			float currentWidth = ImGui.GetColumnWidth(i);
 			string columnName = ColumnNames[i];
+
+			// Skip invalid widths to prevent saving corrupted values
+			if (currentWidth < 1f || currentWidth > 10000f || !float.IsFinite(currentWidth))
+			{
+				continue;
+			}
 
 			if (!AppData.ColumnWidths.TryGetValue(columnName, out float savedWidth) ||
 				Math.Abs(savedWidth - currentWidth) > 1f)
