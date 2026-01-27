@@ -394,6 +394,13 @@ internal static class BuildMonitor
 	{
 		if (ImGui.BeginMenu(Strings.File))
 		{
+			if (ImGui.MenuItem(Strings.ClearData))
+			{
+				ClearData();
+			}
+
+			ImGui.Separator();
+
 			if (ImGui.MenuItem(Strings.Exit))
 			{
 				ImGuiApp.Stop();
@@ -417,6 +424,19 @@ internal static class BuildMonitor
 	}
 
 	internal static void QueueSaveAppData() => ShouldSaveAppData = true;
+
+	private static void ClearData()
+	{
+		BuildSyncCollection.Clear();
+		RunSyncCollection.Clear();
+
+		foreach ((BuildProviderName _, BuildProvider? provider) in AppData.BuildProviders)
+		{
+			provider.ClearData();
+		}
+
+		QueueSaveAppData();
+	}
 
 	private static void SaveSettingsIfRequired()
 	{

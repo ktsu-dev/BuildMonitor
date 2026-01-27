@@ -11,6 +11,7 @@ internal static class Strings
 	internal static string FullyQualifiedApplicationName { get; } = $"{nameof(ktsu)}.{nameof(BuildMonitor)}";
 	internal static string ApplicationName { get; } = nameof(BuildMonitor).Titleize();
 	internal static string File { get; } = nameof(File).Titleize();
+	internal static string ClearData { get; } = nameof(ClearData).Titleize();
 	internal static string Exit { get; } = nameof(Exit).Titleize();
 	internal static string Settings { get; } = nameof(Settings).Titleize();
 	internal static string Providers { get; } = nameof(Providers).Titleize();
