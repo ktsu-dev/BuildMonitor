@@ -85,6 +85,65 @@ internal static class BuildMonitor
 	private static TextFilterType FilterBranchType = TextFilterType.Glob;
 	private static TextFilterMatchOptions FilterBranchMatchOptions = TextFilterMatchOptions.ByWordAny;
 
+	private static readonly string[] ColumnNames =
+	[
+		"##buildStatus",
+		Strings.Repository,
+		Strings.BuildName,
+		Strings.Branch,
+		Strings.Status,
+		Strings.Duration,
+		Strings.History,
+		Strings.Progress,
+		Strings.ETA,
+	];
+
+	private static readonly float[] DefaultColumnWidths =
+	[
+		30f,   // Status indicator
+		200f,  // Repository
+		200f,  // Build Name
+		150f,  // Branch
+		80f,   // Status
+		80f,   // Duration
+		80f,   // History
+		100f,  // Progress
+		80f,   // ETA
+	];
+
+	private static float GetColumnWidth(int index)
+	{
+		string columnName = ColumnNames[index];
+		if (AppData.ColumnWidths.TryGetValue(columnName, out float width))
+		{
+			return width;
+		}
+
+		return DefaultColumnWidths[index];
+	}
+
+	private static void SaveColumnWidths()
+	{
+		bool changed = false;
+		for (int i = 0; i < ColumnNames.Length; i++)
+		{
+			float currentWidth = ImGui.GetColumnWidth(i);
+			string columnName = ColumnNames[i];
+
+			if (!AppData.ColumnWidths.TryGetValue(columnName, out float savedWidth) ||
+				Math.Abs(savedWidth - currentWidth) > 1f)
+			{
+				AppData.ColumnWidths[columnName] = currentWidth;
+				changed = true;
+			}
+		}
+
+		if (changed)
+		{
+			QueueSaveAppData();
+		}
+	}
+
 	private static void OnRender(float dt)
 	{
 		if (UpdateTask.IsCompleted)
@@ -109,17 +168,12 @@ internal static class BuildMonitor
 		//	ImGui.TextUnformatted($"{name} {duration.ToString(format, CultureInfo.InvariantCulture)}");
 		//}
 
-		if (ImGui.BeginTable(Strings.Builds, 9, ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.RowBg))
+		if (ImGui.BeginTable(Strings.Builds, 9, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
 		{
-			ImGui.TableSetupColumn("##buildStatus", ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.Repository, ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.BuildName, ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.Branch, ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.Status, ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.Duration, ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.History, ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.Progress, ImGuiTableColumnFlags.WidthStretch);
-			ImGui.TableSetupColumn(Strings.ETA, ImGuiTableColumnFlags.WidthStretch);
+			for (int i = 0; i < ColumnNames.Length; i++)
+			{
+				ImGui.TableSetupColumn(ColumnNames[i], ImGuiTableColumnFlags.WidthFixed, GetColumnWidth(i));
+			}
 
 			ImGui.TableHeadersRow();
 
@@ -162,6 +216,7 @@ internal static class BuildMonitor
 				RenderBuildBranchRow(build, branch, branchRuns);
 			}
 
+			SaveColumnWidths();
 			ImGui.EndTable();
 
 			ShowPopupsIfRequired();

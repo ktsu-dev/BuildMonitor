@@ -14,4 +14,6 @@ internal sealed class AppData : AppData<AppData>
 	public ImGuiAppWindowState WindowState { get; set; } = new();
 
 	public ConcurrentDictionary<BuildProviderName, BuildProvider> BuildProviders { get; set; } = [];
+
+	public Dictionary<string, float> ColumnWidths { get; set; } = [];
 }
