@@ -122,12 +122,18 @@ internal static class BuildMonitor
 		return DefaultColumnWidths[index];
 	}
 
-	private static void SaveColumnWidths()
+	private static unsafe void SaveColumnWidths()
 	{
+		ImGuiTablePtr table = ImGuiP.GetCurrentTable();
+		if (table.Handle == null)
+		{
+			return;
+		}
+
 		bool changed = false;
 		for (int i = 0; i < ColumnNames.Length; i++)
 		{
-			float currentWidth = ImGui.GetColumnWidth(i);
+			float currentWidth = table.Columns.Data[i].WidthGiven;
 			string columnName = ColumnNames[i];
 
 			if (!AppData.ColumnWidths.TryGetValue(columnName, out float savedWidth) ||
