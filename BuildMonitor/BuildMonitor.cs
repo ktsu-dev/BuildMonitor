@@ -183,21 +183,25 @@ internal static class BuildMonitor
 
 			if (ImGui.TableNextColumn())
 			{
+				ImGui.SetNextItemWidth(-1);
 				ImGuiWidgets.SearchBox("##FilterRepository", ref FilterRepository, ref FilterRepositoryType, ref FilterRepositoryMatchOptions);
 			}
 
 			if (ImGui.TableNextColumn())
 			{
+				ImGui.SetNextItemWidth(-1);
 				ImGuiWidgets.SearchBox("##FilterBuildName", ref FilterBuildName, ref FilterBuildNameType, ref FilterBuildNameMatchOptions);
 			}
 
 			if (ImGui.TableNextColumn())
 			{
+				ImGui.SetNextItemWidth(-1);
 				ImGuiWidgets.SearchBox("##FilterBranch", ref FilterBranch, ref FilterBranchType, ref FilterBranchMatchOptions);
 			}
 
 			if (ImGui.TableNextColumn())
 			{
+				ImGui.SetNextItemWidth(-1);
 				ImGuiWidgets.SearchBox("##FilterStatus", ref FilterStatus, ref FilterStatusType, ref FilterStatusMatchOptions);
 			}
 
