@@ -8,6 +8,7 @@ using ktsu.Semantics.Strings;
 
 internal sealed record class RunName : SemanticString<RunName> { }
 internal sealed record class RunId : SemanticString<RunId> { }
+internal sealed record class BranchName : SemanticString<BranchName> { }
 
 internal enum RunStatus
 {
@@ -30,6 +31,7 @@ internal sealed class Run
 	public DateTimeOffset Started { get; set; }
 	public DateTimeOffset LastUpdated { get; set; }
 	public TimeSpan Duration => LastUpdated - Started;
+	public BranchName Branch { get; set; } = new();
 
 	internal bool IsOngoing => Status is RunStatus.Pending or RunStatus.Running;
 

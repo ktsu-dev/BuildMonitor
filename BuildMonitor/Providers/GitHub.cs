@@ -160,6 +160,7 @@ internal sealed class GitHub : BuildProvider
 	{
 		run.Started = gitHubRun.RunStartedAt;
 		run.LastUpdated = gitHubRun.UpdatedAt;
+		run.Branch = gitHubRun.HeadBranch.As<BranchName>();
 		run.Status = gitHubRun.Conclusion switch
 		{
 			_ when gitHubRun.Status == WorkflowRunStatus.Requested => RunStatus.Pending,

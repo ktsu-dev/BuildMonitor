@@ -81,6 +81,10 @@ internal static class BuildMonitor
 	private static TextFilterType FilterStatusType = TextFilterType.Glob;
 	private static TextFilterMatchOptions FilterStatusMatchOptions = TextFilterMatchOptions.ByWordAny;
 
+	private static string FilterBranch = string.Empty;
+	private static TextFilterType FilterBranchType = TextFilterType.Glob;
+	private static TextFilterMatchOptions FilterBranchMatchOptions = TextFilterMatchOptions.ByWordAny;
+
 	private static void OnRender(float dt)
 	{
 		if (UpdateTask.IsCompleted)
@@ -98,12 +102,6 @@ internal static class BuildMonitor
 			buildProvider.Tick();
 		}
 
-		IOrderedEnumerable<KeyValuePair<BuildId, Build>> builds = AppData.BuildProviders
-			.SelectMany(p => p.Value.Owners)
-			.SelectMany(o => o.Value.Repositories)
-			.SelectMany(r => r.Value.Builds)
-			.OrderByDescending(b => b.Value.LastStarted);
-
 		//foreach (var (name, startTime) in ActiveRequests)
 		//{
 		//	string format = @"hh\:mm\:ss";
@@ -111,11 +109,12 @@ internal static class BuildMonitor
 		//	ImGui.TextUnformatted($"{name} {duration.ToString(format, CultureInfo.InvariantCulture)}");
 		//}
 
-		if (ImGui.BeginTable(Strings.Builds, 8, ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.RowBg))
+		if (ImGui.BeginTable(Strings.Builds, 9, ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.RowBg))
 		{
 			ImGui.TableSetupColumn("##buildStatus", ImGuiTableColumnFlags.WidthStretch);
 			ImGui.TableSetupColumn(Strings.Repository, ImGuiTableColumnFlags.WidthStretch);
 			ImGui.TableSetupColumn(Strings.BuildName, ImGuiTableColumnFlags.WidthStretch);
+			ImGui.TableSetupColumn(Strings.Branch, ImGuiTableColumnFlags.WidthStretch);
 			ImGui.TableSetupColumn(Strings.Status, ImGuiTableColumnFlags.WidthStretch);
 			ImGui.TableSetupColumn(Strings.Duration, ImGuiTableColumnFlags.WidthStretch);
 			ImGui.TableSetupColumn(Strings.History, ImGuiTableColumnFlags.WidthStretch);
@@ -140,70 +139,27 @@ internal static class BuildMonitor
 
 			if (ImGui.TableNextColumn())
 			{
+				ImGuiWidgets.SearchBox("##FilterBranch", ref FilterBranch, ref FilterBranchType, ref FilterBranchMatchOptions);
+			}
+
+			if (ImGui.TableNextColumn())
+			{
 				ImGuiWidgets.SearchBox("##FilterStatus", ref FilterStatus, ref FilterStatusType, ref FilterStatusMatchOptions);
 			}
 
-			foreach ((BuildId _, Build? build) in builds)
+			// Group runs by (Build, Branch) and iterate
+			IOrderedEnumerable<(Build Build, BranchName Branch, List<Run> Runs)> buildBranches = AppData.BuildProviders
+				.SelectMany(p => p.Value.Owners)
+				.SelectMany(o => o.Value.Repositories)
+				.SelectMany(r => r.Value.Builds)
+				.SelectMany(b => b.Value.Runs.Values
+					.GroupBy(r => r.Branch)
+					.Select(g => (Build: b.Value, Branch: g.Key, Runs: g.OrderByDescending(r => r.Started).ToList())))
+				.OrderByDescending(x => x.Runs.FirstOrDefault()?.Started ?? DateTimeOffset.MinValue);
+
+			foreach ((Build build, BranchName branch, List<Run> branchRuns) in buildBranches)
 			{
-				bool shouldShow = ShouldShowBuild(build);
-
-				if (!shouldShow)
-				{
-					continue;
-				}
-
-				bool isOngoing = !build.Runs.IsEmpty && build.IsOngoing;
-				TimeSpan estimate = build.CalculateEstimatedDuration();
-				TimeSpan duration = isOngoing ? DateTimeOffset.UtcNow - build.LastStarted : build.LastDuration;
-				TimeSpan eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
-				double progress = duration.TotalSeconds / estimate.TotalSeconds;
-
-				ImGui.TableNextRow();
-				if (ImGui.TableNextColumn())
-				{
-					ImGuiWidgets.ColorIndicator(GetStatusColor(build.LastStatus), true);
-				}
-
-				if (ImGui.TableNextColumn())
-				{
-					ImGui.TextUnformatted($"{build.Owner.Name}/{build.Repository.Name}");
-				}
-
-				if (ImGui.TableNextColumn())
-				{
-					string displayName = MakeBuildDisplayName(build);
-
-					ImGui.TextUnformatted(displayName);
-				}
-
-				if (ImGui.TableNextColumn())
-				{
-					ImGui.TextUnformatted($"{build.LastStatus}");
-				}
-
-				if (ImGui.TableNextColumn())
-				{
-					string format = MakeDurationFormat(duration);
-
-					ImGui.TextUnformatted(duration.ToString(format, CultureInfo.InvariantCulture));
-				}
-
-				if (ImGui.TableNextColumn())
-				{
-					ShowBuildHistory(build);
-				}
-
-				if (ImGui.TableNextColumn() && isOngoing)
-				{
-					ImGui.ProgressBar((float)progress, new(0, ImGui.GetFrameHeight()), $"{progress:P0}");
-				}
-
-				if (ImGui.TableNextColumn() && isOngoing)
-				{
-					string format = MakeDurationFormat(eta);
-
-					ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString(format, CultureInfo.InvariantCulture) : "???");
-				}
+				RenderBuildBranchRow(build, branch, branchRuns);
 			}
 
 			ImGui.EndTable();
@@ -240,7 +196,7 @@ internal static class BuildMonitor
 		return displayName;
 	}
 
-	private static bool ShouldShowBuild(Build build)
+	private static bool ShouldShowBuildBranch(Build build, BranchName branch)
 	{
 		bool shouldShow = true;
 		if (!string.IsNullOrEmpty(FilterRepository))
@@ -255,21 +211,32 @@ internal static class BuildMonitor
 			shouldShow &= TextFilter.IsMatch(displayName.ToUpperInvariant(), "*" + FilterBuildName.ToUpperInvariant() + "*", FilterBuildNameType, FilterBuildNameMatchOptions);
 		}
 
+		if (!string.IsNullOrEmpty(FilterBranch))
+		{
+			shouldShow &= TextFilter.IsMatch(branch.ToString().ToUpperInvariant(), "*" + FilterBranch.ToUpperInvariant() + "*", FilterBranchType, FilterBranchMatchOptions);
+		}
+
 		if (!string.IsNullOrEmpty(FilterStatus))
 		{
-			shouldShow &= TextFilter.IsMatch(build.LastStatus.ToString().ToUpperInvariant(), "*" + FilterStatus.ToUpperInvariant() + "*", FilterStatusType, FilterStatusMatchOptions);
+			Run? latestRun = build.Runs.Values
+				.Where(r => r.Branch == branch)
+				.OrderByDescending(r => r.Started)
+				.FirstOrDefault();
+			if (latestRun is not null)
+			{
+				shouldShow &= TextFilter.IsMatch(latestRun.Status.ToString().ToUpperInvariant(), "*" + FilterStatus.ToUpperInvariant() + "*", FilterStatusType, FilterStatusMatchOptions);
+			}
 		}
 
 		return shouldShow;
 	}
 
-	private static void ShowBuildHistory(Build build)
+	private static void ShowBranchHistory(List<Run> branchRuns)
 	{
 		const int recentRuns = 5;
 
-		List<Run> runs = [.. build.Runs.Values
+		List<Run> runs = [.. branchRuns
 			.Where(r => r.Status != RunStatus.Canceled)
-			.OrderByDescending(r => r.LastUpdated)
 			.Take(recentRuns)];
 
 		runs.Reverse();
@@ -278,6 +245,75 @@ internal static class BuildMonitor
 		{
 			ImGui.SameLine();
 			ImGuiWidgets.ColorIndicator(GetStatusColor(run.Status), true);
+		}
+	}
+
+	private static void RenderBuildBranchRow(Build build, BranchName branch, List<Run> branchRuns)
+	{
+		if (!ShouldShowBuildBranch(build, branch))
+		{
+			return;
+		}
+
+		Run? latestRun = branchRuns.FirstOrDefault();
+		if (latestRun is null)
+		{
+			return;
+		}
+
+		bool isOngoing = latestRun.IsOngoing;
+		TimeSpan estimate = build.CalculateEstimatedDuration();
+		TimeSpan duration = isOngoing ? DateTimeOffset.UtcNow - latestRun.Started : latestRun.Duration;
+		TimeSpan eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
+		double progress = duration.TotalSeconds / estimate.TotalSeconds;
+
+		ImGui.TableNextRow();
+		if (ImGui.TableNextColumn())
+		{
+			ImGuiWidgets.ColorIndicator(GetStatusColor(latestRun.Status), true);
+		}
+
+		if (ImGui.TableNextColumn())
+		{
+			ImGui.TextUnformatted($"{build.Owner.Name}/{build.Repository.Name}");
+		}
+
+		if (ImGui.TableNextColumn())
+		{
+			string displayName = MakeBuildDisplayName(build);
+			ImGui.TextUnformatted(displayName);
+		}
+
+		if (ImGui.TableNextColumn())
+		{
+			ImGui.TextUnformatted(branch);
+		}
+
+		if (ImGui.TableNextColumn())
+		{
+			ImGui.TextUnformatted($"{latestRun.Status}");
+		}
+
+		if (ImGui.TableNextColumn())
+		{
+			string format = MakeDurationFormat(duration);
+			ImGui.TextUnformatted(duration.ToString(format, CultureInfo.InvariantCulture));
+		}
+
+		if (ImGui.TableNextColumn())
+		{
+			ShowBranchHistory(branchRuns);
+		}
+
+		if (ImGui.TableNextColumn() && isOngoing)
+		{
+			ImGui.ProgressBar((float)progress, new(0, ImGui.GetFrameHeight()), $"{progress:P0}");
+		}
+
+		if (ImGui.TableNextColumn() && isOngoing)
+		{
+			string format = MakeDurationFormat(eta);
+			ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString(format, CultureInfo.InvariantCulture) : "???");
 		}
 	}
 
