@@ -369,7 +369,7 @@ internal static class BuildMonitor
 
 		if (ImGui.TableNextColumn() && isOngoing)
 		{
-			ImGui.ProgressBar((float)progress, new(0, ImGui.GetFrameHeight()), $"{progress:P0}");
+			ImGui.ProgressBar((float)progress, new(-1, ImGui.GetFrameHeight()), $"{progress:P0}");
 		}
 
 		if (ImGui.TableNextColumn() && isOngoing)
