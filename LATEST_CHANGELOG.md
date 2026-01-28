@@ -1,5 +1,5 @@
-## v1.2.8 (patch)
+## v1.2.9-pre.1 (prerelease)
 
-Changes since v1.2.7:
+Changes since v1.2.8:
 
-- Add persistence for column filters ([@matt-edmondson](https://github.com/matt-edmondson))
+- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
