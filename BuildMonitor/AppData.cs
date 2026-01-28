@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 
 using ktsu.AppDataStorage;
 using ktsu.ImGui.App;
+using ktsu.TextFilter;
 
 internal sealed class AppData : AppData<AppData>
 {
@@ -16,4 +17,20 @@ internal sealed class AppData : AppData<AppData>
 	public ConcurrentDictionary<BuildProviderName, BuildProvider> BuildProviders { get; set; } = [];
 
 	public Dictionary<string, float> ColumnWidths { get; set; } = [];
+
+	public string FilterRepository { get; set; } = string.Empty;
+	public TextFilterType FilterRepositoryType { get; set; } = TextFilterType.Glob;
+	public TextFilterMatchOptions FilterRepositoryMatchOptions { get; set; } = TextFilterMatchOptions.ByWordAny;
+
+	public string FilterBuildName { get; set; } = string.Empty;
+	public TextFilterType FilterBuildNameType { get; set; } = TextFilterType.Glob;
+	public TextFilterMatchOptions FilterBuildNameMatchOptions { get; set; } = TextFilterMatchOptions.ByWordAny;
+
+	public string FilterStatus { get; set; } = string.Empty;
+	public TextFilterType FilterStatusType { get; set; } = TextFilterType.Glob;
+	public TextFilterMatchOptions FilterStatusMatchOptions { get; set; } = TextFilterMatchOptions.ByWordAny;
+
+	public string FilterBranch { get; set; } = string.Empty;
+	public TextFilterType FilterBranchType { get; set; } = TextFilterType.Glob;
+	public TextFilterMatchOptions FilterBranchMatchOptions { get; set; } = TextFilterMatchOptions.ByWordAny;
 }

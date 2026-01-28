@@ -70,22 +70,6 @@ internal static class BuildMonitor
 		UpdateTask = UpdateAsync();
 	}
 
-	private static string FilterRepository = string.Empty;
-	private static TextFilterType FilterRepositoryType = TextFilterType.Glob;
-	private static TextFilterMatchOptions FilterRepositoryMatchOptions = TextFilterMatchOptions.ByWordAny;
-
-	private static string FilterBuildName = string.Empty;
-	private static TextFilterType FilterBuildNameType = TextFilterType.Glob;
-	private static TextFilterMatchOptions FilterBuildNameMatchOptions = TextFilterMatchOptions.ByWordAny;
-
-	private static string FilterStatus = string.Empty;
-	private static TextFilterType FilterStatusType = TextFilterType.Glob;
-	private static TextFilterMatchOptions FilterStatusMatchOptions = TextFilterMatchOptions.ByWordAny;
-
-	private static string FilterBranch = string.Empty;
-	private static TextFilterType FilterBranchType = TextFilterType.Glob;
-	private static TextFilterMatchOptions FilterBranchMatchOptions = TextFilterMatchOptions.ByWordAny;
-
 	private static readonly Dictionary<string, float> DefaultColumnWidths = new()
 	{
 		["##buildStatus"] = 30f,
@@ -171,6 +155,67 @@ internal static class BuildMonitor
 		}
 	}
 
+	private static void RenderFilterSearchBox(
+		string id,
+		ref string filterText,
+		ref TextFilterType filterType,
+		ref TextFilterMatchOptions filterMatchOptions)
+	{
+		if (ImGui.TableNextColumn())
+		{
+			ImGui.SetNextItemWidth(-1);
+			string text = filterText;
+			TextFilterType type = filterType;
+			TextFilterMatchOptions matchOptions = filterMatchOptions;
+			ImGuiWidgets.SearchBox(id, ref text, ref type, ref matchOptions);
+			if (text != filterText || type != filterType || matchOptions != filterMatchOptions)
+			{
+				filterText = text;
+				filterType = type;
+				filterMatchOptions = matchOptions;
+				QueueSaveAppData();
+			}
+		}
+	}
+
+	private static void RenderFilterRow()
+	{
+		ImGui.TableNextRow();
+		ImGui.TableNextColumn(); // Skip status column
+
+		string filterRepository = AppData.FilterRepository;
+		TextFilterType filterRepositoryType = AppData.FilterRepositoryType;
+		TextFilterMatchOptions filterRepositoryMatchOptions = AppData.FilterRepositoryMatchOptions;
+		RenderFilterSearchBox("##FilterRepository", ref filterRepository, ref filterRepositoryType, ref filterRepositoryMatchOptions);
+		AppData.FilterRepository = filterRepository;
+		AppData.FilterRepositoryType = filterRepositoryType;
+		AppData.FilterRepositoryMatchOptions = filterRepositoryMatchOptions;
+
+		string filterBuildName = AppData.FilterBuildName;
+		TextFilterType filterBuildNameType = AppData.FilterBuildNameType;
+		TextFilterMatchOptions filterBuildNameMatchOptions = AppData.FilterBuildNameMatchOptions;
+		RenderFilterSearchBox("##FilterBuildName", ref filterBuildName, ref filterBuildNameType, ref filterBuildNameMatchOptions);
+		AppData.FilterBuildName = filterBuildName;
+		AppData.FilterBuildNameType = filterBuildNameType;
+		AppData.FilterBuildNameMatchOptions = filterBuildNameMatchOptions;
+
+		string filterBranch = AppData.FilterBranch;
+		TextFilterType filterBranchType = AppData.FilterBranchType;
+		TextFilterMatchOptions filterBranchMatchOptions = AppData.FilterBranchMatchOptions;
+		RenderFilterSearchBox("##FilterBranch", ref filterBranch, ref filterBranchType, ref filterBranchMatchOptions);
+		AppData.FilterBranch = filterBranch;
+		AppData.FilterBranchType = filterBranchType;
+		AppData.FilterBranchMatchOptions = filterBranchMatchOptions;
+
+		string filterStatus = AppData.FilterStatus;
+		TextFilterType filterStatusType = AppData.FilterStatusType;
+		TextFilterMatchOptions filterStatusMatchOptions = AppData.FilterStatusMatchOptions;
+		RenderFilterSearchBox("##FilterStatus", ref filterStatus, ref filterStatusType, ref filterStatusMatchOptions);
+		AppData.FilterStatus = filterStatus;
+		AppData.FilterStatusType = filterStatusType;
+		AppData.FilterStatusMatchOptions = filterStatusMatchOptions;
+	}
+
 	private static void OnRender(float dt)
 	{
 		if (UpdateTask.IsCompleted)
@@ -188,13 +233,6 @@ internal static class BuildMonitor
 			buildProvider.Tick();
 		}
 
-		//foreach (var (name, startTime) in ActiveRequests)
-		//{
-		//	string format = @"hh\:mm\:ss";
-		//	var duration = DateTimeOffset.UtcNow - startTime;
-		//	ImGui.TextUnformatted($"{name} {duration.ToString(format, CultureInfo.InvariantCulture)}");
-		//}
-
 		if (ImGui.BeginTable(Strings.Builds, 9, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
 		{
 			foreach (string columnName in DefaultColumnWidths.Keys)
@@ -204,33 +242,7 @@ internal static class BuildMonitor
 
 			ImGui.TableHeadersRow();
 
-			// Filter row
-			ImGui.TableNextRow();
-			ImGui.TableNextColumn(); // Skip status column
-
-			if (ImGui.TableNextColumn())
-			{
-				ImGui.SetNextItemWidth(-1);
-				ImGuiWidgets.SearchBox("##FilterRepository", ref FilterRepository, ref FilterRepositoryType, ref FilterRepositoryMatchOptions);
-			}
-
-			if (ImGui.TableNextColumn())
-			{
-				ImGui.SetNextItemWidth(-1);
-				ImGuiWidgets.SearchBox("##FilterBuildName", ref FilterBuildName, ref FilterBuildNameType, ref FilterBuildNameMatchOptions);
-			}
-
-			if (ImGui.TableNextColumn())
-			{
-				ImGui.SetNextItemWidth(-1);
-				ImGuiWidgets.SearchBox("##FilterBranch", ref FilterBranch, ref FilterBranchType, ref FilterBranchMatchOptions);
-			}
-
-			if (ImGui.TableNextColumn())
-			{
-				ImGui.SetNextItemWidth(-1);
-				ImGuiWidgets.SearchBox("##FilterStatus", ref FilterStatus, ref FilterStatusType, ref FilterStatusMatchOptions);
-			}
+			RenderFilterRow();
 
 			// Group runs by (Build, Branch) and iterate
 			IOrderedEnumerable<(Build Build, BranchName Branch, List<Run> Runs)> buildBranches = AppData.BuildProviders
@@ -291,24 +303,24 @@ internal static class BuildMonitor
 	private static bool ShouldShowBuildBranch(Build build, BranchName branch)
 	{
 		bool shouldShow = true;
-		if (!string.IsNullOrEmpty(FilterRepository))
+		if (!string.IsNullOrEmpty(AppData.FilterRepository))
 		{
 			string displayRepository = $"{build.Owner.Name}/{build.Repository.Name}";
-			shouldShow &= TextFilter.IsMatch(displayRepository.ToUpperInvariant(), "*" + FilterRepository.ToUpperInvariant() + "*", FilterRepositoryType, FilterRepositoryMatchOptions);
+			shouldShow &= TextFilter.IsMatch(displayRepository.ToUpperInvariant(), "*" + AppData.FilterRepository.ToUpperInvariant() + "*", AppData.FilterRepositoryType, AppData.FilterRepositoryMatchOptions);
 		}
 
-		if (!string.IsNullOrEmpty(FilterBuildName))
+		if (!string.IsNullOrEmpty(AppData.FilterBuildName))
 		{
 			string displayName = MakeBuildDisplayName(build);
-			shouldShow &= TextFilter.IsMatch(displayName.ToUpperInvariant(), "*" + FilterBuildName.ToUpperInvariant() + "*", FilterBuildNameType, FilterBuildNameMatchOptions);
+			shouldShow &= TextFilter.IsMatch(displayName.ToUpperInvariant(), "*" + AppData.FilterBuildName.ToUpperInvariant() + "*", AppData.FilterBuildNameType, AppData.FilterBuildNameMatchOptions);
 		}
 
-		if (!string.IsNullOrEmpty(FilterBranch))
+		if (!string.IsNullOrEmpty(AppData.FilterBranch))
 		{
-			shouldShow &= TextFilter.IsMatch(branch.ToString().ToUpperInvariant(), "*" + FilterBranch.ToUpperInvariant() + "*", FilterBranchType, FilterBranchMatchOptions);
+			shouldShow &= TextFilter.IsMatch(branch.ToString().ToUpperInvariant(), "*" + AppData.FilterBranch.ToUpperInvariant() + "*", AppData.FilterBranchType, AppData.FilterBranchMatchOptions);
 		}
 
-		if (!string.IsNullOrEmpty(FilterStatus))
+		if (!string.IsNullOrEmpty(AppData.FilterStatus))
 		{
 			Run? latestRun = build.Runs.Values
 				.Where(r => r.Branch == branch)
@@ -316,7 +328,7 @@ internal static class BuildMonitor
 				.FirstOrDefault();
 			if (latestRun is not null)
 			{
-				shouldShow &= TextFilter.IsMatch(latestRun.Status.ToString().ToUpperInvariant(), "*" + FilterStatus.ToUpperInvariant() + "*", FilterStatusType, FilterStatusMatchOptions);
+				shouldShow &= TextFilter.IsMatch(latestRun.Status.ToString().ToUpperInvariant(), "*" + AppData.FilterStatus.ToUpperInvariant() + "*", AppData.FilterStatusType, AppData.FilterStatusMatchOptions);
 			}
 		}
 
