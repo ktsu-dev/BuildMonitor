@@ -8,6 +8,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Runtime.InteropServices;
 using Hexa.NET.ImGui;
 using ktsu.Extensions;
 using ktsu.ImGui.App;
@@ -85,68 +86,87 @@ internal static class BuildMonitor
 	private static TextFilterType FilterBranchType = TextFilterType.Glob;
 	private static TextFilterMatchOptions FilterBranchMatchOptions = TextFilterMatchOptions.ByWordAny;
 
-	private static readonly string[] ColumnNames =
-	[
-		"##buildStatus",
-		Strings.Repository,
-		Strings.BuildName,
-		Strings.Branch,
-		Strings.Status,
-		Strings.Duration,
-		Strings.History,
-		Strings.Progress,
-		Strings.ETA,
-	];
-
-	private static readonly float[] DefaultColumnWidths =
-	[
-		30f,   // Status indicator
-		200f,  // Repository
-		200f,  // Build Name
-		150f,  // Branch
-		80f,   // Status
-		80f,   // Duration
-		80f,   // History
-		100f,  // Progress
-		80f,   // ETA
-	];
-
-	private static float GetColumnWidth(int index)
+	private static readonly Dictionary<string, float> DefaultColumnWidths = new()
 	{
-		string columnName = ColumnNames[index];
+		["##buildStatus"] = 30f,
+		[Strings.Repository] = 200f,
+		[Strings.BuildName] = 200f,
+		[Strings.Branch] = 150f,
+		[Strings.Status] = 80f,
+		[Strings.Duration] = 80f,
+		[Strings.History] = 80f,
+		[Strings.Progress] = 100f,
+		[Strings.ETA] = 80f,
+	};
+
+	private static float GetColumnWidth(string columnName)
+	{
 		if (AppData.ColumnWidths.TryGetValue(columnName, out float width) &&
 			width >= 1f && width <= 10000f && float.IsFinite(width))
 		{
 			return width;
 		}
 
-		return DefaultColumnWidths[index];
+		return DefaultColumnWidths.GetValueOrDefault(columnName, 80f);
 	}
 
-	private static void SaveColumnWidths()
+	// TODO: Remove this workaround once Hexa.NET.ImGui fixes the ImGuiTableColumn struct layout.
+	// The binding incorrectly uses sbyte/byte for ImGuiTableColumnIdx/ImGuiTableDrawChannelIdx fields
+	// which should be short/ushort (2 bytes each). This makes the C# struct 8 bytes smaller than native.
+	// See: https://github.com/HexaEngine/Hexa.NET.ImGui/issues/XXX (report this issue)
+	//
+	// 8 fields are wrong: DisplayOrder, IndexWithinEnabledSet, PrevEnabledColumn, NextEnabledColumn,
+	// SortOrder (all ImGuiTableColumnIdx = ImS16), and DrawChannelCurrent, DrawChannelFrozen,
+	// DrawChannelUnfrozen (all ImGuiTableDrawChannelIdx = ImU16). Each should be 2 bytes but is 1 byte.
+	private const int ImGuiTableColumnSizeDifference = 8;
+
+	private static unsafe int GetNativeImGuiTableColumnSize()
 	{
-		bool changed = false;
-		for (int i = 0; i < ColumnNames.Length; i++)
+		int csharpSize = sizeof(ImGuiTableColumn);
+		int nativeSize = csharpSize + ImGuiTableColumnSizeDifference;
+
+		// Native struct should be ~112 bytes according to imgui comments
+		// If C# size >= 112, the fix has likely been applied
+		Debug.Assert(
+			csharpSize < 112,
+			$"ImGuiTableColumn C# struct size is {csharpSize} bytes (expected < 112). " +
+			"Check if Hexa.NET.ImGui fixed the struct layout and remove this workaround if so.");
+
+		return nativeSize;
+	}
+
+	private static unsafe void SaveColumnWidth(string columnName, int columnIndex)
+	{
+		// Assert that WidthGiven is still at the expected offset (after Flags which is 4 bytes)
+		Debug.Assert(
+			Marshal.OffsetOf<ImGuiTableColumn>(nameof(ImGuiTableColumn.WidthGiven)).ToInt32() == 4,
+			"ImGuiTableColumn.WidthGiven offset changed. Update the workaround.");
+
+		ImGuiTablePtr table = ImGuiP.GetCurrentTable();
+		if (table.Handle == null || columnIndex < 0 || columnIndex >= table.Handle->ColumnsCount)
 		{
-			float currentWidth = ImGui.GetColumnWidth(i);
-			string columnName = ColumnNames[i];
-
-			// Skip invalid widths to prevent saving corrupted values
-			if (currentWidth < 1f || currentWidth > 10000f || !float.IsFinite(currentWidth))
-			{
-				continue;
-			}
-
-			if (!AppData.ColumnWidths.TryGetValue(columnName, out float savedWidth) ||
-				Math.Abs(savedWidth - currentWidth) > 1f)
-			{
-				AppData.ColumnWidths[columnName] = currentWidth;
-				changed = true;
-			}
+			return;
 		}
 
-		if (changed)
+		// Use manual pointer arithmetic with the correct native struct size
+		// instead of relying on C# sizeof(ImGuiTableColumn) which is incorrect
+		int nativeStructSize = GetNativeImGuiTableColumnSize();
+		byte* basePtr = (byte*)table.Handle->Columns.Data;
+		byte* columnAddress = basePtr + (columnIndex * nativeStructSize);
+
+		// Read WidthGiven directly from offset 4 (after Flags which is 4 bytes)
+		const int widthGivenOffset = 4;
+		float currentWidth = *(float*)(columnAddress + widthGivenOffset);
+
+		if (currentWidth < 1f || currentWidth > 10000f || !float.IsFinite(currentWidth))
 		{
+			return;
+		}
+
+		if (!AppData.ColumnWidths.TryGetValue(columnName, out float savedWidth) ||
+			Math.Abs(savedWidth - currentWidth) > 1f)
+		{
+			AppData.ColumnWidths[columnName] = currentWidth;
 			QueueSaveAppData();
 		}
 	}
@@ -177,9 +197,9 @@ internal static class BuildMonitor
 
 		if (ImGui.BeginTable(Strings.Builds, 9, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
 		{
-			for (int i = 0; i < ColumnNames.Length; i++)
+			foreach (string columnName in DefaultColumnWidths.Keys)
 			{
-				ImGui.TableSetupColumn(ColumnNames[i], ImGuiTableColumnFlags.WidthFixed, GetColumnWidth(i));
+				ImGui.TableSetupColumn(columnName, ImGuiTableColumnFlags.WidthFixed, GetColumnWidth(columnName));
 			}
 
 			ImGui.TableHeadersRow();
@@ -227,7 +247,13 @@ internal static class BuildMonitor
 				RenderBuildBranchRow(build, branch, branchRuns);
 			}
 
-			SaveColumnWidths();
+			int saveColIndex = 0;
+			foreach (string columnName in DefaultColumnWidths.Keys)
+			{
+				SaveColumnWidth(columnName, saveColIndex);
+				saveColIndex++;
+			}
+
 			ImGui.EndTable();
 
 			ShowPopupsIfRequired();
