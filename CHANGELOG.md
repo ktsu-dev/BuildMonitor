@@ -1,3 +1,6 @@
+## v1.2.9
+
+No significant changes detected since v1.2.9.
 ## v1.2.9 (patch)
 
 Changes since v1.2.8:
@@ -16,9 +19,7 @@ Changes since v1.2.9-pre.1:
 - Sync global.json ([@ktsu[bot]](https://github.com/ktsu[bot]))
 ## v1.2.9-pre.1 (prerelease)
 
-Changes since v1.2.8:
-
-- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
+Incremental prerelease update.
 ## v1.2.8 (patch)
 
 Changes since v1.2.7:
