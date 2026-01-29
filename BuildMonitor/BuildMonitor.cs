@@ -77,6 +77,7 @@ internal static class BuildMonitor
 		[Strings.BuildName] = 200f,
 		[Strings.Branch] = 150f,
 		[Strings.Status] = 80f,
+		[Strings.LastRun] = 180f,
 		[Strings.Duration] = 80f,
 		[Strings.History] = 80f,
 		[Strings.Progress] = 100f,
@@ -233,7 +234,7 @@ internal static class BuildMonitor
 			buildProvider.Tick();
 		}
 
-		if (ImGui.BeginTable(Strings.Builds, 9, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
+		if (ImGui.BeginTable(Strings.Builds, 10, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
 		{
 			foreach (string columnName in DefaultColumnWidths.Keys)
 			{
@@ -403,6 +404,11 @@ internal static class BuildMonitor
 		if (ImGui.TableNextColumn())
 		{
 			ImGui.TextUnformatted($"{latestRun.Status}");
+		}
+
+		if (ImGui.TableNextColumn())
+		{
+			ImGui.TextUnformatted(latestRun.Started.ToLocalTime().ToString("yyyy-MM-dd HH:mm zzz", CultureInfo.InvariantCulture));
 		}
 
 		if (ImGui.TableNextColumn())
