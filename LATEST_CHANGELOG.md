@@ -1,5 +1,5 @@
-## v1.2.9-pre.3 (prerelease)
+## v1.2.9 (patch)
 
-Changes since v1.2.9-pre.2:
+Changes since v1.2.8:
 
-- Bump the ktsu group with 3 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Add LastRun column to BuildMonitor table and update Strings ([@matt-edmondson](https://github.com/matt-edmondson))
