@@ -6,13 +6,14 @@ namespace ktsu.BuildMonitor;
 
 using System.Collections.Generic;
 using System.Globalization;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 using ktsu.Extensions;
 using ktsu.Semantics.Strings;
 using Octokit;
 
-internal sealed class GitHub : BuildProvider
+internal sealed partial class GitHub : BuildProvider
 {
 	internal static BuildProviderName BuildProviderName => nameof(GitHub).As<BuildProviderName>();
 	internal override BuildProviderName Name => BuildProviderName;
@@ -208,19 +209,31 @@ internal sealed class GitHub : BuildProvider
 			{
 				if (job.Conclusion == WorkflowJobConclusion.Failure)
 				{
-					// Get the failed steps
-					List<WorkflowJobStep> failedSteps = [.. job.Steps.Where(s => s.Conclusion == WorkflowJobConclusion.Failure)];
-					if (failedSteps.Count > 0)
+					// Try to fetch and parse the job logs for actual error messages
+					List<string> logErrors = await FetchJobLogErrorsAsync(run.Owner.Name, run.Repository.Name, job.Id).ConfigureAwait(false);
+
+					if (logErrors.Count > 0)
 					{
-						foreach (WorkflowJobStep step in failedSteps)
+						foreach (string logError in logErrors)
 						{
-							errors.Add($"[{job.Name}] {step.Name}");
+							errors.Add($"[{job.Name}] {logError}");
 						}
 					}
 					else
 					{
-						// If no specific failed steps found, just add the job name
-						errors.Add($"[{job.Name}] Failed");
+						// Fall back to failed step names if no log errors found
+						List<WorkflowJobStep> failedSteps = [.. job.Steps.Where(s => s.Conclusion == WorkflowJobConclusion.Failure)];
+						if (failedSteps.Count > 0)
+						{
+							foreach (WorkflowJobStep step in failedSteps)
+							{
+								errors.Add($"[{job.Name}] {step.Name}");
+							}
+						}
+						else
+						{
+							errors.Add($"[{job.Name}] Failed");
+						}
 					}
 				}
 			}
@@ -235,6 +248,68 @@ internal sealed class GitHub : BuildProvider
 		{
 			// API error, ignore
 		}
+	}
+
+	private async Task<List<string>> FetchJobLogErrorsAsync(string owner, string repo, long jobId)
+	{
+		List<string> errors = [];
+		try
+		{
+			string logs = await GitHubJobs.GetLogs(owner, repo, jobId).ConfigureAwait(false);
+			errors = ParseLogForErrors(logs);
+		}
+		catch (NotFoundException)
+		{
+			// Logs not found, ignore
+		}
+		catch (ApiException)
+		{
+			// API error, ignore
+		}
+		return errors;
+	}
+
+	[GeneratedRegex(@"(?:^|\s)error\s*:", RegexOptions.IgnoreCase)]
+	private static partial Regex ErrorPatternRegex();
+
+	private static List<string> ParseLogForErrors(string logs)
+	{
+		List<string> errors = [];
+		HashSet<string> seenErrors = new(StringComparer.OrdinalIgnoreCase);
+
+		string[] lines = logs.Split('\n');
+		foreach (string line in lines)
+		{
+			string trimmedLine = line.Trim();
+
+			// GitHub Actions error annotations: ##[error]message
+			if (trimmedLine.Contains("##[error]", StringComparison.OrdinalIgnoreCase))
+			{
+				int errorIndex = trimmedLine.IndexOf("##[error]", StringComparison.OrdinalIgnoreCase);
+				string errorMessage = trimmedLine[(errorIndex + 9)..].Trim();
+				if (!string.IsNullOrWhiteSpace(errorMessage) && seenErrors.Add(errorMessage))
+				{
+					errors.Add(errorMessage);
+				}
+			}
+			// Common error patterns: "error:" or "Error:" at start or after timestamp
+			else if (ErrorPatternRegex().IsMatch(trimmedLine))
+			{
+				int errorIndex = trimmedLine.IndexOf("error", StringComparison.OrdinalIgnoreCase);
+				int colonIndex = trimmedLine.IndexOf(':', errorIndex);
+				if (colonIndex >= 0 && colonIndex < trimmedLine.Length - 1)
+				{
+					string errorMessage = trimmedLine[(colonIndex + 1)..].Trim();
+					if (!string.IsNullOrWhiteSpace(errorMessage) && seenErrors.Add(errorMessage))
+					{
+						errors.Add(errorMessage);
+					}
+				}
+			}
+		}
+
+		// Limit to first 10 errors to avoid overwhelming the UI
+		return [.. errors.Take(10)];
 	}
 
 	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0010:Add missing cases", Justification = "<Pending>")]
