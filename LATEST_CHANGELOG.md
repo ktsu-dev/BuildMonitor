@@ -1,6 +1,5 @@
-## v1.2.11 (patch)
+## v1.2.12 (patch)
 
-Changes since v1.2.10:
+Changes since v1.2.11:
 
-- Enhance ClearData method to clear repositories for each owner ([@matt-edmondson](https://github.com/matt-edmondson))
-- Remove .github\workflows\project.yml ([@matt-edmondson](https://github.com/matt-edmondson))
+- Allow concurrent requests ([@matt-edmondson](https://github.com/matt-edmondson))
