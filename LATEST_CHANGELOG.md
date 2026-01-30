@@ -1,5 +1,5 @@
-## v1.2.12 (patch)
+## v1.2.13 (patch)
 
-Changes since v1.2.11:
+Changes since v1.2.12:
 
-- Allow concurrent requests ([@matt-edmondson](https://github.com/matt-edmondson))
+- Fix an issue where token would get erased when you were rate limited ([@matt-edmondson](https://github.com/matt-edmondson))
