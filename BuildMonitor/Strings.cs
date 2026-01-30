@@ -33,4 +33,7 @@ internal static class Strings
 	internal static string Duration { get; } = nameof(Duration).Titleize();
 	internal static string Branch { get; } = nameof(Branch).Titleize();
 	internal static string LastRun { get; } = nameof(LastRun).Titleize();
+	internal static string Errors { get; } = nameof(Errors).Titleize();
+	internal static string ErrorDetails { get; } = nameof(ErrorDetails).Titleize();
+	internal static string OK { get; } = nameof(OK).Titleize();
 }

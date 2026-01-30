@@ -14,6 +14,7 @@ using ktsu.Extensions;
 using ktsu.ImGui.App;
 using ktsu.ImGui.Styler;
 using ktsu.ImGui.Widgets;
+using ktsu.ImGui.Popups;
 using ktsu.TextFilter;
 
 internal static class BuildMonitor
@@ -82,7 +83,11 @@ internal static class BuildMonitor
 		[Strings.History] = 80f,
 		[Strings.Progress] = 100f,
 		[Strings.ETA] = 80f,
+		[Strings.Errors] = 200f,
 	};
+
+	private static ImGuiPopups.Prompt ErrorDetailsPopup { get; } = new();
+	private static string CurrentErrorDetails { get; set; } = string.Empty;
 
 	private static float GetColumnWidth(string columnName)
 	{
@@ -234,7 +239,7 @@ internal static class BuildMonitor
 			buildProvider.Tick();
 		}
 
-		if (ImGui.BeginTable(Strings.Builds, 10, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
+		if (ImGui.BeginTable(Strings.Builds, 11, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
 		{
 			foreach (string columnName in DefaultColumnWidths.Keys)
 			{
@@ -432,6 +437,72 @@ internal static class BuildMonitor
 			string format = MakeDurationFormat(eta);
 			ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString(format, CultureInfo.InvariantCulture) : "???");
 		}
+
+		if (ImGui.TableNextColumn())
+		{
+			RenderErrorsColumn(latestRun, build, branch);
+		}
+	}
+
+	private static void RenderErrorsColumn(Run run, Build build, BranchName branch)
+	{
+		if (run.Errors.Count == 0)
+		{
+			return;
+		}
+
+		string errorSummary = string.Join("; ", run.Errors);
+		float columnWidth = ImGui.GetColumnWidth();
+
+		// Calculate how much text fits in the column
+		System.Numerics.Vector2 textSize = ImGui.CalcTextSize(errorSummary);
+		string displayText = errorSummary;
+		if (textSize.X > columnWidth - 10)
+		{
+			// Ellipsize the text
+			const string ellipsis = "...";
+			float ellipsisWidth = ImGui.CalcTextSize(ellipsis).X;
+			float availableWidth = columnWidth - ellipsisWidth - 10;
+
+			int charCount = 0;
+			float currentWidth = 0;
+			foreach (char c in errorSummary)
+			{
+				float charWidth = ImGui.CalcTextSize(c.ToString()).X;
+				if (currentWidth + charWidth > availableWidth)
+				{
+					break;
+				}
+				currentWidth += charWidth;
+				charCount++;
+			}
+			displayText = errorSummary[..charCount] + ellipsis;
+		}
+
+		// Make the text clickable
+		using (new ScopedTextColor(Color.Palette.Basic.Red))
+		{
+			if (ImGui.Selectable(displayText))
+			{
+				string fullErrorText = $"Build: {build.Name}\nBranch: {branch}\n\nErrors:\n" + string.Join("\n\n", run.Errors);
+				CurrentErrorDetails = fullErrorText;
+				ErrorDetailsPopup.Open(
+					Strings.ErrorDetails,
+					CurrentErrorDetails,
+					new Dictionary<string, Action?>
+					{
+						{ Strings.OK, null }
+					},
+					ImGuiPopups.PromptTextLayoutType.Wrapped,
+					new System.Numerics.Vector2(600, 400));
+			}
+		}
+
+		// Show tooltip on hover
+		if (ImGui.IsItemHovered())
+		{
+			ImGui.SetTooltip(errorSummary);
+		}
 	}
 
 	private static bool IsBuildUpdating(Build build)
@@ -570,10 +641,7 @@ internal static class BuildMonitor
 		}
 	}
 
-	private static void ShowPopupsIfRequired()
-	{
-		// none yet
-	}
+	private static void ShowPopupsIfRequired() => _ = ErrorDetailsPopup.ShowIfOpen();
 
 	internal static async Task MakeRequestAsync(string name, Func<Task> action)
 	{

@@ -21,6 +21,7 @@ internal sealed class GitHub : BuildProvider
 	private IActionsClient GitHubActions => GitHubClient.Actions;
 	private IActionsWorkflowsClient GitHubWorkflows => GitHubActions.Workflows;
 	private IActionsWorkflowRunsClient GitHubRuns => GitHubWorkflows.Runs;
+	private IActionsWorkflowJobsClient GitHubJobs => GitHubWorkflows.Jobs;
 	private void UpdateGitHubClientCredentials()
 	{
 		if (!string.IsNullOrEmpty(AccountId) && !string.IsNullOrEmpty(Token))
@@ -121,7 +122,7 @@ internal sealed class GitHub : BuildProvider
 				RunId runId = gitHubRun.Id.ToString(CultureInfo.InvariantCulture).As<RunId>();
 				RunName runName = gitHubRun.Name.As<RunName>();
 				Run run = build.Runs.GetOrCreate(runId, build.CreateRun(runName, runId));
-				UpdateRunFromWorkflow(run, gitHubRun);
+				await UpdateRunFromWorkflowAsync(run, gitHubRun).ConfigureAwait(false);
 			}
 		}).ConfigureAwait(false);
 		}
@@ -146,7 +147,7 @@ internal sealed class GitHub : BuildProvider
 			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}/{run.Name}", async () =>
 			{
 				WorkflowRun gitHubRun = await GitHubRuns.Get(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
-				UpdateRunFromWorkflow(run, gitHubRun);
+				await UpdateRunFromWorkflowAsync(run, gitHubRun).ConfigureAwait(false);
 			}).ConfigureAwait(false);
 		}
 		catch (NotFoundException)
@@ -156,11 +157,13 @@ internal sealed class GitHub : BuildProvider
 		}
 	}
 
-	private static void UpdateRunFromWorkflow(Run run, WorkflowRun gitHubRun)
+	private async Task UpdateRunFromWorkflowAsync(Run run, WorkflowRun gitHubRun)
 	{
 		run.Started = gitHubRun.RunStartedAt;
 		run.LastUpdated = gitHubRun.UpdatedAt;
 		run.Branch = gitHubRun.HeadBranch.As<BranchName>();
+
+		RunStatus previousStatus = run.Status;
 		run.Status = gitHubRun.Conclusion switch
 		{
 			_ when gitHubRun.Status == WorkflowRunStatus.Requested => RunStatus.Pending,
@@ -178,8 +181,60 @@ internal sealed class GitHub : BuildProvider
 			_ => throw new InvalidOperationException(),
 		};
 
+		// Fetch error details if the run just failed or is a failure without errors
+		if (run.Status == RunStatus.Failure && (previousStatus != RunStatus.Failure || run.Errors.Count == 0))
+		{
+			await FetchRunErrorsAsync(run).ConfigureAwait(false);
+		}
+
+		// Clear errors if the run is no longer a failure
+		if (run.Status != RunStatus.Failure && run.Errors.Count > 0)
+		{
+			run.Errors.Clear();
+		}
+
 		run.Build.UpdateFromRun(run);
 		BuildMonitor.QueueSaveAppData();
+	}
+
+	private async Task FetchRunErrorsAsync(Run run)
+	{
+		try
+		{
+			WorkflowJobsResponse jobs = await GitHubJobs.List(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
+
+			List<string> errors = [];
+			foreach (WorkflowJob? job in jobs.Jobs)
+			{
+				if (job.Conclusion == WorkflowJobConclusion.Failure)
+				{
+					// Get the failed steps
+					List<WorkflowJobStep> failedSteps = [.. job.Steps.Where(s => s.Conclusion == WorkflowJobConclusion.Failure)];
+					if (failedSteps.Count > 0)
+					{
+						foreach (WorkflowJobStep step in failedSteps)
+						{
+							errors.Add($"[{job.Name}] {step.Name}");
+						}
+					}
+					else
+					{
+						// If no specific failed steps found, just add the job name
+						errors.Add($"[{job.Name}] Failed");
+					}
+				}
+			}
+
+			run.Errors = errors;
+		}
+		catch (NotFoundException)
+		{
+			// Jobs not found, ignore
+		}
+		catch (ApiException)
+		{
+			// API error, ignore
+		}
 	}
 
 	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0010:Add missing cases", Justification = "<Pending>")]
