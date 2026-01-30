@@ -119,7 +119,13 @@ internal abstract class BuildProvider
 	[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "<Pending>")]
 	protected void OnRateLimitExceeded() => RateLimitSleep += TimeSpan.FromMilliseconds(100);
 
-	internal void ClearData() => Owners.Clear();
+	internal void ClearData()
+	{
+		foreach ((OwnerName _, Owner owner) in Owners)
+		{
+			owner.Repositories.Clear();
+		}
+	}
 
 	internal abstract Task UpdateRepositoriesAsync(Owner owner);
 	internal abstract Task UpdateBuildsAsync(Repository repository);
