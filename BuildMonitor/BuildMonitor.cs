@@ -479,10 +479,10 @@ internal static class BuildMonitor
 			displayText = errorSummary[..charCount] + ellipsis;
 		}
 
-		// Make the text clickable
+		// Make the text clickable (use run ID for unique widget ID)
 		using (new ScopedTextColor(Color.Palette.Basic.Red))
 		{
-			if (ImGui.Selectable(displayText))
+			if (ImGui.Selectable($"{displayText}##{run.Id}"))
 			{
 				string fullErrorText = $"Build: {build.Name}\nBranch: {branch}\n\nErrors:\n" + string.Join("\n\n", run.Errors);
 				CurrentErrorDetails = fullErrorText;
