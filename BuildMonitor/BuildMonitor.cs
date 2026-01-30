@@ -528,31 +528,52 @@ internal static class BuildMonitor
 	{
 		if (!ProviderRefreshTimer.IsRunning || ProviderRefreshTimer.Elapsed.TotalSeconds >= ProviderRefreshTimeout)
 		{
+			// Gather all owners across all providers
+			List<(BuildProvider Provider, Owner Owner)> allOwners = [];
 			foreach ((BuildProviderName _, BuildProvider? provider) in AppData.BuildProviders)
 			{
 				foreach ((OwnerName _, Owner? owner) in provider.Owners)
 				{
-					await provider.UpdateRepositoriesAsync(owner).ConfigureAwait(false);
-					foreach ((RepositoryId _, Repository? repository) in owner.Repositories)
-					{
-						await provider.UpdateBuildsAsync(repository).ConfigureAwait(false);
-						foreach ((BuildId _, Build? build) in repository.Builds)
-						{
-							_ = BuildSyncCollection.TryAdd(build.Id, new()
-							{
-								Build = build,
-							});
-						}
-					}
+					allOwners.Add((provider, owner));
 				}
 			}
+
+			// Update repositories concurrently (semaphore limits per-provider concurrency)
+			await Task.WhenAll(allOwners.Select(x => x.Provider.UpdateRepositoriesAsync(x.Owner))).ConfigureAwait(false);
+
+			// Gather all repositories across all owners
+			List<(BuildProvider Provider, Repository Repository)> allRepositories = [];
+			foreach ((BuildProvider provider, Owner owner) in allOwners)
+			{
+				foreach ((RepositoryId _, Repository? repository) in owner.Repositories)
+				{
+					allRepositories.Add((provider, repository));
+				}
+			}
+
+			// Update builds concurrently (semaphore limits per-provider concurrency)
+			await Task.WhenAll(allRepositories.Select(async x =>
+			{
+				await x.Provider.UpdateBuildsAsync(x.Repository).ConfigureAwait(false);
+
+				// Add new builds to sync collection
+				foreach ((BuildId _, Build? build) in x.Repository.Builds)
+				{
+					_ = BuildSyncCollection.TryAdd(build.Id, new()
+					{
+						Build = build,
+					});
+				}
+			})).ConfigureAwait(false);
 
 			ProviderRefreshTimer.Restart();
 		}
 
-		await UpdateBuildsAsync().ConfigureAwait(false);
-
-		await UpdateRunsAsync().ConfigureAwait(false);
+		// Update builds and runs concurrently
+		await Task.WhenAll(
+			UpdateBuildsAsync(),
+			UpdateRunsAsync()
+		).ConfigureAwait(false);
 
 		PruneCompletedRuns();
 	}
@@ -569,19 +590,17 @@ internal static class BuildMonitor
 	private static async Task UpdateRunsAsync()
 	{
 		List<KeyValuePair<RunId, RunSync>> runSyncs = [.. RunSyncCollection.Where(b => b.Value.ShouldUpdate)];
-		foreach ((RunId? runId, RunSync? runSync) in runSyncs)
-		{
-			await runSync.UpdateAsync().ConfigureAwait(false);
-		}
+
+		// Update all runs concurrently (semaphore limits per-provider concurrency)
+		await Task.WhenAll(runSyncs.Select(kvp => kvp.Value.UpdateAsync())).ConfigureAwait(false);
 	}
 
 	private static async Task UpdateBuildsAsync()
 	{
 		List<KeyValuePair<BuildId, BuildSync>> buildSyncs = [.. BuildSyncCollection.Where(b => b.Value.ShouldUpdate)];
-		foreach ((BuildId? buildId, BuildSync? buildSync) in buildSyncs)
-		{
-			await buildSync.UpdateAsync().ConfigureAwait(false);
-		}
+
+		// Update all builds concurrently (semaphore limits per-provider concurrency)
+		await Task.WhenAll(buildSyncs.Select(kvp => kvp.Value.UpdateAsync())).ConfigureAwait(false);
 	}
 
 	private static void OnAppMenu()

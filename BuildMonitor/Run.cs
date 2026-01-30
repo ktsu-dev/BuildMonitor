@@ -32,7 +32,7 @@ internal sealed class Run
 	public DateTimeOffset LastUpdated { get; set; }
 	public TimeSpan Duration => LastUpdated - Started;
 	public BranchName Branch { get; set; } = new();
-	public List<string> Errors { get; set; } = [];
+	public IReadOnlyList<string> Errors { get; set; } = [];
 
 	internal bool IsOngoing => Status is RunStatus.Pending or RunStatus.Running;
 

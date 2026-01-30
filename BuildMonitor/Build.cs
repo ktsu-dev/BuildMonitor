@@ -14,6 +14,7 @@ internal sealed record class BuildId : SemanticString<BuildId> { }
 internal sealed class Build
 {
 	private const int NumRecentRuns = 10;
+	private readonly Lock _updateLock = new();
 
 	public BuildName Name { get; set; } = new();
 	public BuildId Id { get; set; } = new();
@@ -57,11 +58,14 @@ internal sealed class Build
 
 	internal void UpdateFromRun(Run run)
 	{
-		if (run.LastUpdated > LastUpdated)
+		lock (_updateLock)
 		{
-			LastUpdated = run.LastUpdated;
-			LastStarted = run.Started;
-			LastStatus = run.Status;
+			if (run.LastUpdated > LastUpdated)
+			{
+				LastUpdated = run.LastUpdated;
+				LastStarted = run.Started;
+				LastStatus = run.Status;
+			}
 		}
 	}
 }

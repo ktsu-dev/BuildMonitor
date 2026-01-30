@@ -191,7 +191,7 @@ internal sealed partial class GitHub : BuildProvider
 		// Clear errors if the run is no longer a failure
 		if (run.Status != RunStatus.Failure && run.Errors.Count > 0)
 		{
-			run.Errors.Clear();
+			run.Errors = [];
 		}
 
 		run.Build.UpdateFromRun(run);
@@ -315,29 +315,37 @@ internal sealed partial class GitHub : BuildProvider
 	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0010:Add missing cases", Justification = "<Pending>")]
 	internal async Task MakeGitHubRequestAsync(string name, Func<Task> action)
 	{
-		await Task.Delay((int)RateLimitSleep.TotalMilliseconds).ConfigureAwait(false);
-
+		await RequestSemaphore.WaitAsync().ConfigureAwait(false);
 		try
 		{
-			await BuildMonitor.MakeRequestAsync(name, action).ConfigureAwait(false);
-		}
-		catch (AuthorizationException)
-		{
-			OnAuthenticationFailure();
-		}
-		catch (ApiException e)
-		{
-			switch (e.HttpResponse?.StatusCode)
+			await Task.Delay((int)RateLimitSleep.TotalMilliseconds).ConfigureAwait(false);
+
+			try
 			{
-				case System.Net.HttpStatusCode.Forbidden:
-					OnAuthenticationFailure();
-					break;
-				case System.Net.HttpStatusCode.TooManyRequests:
-					OnRateLimitExceeded();
-					break;
-				default:
-					throw;
+				await BuildMonitor.MakeRequestAsync(name, action).ConfigureAwait(false);
 			}
+			catch (AuthorizationException)
+			{
+				OnAuthenticationFailure();
+			}
+			catch (ApiException e)
+			{
+				switch (e.HttpResponse?.StatusCode)
+				{
+					case System.Net.HttpStatusCode.Forbidden:
+						OnAuthenticationFailure();
+						break;
+					case System.Net.HttpStatusCode.TooManyRequests:
+						OnRateLimitExceeded();
+						break;
+					default:
+						throw;
+				}
+			}
+		}
+		finally
+		{
+			RequestSemaphore.Release();
 		}
 	}
 }
