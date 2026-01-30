@@ -239,6 +239,8 @@ internal static class BuildMonitor
 			buildProvider.Tick();
 		}
 
+		RenderProviderStatusBar();
+
 		if (ImGui.BeginTable(Strings.Builds, 11, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
 		{
 			foreach (string columnName in DefaultColumnWidths.Keys)
@@ -522,6 +524,50 @@ internal static class BuildMonitor
 			RunStatus.Failure => Color.Palette.Basic.Red,
 			_ => Color.Palette.Neutral.Gray,
 		};
+	}
+
+	private static ImColor GetProviderStatusColor(ProviderStatus status)
+	{
+		return status switch
+		{
+			ProviderStatus.OK => Color.Palette.Basic.Green,
+			ProviderStatus.RateLimited => Color.Palette.Basic.Yellow,
+			ProviderStatus.AuthFailed => Color.Palette.Basic.Red,
+			ProviderStatus.Error => Color.Palette.Basic.Magenta,
+			_ => Color.Palette.Neutral.Gray,
+		};
+	}
+
+	private static string GetProviderStatusLabel(ProviderStatus status)
+	{
+		return status switch
+		{
+			ProviderStatus.OK => Strings.OK,
+			ProviderStatus.RateLimited => Strings.RateLimited,
+			ProviderStatus.AuthFailed => Strings.AuthFailed,
+			ProviderStatus.Error => Strings.ConnectionError,
+			_ => Strings.Status,
+		};
+	}
+
+	private static void RenderProviderStatusBar()
+	{
+		foreach ((BuildProviderName _, BuildProvider? provider) in AppData.BuildProviders)
+		{
+			ImGuiWidgets.ColorIndicator(GetProviderStatusColor(provider.Status), true);
+			ImGui.SameLine();
+			ImGui.TextUnformatted($"{provider.Name}: {GetProviderStatusLabel(provider.Status)}");
+
+			if (ImGui.IsItemHovered() && !string.IsNullOrEmpty(provider.StatusMessage))
+			{
+				ImGui.SetTooltip(provider.StatusMessage);
+			}
+
+			ImGui.SameLine();
+			ImGui.Spacing();
+			ImGui.SameLine();
+		}
+		ImGui.NewLine();
 	}
 
 	private static async Task UpdateAsync()

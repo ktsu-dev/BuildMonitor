@@ -36,4 +36,13 @@ internal static class Strings
 	internal static string Errors { get; } = nameof(Errors).Titleize();
 	internal static string ErrorDetails { get; } = nameof(ErrorDetails).Titleize();
 	internal static string OK { get; } = nameof(OK).Titleize();
+	internal static string ProviderStatus { get; } = nameof(ProviderStatus).Titleize();
+	internal static string RateLimited { get; } = nameof(RateLimited).Titleize();
+	internal static string RateLimitedMessage { get; } = "Rate limited.";
+	internal static string AuthFailed { get; } = nameof(AuthFailed).Titleize();
+	internal static string AuthFailedMessage { get; } = "Authentication failed. Please update credentials.";
+	internal static string ConnectionError { get; } = nameof(ConnectionError).Titleize();
+	internal static string ConnectionErrorMessage { get; } = "Connection error.";
+	internal static string Delay { get; } = nameof(Delay).Titleize();
+	internal static string ResetsAt { get; } = "Resets at";
 }

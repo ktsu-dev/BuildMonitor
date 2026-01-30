@@ -323,6 +323,7 @@ internal sealed partial class GitHub : BuildProvider
 			try
 			{
 				await BuildMonitor.MakeRequestAsync(name, action).ConfigureAwait(false);
+				ClearStatus();
 			}
 			catch (AuthorizationException)
 			{
@@ -333,19 +334,67 @@ internal sealed partial class GitHub : BuildProvider
 				switch (e.HttpResponse?.StatusCode)
 				{
 					case System.Net.HttpStatusCode.Forbidden:
-						OnAuthenticationFailure();
+						// GitHub returns 403 for both auth failures and rate limits
+						// Check if this is a rate limit response before clearing credentials
+						if (IsRateLimitResponse(e))
+						{
+							OnRateLimitExceeded(ParseRateLimitResetTime(e));
+						}
+						else
+						{
+							OnAuthenticationFailure();
+						}
 						break;
 					case System.Net.HttpStatusCode.TooManyRequests:
-						OnRateLimitExceeded();
+						OnRateLimitExceeded(ParseRateLimitResetTime(e));
 						break;
 					default:
 						throw;
 				}
+			}
+			catch (System.Net.Http.HttpRequestException ex)
+			{
+				SetStatus(ProviderStatus.Error, $"{Strings.ConnectionErrorMessage} {ex.Message}");
 			}
 		}
 		finally
 		{
 			RequestSemaphore.Release();
 		}
+	}
+
+	private static DateTimeOffset? ParseRateLimitResetTime(ApiException exception)
+	{
+		if (exception.HttpResponse?.Headers == null)
+		{
+			return null;
+		}
+
+		if (exception.HttpResponse.Headers.TryGetValue("X-RateLimit-Reset", out string? resetValue) &&
+			long.TryParse(resetValue, CultureInfo.InvariantCulture, out long unixTimestamp))
+		{
+			return DateTimeOffset.FromUnixTimeSeconds(unixTimestamp);
+		}
+
+		return null;
+	}
+
+	private static bool IsRateLimitResponse(ApiException exception)
+	{
+		if (exception.HttpResponse?.Headers == null)
+		{
+			return false;
+		}
+
+		// Check if X-RateLimit-Remaining is 0, indicating rate limit exceeded
+		if (exception.HttpResponse.Headers.TryGetValue("X-RateLimit-Remaining", out string? remainingValue) &&
+			int.TryParse(remainingValue, CultureInfo.InvariantCulture, out int remaining) &&
+			remaining == 0)
+		{
+			return true;
+		}
+
+		// Also check for "rate limit" in the error message as a fallback
+		return exception.Message.Contains("rate limit", StringComparison.OrdinalIgnoreCase);
 	}
 }

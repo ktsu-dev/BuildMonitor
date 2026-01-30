@@ -25,6 +25,21 @@ public sealed record class BuildProviderAccountId : SemanticString<BuildProvider
 /// </summary>
 public sealed record class BuildProviderToken : SemanticString<BuildProviderToken> { }
 
+/// <summary>
+/// Represents the operational status of a build provider.
+/// </summary>
+internal enum ProviderStatus
+{
+	/// <summary>Provider is operating normally.</summary>
+	OK,
+	/// <summary>Provider is rate limited.</summary>
+	RateLimited,
+	/// <summary>Provider authentication failed.</summary>
+	AuthFailed,
+	/// <summary>Provider encountered an error.</summary>
+	Error
+}
+
 [JsonDerivedType(typeof(GitHub), nameof(GitHub))]
 [JsonPolymorphic]
 internal abstract class BuildProvider
@@ -41,6 +56,30 @@ internal abstract class BuildProvider
 	private bool ShouldShowAddOwnerPopup { get; set; }
 	private ImGuiPopups.InputString PopupInputString { get; } = new();
 	protected TimeSpan RateLimitSleep { get; set; } = TimeSpan.FromMilliseconds(500);
+
+	/// <summary>
+	/// Current operational status of the provider.
+	/// </summary>
+	[JsonIgnore]
+	internal ProviderStatus Status { get; private set; } = ProviderStatus.OK;
+
+	/// <summary>
+	/// Timestamp when the status was last changed.
+	/// </summary>
+	[JsonIgnore]
+	internal DateTimeOffset StatusTimestamp { get; private set; } = DateTimeOffset.UtcNow;
+
+	/// <summary>
+	/// Human-readable message describing the current status.
+	/// </summary>
+	[JsonIgnore]
+	internal string StatusMessage { get; private set; } = string.Empty;
+
+	/// <summary>
+	/// When rate limited, the time when the rate limit resets.
+	/// </summary>
+	[JsonIgnore]
+	internal DateTimeOffset? RateLimitResetTime { get; private set; }
 
 	/// <summary>
 	/// Controls the maximum number of concurrent requests to this provider.
@@ -121,13 +160,45 @@ internal abstract class BuildProvider
 	{
 		AccountId = new();
 		Token = new();
+		SetStatus(ProviderStatus.AuthFailed, Strings.AuthFailedMessage);
 		BuildMonitor.QueueSaveAppData();
-		//ShouldShowAccountIdPopup = true;
-		//ShouldShowTokenPopup = true;
 	}
 
-	[System.Diagnostics.CodeAnalysis.SuppressMessage("Performance", "CA1822:Mark members as static", Justification = "<Pending>")]
-	protected void OnRateLimitExceeded() => RateLimitSleep += TimeSpan.FromMilliseconds(100);
+	protected void OnRateLimitExceeded(DateTimeOffset? resetTime = null)
+	{
+		RateLimitSleep += TimeSpan.FromMilliseconds(100);
+		RateLimitResetTime = resetTime;
+		string message = $"{Strings.RateLimitedMessage} {Strings.Delay}: {RateLimitSleep.TotalMilliseconds}ms";
+		if (resetTime.HasValue)
+		{
+			message += $" {Strings.ResetsAt}: {resetTime.Value.ToLocalTime():HH:mm:ss}";
+		}
+		SetStatus(ProviderStatus.RateLimited, message);
+	}
+
+	/// <summary>
+	/// Sets the provider status with a message.
+	/// </summary>
+	protected void SetStatus(ProviderStatus status, string message)
+	{
+		Status = status;
+		StatusMessage = message;
+		StatusTimestamp = DateTimeOffset.UtcNow;
+	}
+
+	/// <summary>
+	/// Clears the provider status back to OK after a successful request.
+	/// </summary>
+	protected void ClearStatus()
+	{
+		if (Status != ProviderStatus.OK)
+		{
+			Status = ProviderStatus.OK;
+			StatusMessage = string.Empty;
+			StatusTimestamp = DateTimeOffset.UtcNow;
+			RateLimitResetTime = null;
+		}
+	}
 
 	internal void ClearData()
 	{
