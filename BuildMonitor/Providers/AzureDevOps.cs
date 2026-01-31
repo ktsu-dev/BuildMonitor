@@ -35,7 +35,13 @@ internal sealed class AzureDevOps : BuildProvider
 				ProjectClient = Connection.GetClient<ProjectHttpClient>();
 				BuildClient = Connection.GetClient<BuildHttpClient>();
 			}
-			catch (Exception)
+			catch (VssServiceException)
+			{
+				Connection = null;
+				ProjectClient = null;
+				BuildClient = null;
+			}
+			catch (UriFormatException)
 			{
 				Connection = null;
 				ProjectClient = null;
@@ -167,10 +173,10 @@ internal sealed class AzureDevOps : BuildProvider
 	{
 		// Use QueueTime as fallback for StartTime if not yet started
 		run.Started = build.StartTime ?? build.QueueTime ?? DateTimeOffset.UtcNow;
-		
+
 		// For LastUpdated, use current time if not finished yet (in-progress builds)
 		run.LastUpdated = build.FinishTime ?? DateTimeOffset.UtcNow;
-		
+
 		run.Branch = (build.SourceBranch ?? string.Empty).As<BranchName>();
 
 		RunStatus previousStatus = run.Status;
