@@ -153,6 +153,6 @@ These prevent mixing up different types of identifiers and enable type-safe conv
 ## Project Structure
 
 - Uses ktsu custom SDK (`ktsu.Sdk`, `ktsu.Sdk.App`) in the .csproj
-- Targets .NET 9.0
+- Targets .NET 10.0
 - Requires `AllowUnsafeBlocks` for ImGui interop
 - Dependencies managed via Central Package Management (Directory.Packages.props)
