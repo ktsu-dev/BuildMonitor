@@ -515,6 +515,33 @@ internal static class BuildMonitor
 				CopyRunUrl(latestRun);
 			}
 
+			// API Actions for Latest Run
+			if (build.Owner.BuildProvider is GitHub gitHubProvider)
+			{
+				ImGui.Separator();
+
+				// Re-run workflow (only if not currently running)
+				if (!latestRun.IsOngoing && ImGui.MenuItem("Re-run Latest Workflow"))
+				{
+					RerunLatestWorkflow(gitHubProvider, latestRun, build);
+				}
+
+				// Cancel workflow (only if currently running)
+				if (latestRun.IsOngoing && ImGui.MenuItem("Cancel Running Workflow"))
+				{
+					CancelRunningWorkflow(gitHubProvider, latestRun, build);
+				}
+			}
+
+			// Workflow Dispatch
+			if (build.Owner.BuildProvider is GitHub gitHubDispatchProvider)
+			{
+				if (ImGui.MenuItem("Trigger Workflow on Branch"))
+				{
+					TriggerWorkflowOnBranch(gitHubDispatchProvider, build, branch);
+				}
+			}
+
 			// Re-run Workflow (if supported in the future)
 			ImGui.Separator();
 			if (ImGui.MenuItem("Refresh Build Data"))
@@ -605,6 +632,45 @@ internal static class BuildMonitor
 		{
 			buildSync.ResetTimer();
 		}
+	}
+
+	private static void RerunLatestWorkflow(GitHub gitHubProvider, Run latestRun, Build build)
+	{
+		Task.Run(async () =>
+		{
+			bool success = await gitHubProvider.RerunWorkflowAsync(latestRun).ConfigureAwait(false);
+			if (success)
+			{
+				// Trigger immediate refresh of the build data
+				RefreshBuildData(build);
+			}
+		});
+	}
+
+	private static void CancelRunningWorkflow(GitHub gitHubProvider, Run latestRun, Build build)
+	{
+		Task.Run(async () =>
+		{
+			bool success = await gitHubProvider.CancelWorkflowAsync(latestRun).ConfigureAwait(false);
+			if (success)
+			{
+				// Trigger immediate refresh of the build data
+				RefreshBuildData(build);
+			}
+		});
+	}
+
+	private static void TriggerWorkflowOnBranch(GitHub gitHubProvider, Build build, BranchName branch)
+	{
+		Task.Run(async () =>
+		{
+			bool success = await gitHubProvider.TriggerWorkflowAsync(build, branch).ConfigureAwait(false);
+			if (success)
+			{
+				// Trigger immediate refresh of the build data
+				RefreshBuildData(build);
+			}
+		});
 	}
 
 	private static void OpenUrl(string url)

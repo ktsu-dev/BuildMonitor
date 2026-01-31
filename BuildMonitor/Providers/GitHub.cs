@@ -397,4 +397,102 @@ internal sealed partial class GitHub : BuildProvider
 		// Also check for "rate limit" in the error message as a fallback
 		return exception.Message.Contains("rate limit", StringComparison.OrdinalIgnoreCase);
 	}
+
+	/// <summary>
+	/// Re-runs a workflow run.
+	/// </summary>
+	/// <param name="run">The workflow run to re-run.</param>
+	/// <returns>True if the operation was successful, false otherwise.</returns>
+	internal async Task<bool> RerunWorkflowAsync(Run run)
+	{
+		if (AccountId.IsEmpty() || Token.IsEmpty())
+		{
+			return false;
+		}
+
+		UpdateGitHubClientCredentials();
+		try
+		{
+			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/rerun/{run.Id}", async () =>
+			{
+				await GitHubRuns.Rerun(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
+			}).ConfigureAwait(false);
+			return true;
+		}
+		catch (NotFoundException)
+		{
+			return false;
+		}
+		catch (ApiException)
+		{
+			return false;
+		}
+	}
+
+	/// <summary>
+	/// Cancels a running workflow.
+	/// </summary>
+	/// <param name="run">The workflow run to cancel.</param>
+	/// <returns>True if the operation was successful, false otherwise.</returns>
+	internal async Task<bool> CancelWorkflowAsync(Run run)
+	{
+		if (AccountId.IsEmpty() || Token.IsEmpty())
+		{
+			return false;
+		}
+
+		UpdateGitHubClientCredentials();
+		try
+		{
+			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/cancel/{run.Id}", async () =>
+			{
+				await GitHubRuns.Cancel(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
+			}).ConfigureAwait(false);
+			return true;
+		}
+		catch (NotFoundException)
+		{
+			return false;
+		}
+		catch (ApiException)
+		{
+			return false;
+		}
+	}
+
+	/// <summary>
+	/// Triggers a workflow dispatch event.
+	/// </summary>
+	/// <param name="build">The workflow build to trigger.</param>
+	/// <param name="branch">The branch to run the workflow on.</param>
+	/// <returns>True if the operation was successful, false otherwise.</returns>
+	internal async Task<bool> TriggerWorkflowAsync(Build build, BranchName branch)
+	{
+		if (AccountId.IsEmpty() || Token.IsEmpty())
+		{
+			return false;
+		}
+
+		UpdateGitHubClientCredentials();
+		try
+		{
+			await MakeGitHubRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/dispatch/{build.Name}", async () =>
+			{
+				var createWorkflowDispatch = new CreateWorkflowDispatch(branch)
+				{
+					Inputs = new Dictionary<string, object>()
+				};
+				await GitHubActions.Workflows.CreateDispatch(build.Owner.Name, build.Repository.Name, long.Parse(build.Id, CultureInfo.InvariantCulture), createWorkflowDispatch).ConfigureAwait(false);
+			}).ConfigureAwait(false);
+			return true;
+		}
+		catch (NotFoundException)
+		{
+			return false;
+		}
+		catch (ApiException)
+		{
+			return false;
+		}
+	}
 }
