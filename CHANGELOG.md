@@ -1,3 +1,9 @@
+## v1.2.15 (patch)
+
+Changes since v1.2.14:
+
+- Enhance CLAUDE.md with context menu actions and provider status tracking details ([@matt-edmondson](https://github.com/matt-edmondson))
+- Refactor GitHub API methods for improved readability and error handling ([@matt-edmondson](https://github.com/matt-edmondson))
 ## v1.2.14 (patch)
 
 Changes since v1.2.13:
@@ -19,11 +25,7 @@ Changes since v1.2.14-pre.1:
 - Merge remote-tracking branch 'refs/remotes/origin/main' ([@ktsu[bot]](https://github.com/ktsu[bot]))
 ## v1.2.14-pre.1 (prerelease)
 
-Changes since v1.2.13:
-
-- Sync COPYRIGHT.md ([@ktsu[bot]](https://github.com/ktsu[bot]))
-- Sync global.json ([@ktsu[bot]](https://github.com/ktsu[bot]))
-- Sync scripts\update-winget-manifests.ps1 ([@ktsu[bot]](https://github.com/ktsu[bot]))
+Incremental prerelease update.
 ## v1.2.13 (patch)
 
 Changes since v1.2.12:

@@ -1,6 +1,6 @@
-## v1.2.14 (patch)
+## v1.2.15 (patch)
 
-Changes since v1.2.13:
+Changes since v1.2.14:
 
-- update deps ([@matt-edmondson](https://github.com/matt-edmondson))
-- rate limit display ([@matt-edmondson](https://github.com/matt-edmondson))
+- Enhance CLAUDE.md with context menu actions and provider status tracking details ([@matt-edmondson](https://github.com/matt-edmondson))
+- Refactor GitHub API methods for improved readability and error handling ([@matt-edmondson](https://github.com/matt-edmondson))
