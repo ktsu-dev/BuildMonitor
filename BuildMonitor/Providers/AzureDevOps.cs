@@ -135,7 +135,7 @@ internal sealed class AzureDevOps : BuildProvider
 				RunId runId = azureBuild.Id.ToString(CultureInfo.InvariantCulture).As<RunId>();
 				RunName runName = $"{azureBuild.BuildNumber}".As<RunName>();
 				Run run = build.Runs.GetOrCreate(runId, build.CreateRun(runName, runId));
-				await UpdateRunFromBuildAsync(run, azureBuild).ConfigureAwait(false);
+				UpdateRunFromBuild(run, azureBuild);
 			}
 		}).ConfigureAwait(false);
 	}
@@ -159,26 +159,30 @@ internal sealed class AzureDevOps : BuildProvider
 				run.Owner.Name,
 				int.Parse(run.Id, CultureInfo.InvariantCulture)
 			).ConfigureAwait(false);
-			await UpdateRunFromBuildAsync(run, azureBuild).ConfigureAwait(false);
+			UpdateRunFromBuild(run, azureBuild);
 		}).ConfigureAwait(false);
 	}
 
-	private static async Task UpdateRunFromBuildAsync(Run run, Microsoft.TeamFoundation.Build.WebApi.Build azureBuild)
+	private static void UpdateRunFromBuild(Run run, Microsoft.TeamFoundation.Build.WebApi.Build build)
 	{
-		run.Started = azureBuild.StartTime ?? DateTimeOffset.UtcNow;
-		run.LastUpdated = azureBuild.FinishTime ?? DateTimeOffset.UtcNow;
-		run.Branch = (azureBuild.SourceBranch ?? string.Empty).As<BranchName>();
+		// Use QueueTime as fallback for StartTime if not yet started
+		run.Started = build.StartTime ?? build.QueueTime ?? DateTimeOffset.UtcNow;
+		
+		// For LastUpdated, use current time if not finished yet (in-progress builds)
+		run.LastUpdated = build.FinishTime ?? DateTimeOffset.UtcNow;
+		
+		run.Branch = (build.SourceBranch ?? string.Empty).As<BranchName>();
 
 		RunStatus previousStatus = run.Status;
-		run.Status = azureBuild.Status switch
+		run.Status = build.Status switch
 		{
 			BuildStatus.NotStarted => RunStatus.Pending,
 			BuildStatus.InProgress => RunStatus.Running,
 			BuildStatus.Cancelling => RunStatus.Running,
-			BuildStatus.Completed when azureBuild.Result == BuildResult.Succeeded => RunStatus.Success,
-			BuildStatus.Completed when azureBuild.Result == BuildResult.PartiallySucceeded => RunStatus.Success,
-			BuildStatus.Completed when azureBuild.Result == BuildResult.Failed => RunStatus.Failure,
-			BuildStatus.Completed when azureBuild.Result == BuildResult.Canceled => RunStatus.Canceled,
+			BuildStatus.Completed when build.Result == BuildResult.Succeeded => RunStatus.Success,
+			BuildStatus.Completed when build.Result == BuildResult.PartiallySucceeded => RunStatus.Success,
+			BuildStatus.Completed when build.Result == BuildResult.Failed => RunStatus.Failure,
+			BuildStatus.Completed when build.Result == BuildResult.Canceled => RunStatus.Canceled,
 			BuildStatus.Completed => RunStatus.Failure,
 			_ => RunStatus.Pending,
 		};
@@ -191,8 +195,6 @@ internal sealed class AzureDevOps : BuildProvider
 
 		run.Build.UpdateFromRun(run);
 		BuildMonitor.QueueSaveAppData();
-
-		await Task.CompletedTask.ConfigureAwait(false);
 	}
 
 	internal async Task MakeAzureDevOpsRequestAsync(string name, Func<Task> action)
@@ -208,11 +210,11 @@ internal sealed class AzureDevOps : BuildProvider
 				await BuildMonitor.MakeRequestAsync(name, action).ConfigureAwait(false);
 				ClearStatus();
 			}
-			catch (VssServiceException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.Unauthorized)
+			catch (VssServiceResponseException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.Unauthorized)
 			{
 				OnAuthenticationFailure();
 			}
-			catch (VssServiceException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.TooManyRequests)
+			catch (VssServiceResponseException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.TooManyRequests)
 			{
 				OnRateLimitExceeded();
 			}
