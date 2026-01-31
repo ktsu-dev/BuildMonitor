@@ -629,7 +629,15 @@ internal static class BuildMonitor
 				System.Diagnostics.Process.Start("open", url);
 			}
 		}
-		catch (Exception ex)
+		catch (System.ComponentModel.Win32Exception ex)
+		{
+			Console.WriteLine($"Failed to open URL: {ex.Message}");
+		}
+		catch (System.IO.FileNotFoundException ex)
+		{
+			Console.WriteLine($"Failed to open URL: {ex.Message}");
+		}
+		catch (PlatformNotSupportedException ex)
 		{
 			Console.WriteLine($"Failed to open URL: {ex.Message}");
 		}

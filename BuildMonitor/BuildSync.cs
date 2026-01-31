@@ -17,10 +17,7 @@ internal sealed class BuildSync
 
 	internal BuildSync() => UpdateTimer.Start();
 
-	internal void ResetTimer()
-	{
-		UpdateTimer.Restart();
-	}
+	internal void ResetTimer() => UpdateTimer.Restart();
 
 	internal async Task UpdateAsync()
 	{
