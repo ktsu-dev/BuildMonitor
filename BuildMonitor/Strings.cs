@@ -45,4 +45,8 @@ internal static class Strings
 	internal static string ConnectionErrorMessage { get; } = "Connection error.";
 	internal static string Delay { get; } = nameof(Delay).Titleize();
 	internal static string ResetsAt { get; } = "Resets at";
+	internal static string WaitingFor { get; } = "waiting";
+	internal static string ResetImminent { get; } = "reset imminent";
+	internal static string RateLimitBudget { get; } = "API Budget";
+	internal static string ResetsIn { get; } = "resets in";
 }
