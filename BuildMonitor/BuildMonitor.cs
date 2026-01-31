@@ -630,20 +630,14 @@ internal static class BuildMonitor
 		}
 	}
 
-	private static void RerunLatestWorkflow(GitHub gitHubProvider, Run latestRun, Build build)
-	{
+	private static void RerunLatestWorkflow(GitHub gitHubProvider, Run latestRun, Build build) =>
 		ExecuteGitHubApiAction(async () => await gitHubProvider.RerunWorkflowAsync(latestRun).ConfigureAwait(false), build);
-	}
 
-	private static void CancelRunningWorkflow(GitHub gitHubProvider, Run latestRun, Build build)
-	{
+	private static void CancelRunningWorkflow(GitHub gitHubProvider, Run latestRun, Build build) =>
 		ExecuteGitHubApiAction(async () => await gitHubProvider.CancelWorkflowAsync(latestRun).ConfigureAwait(false), build);
-	}
 
-	private static void TriggerWorkflowOnBranch(GitHub gitHubProvider, Build build, BranchName branch)
-	{
+	private static void TriggerWorkflowOnBranch(GitHub gitHubProvider, Build build, BranchName branch) =>
 		ExecuteGitHubApiAction(async () => await gitHubProvider.TriggerWorkflowAsync(build, branch).ConfigureAwait(false), build);
-	}
 
 	private static void ExecuteGitHubApiAction(Func<Task<bool>> apiAction, Build build)
 	{
@@ -658,7 +652,7 @@ internal static class BuildMonitor
 					RefreshBuildData(build);
 				}
 			}
-			catch (Exception ex)
+			catch (Octokit.ApiException ex)
 			{
 				// Log the error but don't crash the application
 				Console.WriteLine($"GitHub API action failed: {ex.Message}");
@@ -673,7 +667,7 @@ internal static class BuildMonitor
 			// Use platform-specific command to open URL
 			if (OperatingSystem.IsWindows())
 			{
-				System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+				Process.Start(new ProcessStartInfo
 				{
 					FileName = url,
 					UseShellExecute = true
@@ -681,11 +675,11 @@ internal static class BuildMonitor
 			}
 			else if (OperatingSystem.IsLinux())
 			{
-				System.Diagnostics.Process.Start("xdg-open", url);
+				Process.Start("xdg-open", url);
 			}
 			else if (OperatingSystem.IsMacOS())
 			{
-				System.Diagnostics.Process.Start("open", url);
+				Process.Start("open", url);
 			}
 		}
 #pragma warning disable CA1031 // Do not catch general exception types

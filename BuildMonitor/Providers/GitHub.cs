@@ -352,7 +352,7 @@ internal sealed partial class GitHub : BuildProvider
 						throw;
 				}
 			}
-			catch (System.Net.Http.HttpRequestException ex)
+			catch (HttpRequestException ex)
 			{
 				SetStatus(ProviderStatus.Error, $"{Strings.ConnectionErrorMessage} {ex.Message}");
 			}
@@ -413,10 +413,7 @@ internal sealed partial class GitHub : BuildProvider
 		UpdateGitHubClientCredentials();
 		try
 		{
-			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/rerun/{run.Id}", async () =>
-			{
-				await GitHubRuns.Rerun(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
-			}).ConfigureAwait(false);
+			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/rerun/{run.Id}", async () => await GitHubRuns.Rerun(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false)).ConfigureAwait(false);
 			return true;
 		}
 		catch (NotFoundException)
@@ -444,10 +441,7 @@ internal sealed partial class GitHub : BuildProvider
 		UpdateGitHubClientCredentials();
 		try
 		{
-			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/cancel/{run.Id}", async () =>
-			{
-				await GitHubRuns.Cancel(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
-			}).ConfigureAwait(false);
+			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/cancel/{run.Id}", async () => await GitHubRuns.Cancel(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false)).ConfigureAwait(false);
 			return true;
 		}
 		catch (NotFoundException)
@@ -478,9 +472,9 @@ internal sealed partial class GitHub : BuildProvider
 		{
 			await MakeGitHubRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/dispatch/{build.Name}", async () =>
 			{
-				var createWorkflowDispatch = new CreateWorkflowDispatch(branch)
+				CreateWorkflowDispatch createWorkflowDispatch = new(branch)
 				{
-					Inputs = []
+					Inputs = new Dictionary<string, object>()
 				};
 				await GitHubActions.Workflows.CreateDispatch(build.Owner.Name, build.Repository.Name, long.Parse(build.Id, CultureInfo.InvariantCulture), createWorkflowDispatch).ConfigureAwait(false);
 			}).ConfigureAwait(false);
