@@ -530,8 +530,7 @@ internal static class BuildMonitor
 	{
 		if (build.Owner.BuildProvider is GitHub)
 		{
-			string url = $"https://github.com/{build.Owner.Name}/{build.Repository.Name}";
-			OpenUrl(url);
+			OpenUrl(GetRepositoryUrl(build));
 		}
 	}
 
@@ -539,8 +538,7 @@ internal static class BuildMonitor
 	{
 		if (build.Owner.BuildProvider is GitHub)
 		{
-			string url = $"https://github.com/{build.Owner.Name}/{build.Repository.Name}";
-			ImGui.SetClipboardText(url);
+			ImGui.SetClipboardText(GetRepositoryUrl(build));
 		}
 	}
 
@@ -548,8 +546,7 @@ internal static class BuildMonitor
 	{
 		if (build.Owner.BuildProvider is GitHub)
 		{
-			string url = $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/actions/workflows/{build.Id}";
-			OpenUrl(url);
+			OpenUrl(GetWorkflowUrl(build));
 		}
 	}
 
@@ -557,8 +554,7 @@ internal static class BuildMonitor
 	{
 		if (build.Owner.BuildProvider is GitHub)
 		{
-			string url = $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/actions/workflows/{build.Id}";
-			ImGui.SetClipboardText(url);
+			ImGui.SetClipboardText(GetWorkflowUrl(build));
 		}
 	}
 
@@ -566,8 +562,7 @@ internal static class BuildMonitor
 	{
 		if (build.Owner.BuildProvider is GitHub)
 		{
-			string url = $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/tree/{branch}";
-			OpenUrl(url);
+			OpenUrl(GetBranchUrl(build, branch));
 		}
 	}
 
@@ -575,8 +570,7 @@ internal static class BuildMonitor
 	{
 		if (build.Owner.BuildProvider is GitHub)
 		{
-			string url = $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/tree/{branch}";
-			ImGui.SetClipboardText(url);
+			ImGui.SetClipboardText(GetBranchUrl(build, branch));
 		}
 	}
 
@@ -584,8 +578,7 @@ internal static class BuildMonitor
 	{
 		if (run.Owner.BuildProvider is GitHub)
 		{
-			string url = $"https://github.com/{run.Owner.Name}/{run.Repository.Name}/actions/runs/{run.Id}";
-			OpenUrl(url);
+			OpenUrl(GetRunUrl(run));
 		}
 	}
 
@@ -593,10 +586,17 @@ internal static class BuildMonitor
 	{
 		if (run.Owner.BuildProvider is GitHub)
 		{
-			string url = $"https://github.com/{run.Owner.Name}/{run.Repository.Name}/actions/runs/{run.Id}";
-			ImGui.SetClipboardText(url);
+			ImGui.SetClipboardText(GetRunUrl(run));
 		}
 	}
+
+	private static string GetRepositoryUrl(Build build) => $"https://github.com/{build.Owner.Name}/{build.Repository.Name}";
+
+	private static string GetWorkflowUrl(Build build) => $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/actions/workflows/{build.Id}";
+
+	private static string GetBranchUrl(Build build, BranchName branch) => $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/tree/{branch}";
+
+	private static string GetRunUrl(Run run) => $"https://github.com/{run.Owner.Name}/{run.Repository.Name}/actions/runs/{run.Id}";
 
 	private static void RefreshBuildData(Build build)
 	{
@@ -629,15 +629,9 @@ internal static class BuildMonitor
 				System.Diagnostics.Process.Start("open", url);
 			}
 		}
-		catch (System.ComponentModel.Win32Exception ex)
-		{
-			Console.WriteLine($"Failed to open URL: {ex.Message}");
-		}
-		catch (System.IO.FileNotFoundException ex)
-		{
-			Console.WriteLine($"Failed to open URL: {ex.Message}");
-		}
-		catch (PlatformNotSupportedException ex)
+#pragma warning disable CA1031 // Do not catch general exception types
+		catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or System.IO.FileNotFoundException or PlatformNotSupportedException)
+#pragma warning restore CA1031 // Do not catch general exception types
 		{
 			Console.WriteLine($"Failed to open URL: {ex.Message}");
 		}
