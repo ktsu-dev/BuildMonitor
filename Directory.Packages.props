@@ -13,6 +13,7 @@
     <PackageVersion Include="ktsu.TextFilter" Version="1.5.6" />
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="10.0.102" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.102" />
+    <PackageVersion Include="Microsoft.TeamFoundationServer.Client" Version="19.225.2" />
     <PackageVersion Include="Octokit" Version="14.0.0" />
     <PackageVersion Include="Polyfill" Version="9.7.7" />
   </ItemGroup>

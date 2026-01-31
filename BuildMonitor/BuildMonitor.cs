@@ -60,6 +60,7 @@ internal static class BuildMonitor
 		bool needsSave = false;
 
 		needsSave |= AppData.BuildProviders.TryAdd(GitHub.BuildProviderName, new GitHub());
+		needsSave |= AppData.BuildProviders.TryAdd(AzureDevOps.BuildProviderName, new AzureDevOps());
 
 		// add more providers here as needed
 
