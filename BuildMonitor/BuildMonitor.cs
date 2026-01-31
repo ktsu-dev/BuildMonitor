@@ -630,10 +630,10 @@ internal static class BuildMonitor
 			}
 		}
 #pragma warning disable CA1031 // Do not catch general exception types
-		catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or System.IO.FileNotFoundException or PlatformNotSupportedException)
+		catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or PlatformNotSupportedException)
 #pragma warning restore CA1031 // Do not catch general exception types
 		{
-			Console.WriteLine($"Failed to open URL: {ex.Message}");
+			Console.WriteLine($"Failed to open URL '{url}': {ex.Message}");
 		}
 	}
 
