@@ -480,7 +480,7 @@ internal sealed partial class GitHub : BuildProvider
 			{
 				var createWorkflowDispatch = new CreateWorkflowDispatch(branch)
 				{
-					Inputs = new Dictionary<string, object>()
+					Inputs = []
 				};
 				await GitHubActions.Workflows.CreateDispatch(build.Owner.Name, build.Repository.Name, long.Parse(build.Id, CultureInfo.InvariantCulture), createWorkflowDispatch).ConfigureAwait(false);
 			}).ConfigureAwait(false);

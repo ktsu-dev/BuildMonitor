@@ -647,13 +647,21 @@ internal static class BuildMonitor
 
 	private static void ExecuteGitHubApiAction(Func<Task<bool>> apiAction, Build build)
 	{
-		Task.Run(async () =>
+		_ = Task.Run(async () =>
 		{
-			bool success = await apiAction().ConfigureAwait(false);
-			if (success)
+			try
 			{
-				// Trigger immediate refresh of the build data
-				RefreshBuildData(build);
+				bool success = await apiAction().ConfigureAwait(false);
+				if (success)
+				{
+					// Trigger immediate refresh of the build data
+					RefreshBuildData(build);
+				}
+			}
+			catch (Exception ex)
+			{
+				// Log the error but don't crash the application
+				Console.WriteLine($"GitHub API action failed: {ex.Message}");
 			}
 		});
 	}
