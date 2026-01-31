@@ -444,6 +444,195 @@ internal static class BuildMonitor
 		{
 			RenderErrorsColumn(latestRun, build, branch);
 		}
+
+		// Context menu for the row
+		RenderBuildBranchContextMenu(build, branch, latestRun);
+	}
+
+	private static void RenderBuildBranchContextMenu(Build build, BranchName branch, Run latestRun)
+	{
+		// Create a unique ID for the context menu based on the row
+		string contextMenuId = $"ContextMenu_{build.Owner.Name}_{build.Repository.Name}_{build.Name}_{branch}";
+
+		if (ImGui.BeginPopupContextItem(contextMenuId))
+		{
+			ImGui.SeparatorText("Repository");
+
+			// Open Repository in Browser
+			if (ImGui.MenuItem("Open Repository in Browser"))
+			{
+				OpenRepositoryInBrowser(build);
+			}
+
+			// Copy Repository URL
+			if (ImGui.MenuItem("Copy Repository URL"))
+			{
+				CopyRepositoryUrl(build);
+			}
+
+			ImGui.Separator();
+			ImGui.SeparatorText("Workflow");
+
+			// Open Workflow in Browser
+			if (ImGui.MenuItem("Open Workflow in Browser"))
+			{
+				OpenWorkflowInBrowser(build);
+			}
+
+			// Copy Workflow URL
+			if (ImGui.MenuItem("Copy Workflow URL"))
+			{
+				CopyWorkflowUrl(build);
+			}
+
+			ImGui.Separator();
+			ImGui.SeparatorText("Branch");
+
+			// Open Branch in Browser
+			if (ImGui.MenuItem("Open Branch in Browser"))
+			{
+				OpenBranchInBrowser(build, branch);
+			}
+
+			// Copy Branch URL
+			if (ImGui.MenuItem("Copy Branch URL"))
+			{
+				CopyBranchUrl(build, branch);
+			}
+
+			ImGui.Separator();
+			ImGui.SeparatorText("Latest Run");
+
+			// Open Latest Run in Browser
+			if (ImGui.MenuItem("Open Latest Run in Browser"))
+			{
+				OpenRunInBrowser(latestRun);
+			}
+
+			// Copy Latest Run URL
+			if (ImGui.MenuItem("Copy Latest Run URL"))
+			{
+				CopyRunUrl(latestRun);
+			}
+
+			// Re-run Workflow (if supported in the future)
+			ImGui.Separator();
+			if (ImGui.MenuItem("Refresh Build Data"))
+			{
+				RefreshBuildData(build);
+			}
+
+			ImGui.EndPopup();
+		}
+	}
+
+	private static void OpenRepositoryInBrowser(Build build)
+	{
+		if (build.Owner.BuildProvider is GitHub)
+		{
+			string url = $"https://github.com/{build.Owner.Name}/{build.Repository.Name}";
+			OpenUrl(url);
+		}
+	}
+
+	private static void CopyRepositoryUrl(Build build)
+	{
+		if (build.Owner.BuildProvider is GitHub)
+		{
+			string url = $"https://github.com/{build.Owner.Name}/{build.Repository.Name}";
+			ImGui.SetClipboardText(url);
+		}
+	}
+
+	private static void OpenWorkflowInBrowser(Build build)
+	{
+		if (build.Owner.BuildProvider is GitHub)
+		{
+			string url = $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/actions/workflows/{build.Id}";
+			OpenUrl(url);
+		}
+	}
+
+	private static void CopyWorkflowUrl(Build build)
+	{
+		if (build.Owner.BuildProvider is GitHub)
+		{
+			string url = $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/actions/workflows/{build.Id}";
+			ImGui.SetClipboardText(url);
+		}
+	}
+
+	private static void OpenBranchInBrowser(Build build, BranchName branch)
+	{
+		if (build.Owner.BuildProvider is GitHub)
+		{
+			string url = $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/tree/{branch}";
+			OpenUrl(url);
+		}
+	}
+
+	private static void CopyBranchUrl(Build build, BranchName branch)
+	{
+		if (build.Owner.BuildProvider is GitHub)
+		{
+			string url = $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/tree/{branch}";
+			ImGui.SetClipboardText(url);
+		}
+	}
+
+	private static void OpenRunInBrowser(Run run)
+	{
+		if (run.Owner.BuildProvider is GitHub)
+		{
+			string url = $"https://github.com/{run.Owner.Name}/{run.Repository.Name}/actions/runs/{run.Id}";
+			OpenUrl(url);
+		}
+	}
+
+	private static void CopyRunUrl(Run run)
+	{
+		if (run.Owner.BuildProvider is GitHub)
+		{
+			string url = $"https://github.com/{run.Owner.Name}/{run.Repository.Name}/actions/runs/{run.Id}";
+			ImGui.SetClipboardText(url);
+		}
+	}
+
+	private static void RefreshBuildData(Build build)
+	{
+		// Queue the build for immediate update
+		if (BuildSyncCollection.TryGetValue(build.Id, out BuildSync? buildSync))
+		{
+			buildSync.ResetTimer();
+		}
+	}
+
+	private static void OpenUrl(string url)
+	{
+		try
+		{
+			// Use platform-specific command to open URL
+			if (OperatingSystem.IsWindows())
+			{
+				System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+				{
+					FileName = url,
+					UseShellExecute = true
+				});
+			}
+			else if (OperatingSystem.IsLinux())
+			{
+				System.Diagnostics.Process.Start("xdg-open", url);
+			}
+			else if (OperatingSystem.IsMacOS())
+			{
+				System.Diagnostics.Process.Start("open", url);
+			}
+		}
+		catch (Exception ex)
+		{
+			Console.WriteLine($"Failed to open URL: {ex.Message}");
+		}
 	}
 
 	private static void RenderErrorsColumn(Run run, Build build, BranchName branch)
