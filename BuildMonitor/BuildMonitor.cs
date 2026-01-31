@@ -444,6 +444,250 @@ internal static class BuildMonitor
 		{
 			RenderErrorsColumn(latestRun, build, branch);
 		}
+
+		// Context menu for the row
+		RenderBuildBranchContextMenu(build, branch, latestRun);
+	}
+
+	private static void RenderBuildBranchContextMenu(Build build, BranchName branch, Run latestRun)
+	{
+		// Create a unique ID for the context menu based on the row
+		string contextMenuId = $"ContextMenu_{build.Owner.Name}_{build.Repository.Name}_{build.Name}_{branch}";
+
+		if (ImGui.BeginPopupContextItem(contextMenuId))
+		{
+			ImGui.SeparatorText("Repository");
+
+			// Open Repository in Browser
+			if (ImGui.MenuItem("Open Repository in Browser"))
+			{
+				OpenRepositoryInBrowser(build);
+			}
+
+			// Copy Repository URL
+			if (ImGui.MenuItem("Copy Repository URL"))
+			{
+				CopyRepositoryUrl(build);
+			}
+
+			ImGui.Separator();
+			ImGui.SeparatorText("Workflow");
+
+			// Open Workflow in Browser
+			if (ImGui.MenuItem("Open Workflow in Browser"))
+			{
+				OpenWorkflowInBrowser(build);
+			}
+
+			// Copy Workflow URL
+			if (ImGui.MenuItem("Copy Workflow URL"))
+			{
+				CopyWorkflowUrl(build);
+			}
+
+			ImGui.Separator();
+			ImGui.SeparatorText("Branch");
+
+			// Open Branch in Browser
+			if (ImGui.MenuItem("Open Branch in Browser"))
+			{
+				OpenBranchInBrowser(build, branch);
+			}
+
+			// Copy Branch URL
+			if (ImGui.MenuItem("Copy Branch URL"))
+			{
+				CopyBranchUrl(build, branch);
+			}
+
+			ImGui.Separator();
+			ImGui.SeparatorText("Latest Run");
+
+			// Open Latest Run in Browser
+			if (ImGui.MenuItem("Open Latest Run in Browser"))
+			{
+				OpenRunInBrowser(latestRun);
+			}
+
+			// Copy Latest Run URL
+			if (ImGui.MenuItem("Copy Latest Run URL"))
+			{
+				CopyRunUrl(latestRun);
+			}
+
+			// API Actions for Latest Run
+			if (build.Owner.BuildProvider is GitHub gitHubProvider)
+			{
+				ImGui.Separator();
+
+				// Re-run workflow (only if not currently running)
+				if (!latestRun.IsOngoing && ImGui.MenuItem("Re-run Latest Workflow"))
+				{
+					RerunLatestWorkflow(gitHubProvider, latestRun, build);
+				}
+
+				// Cancel workflow (only if currently running)
+				if (latestRun.IsOngoing && ImGui.MenuItem("Cancel Running Workflow"))
+				{
+					CancelRunningWorkflow(gitHubProvider, latestRun, build);
+				}
+
+				// Trigger workflow dispatch
+				if (ImGui.MenuItem("Trigger Workflow on Branch"))
+				{
+					TriggerWorkflowOnBranch(gitHubProvider, build, branch);
+				}
+			}
+
+			ImGui.Separator();
+			if (ImGui.MenuItem("Refresh Build Data"))
+			{
+				RefreshBuildData(build);
+			}
+
+			ImGui.EndPopup();
+		}
+	}
+
+	private static void OpenRepositoryInBrowser(Build build)
+	{
+		if (build.Owner.BuildProvider is GitHub)
+		{
+			OpenUrl(GetRepositoryUrl(build));
+		}
+	}
+
+	private static void CopyRepositoryUrl(Build build)
+	{
+		if (build.Owner.BuildProvider is GitHub)
+		{
+			ImGui.SetClipboardText(GetRepositoryUrl(build));
+		}
+	}
+
+	private static void OpenWorkflowInBrowser(Build build)
+	{
+		if (build.Owner.BuildProvider is GitHub)
+		{
+			OpenUrl(GetWorkflowUrl(build));
+		}
+	}
+
+	private static void CopyWorkflowUrl(Build build)
+	{
+		if (build.Owner.BuildProvider is GitHub)
+		{
+			ImGui.SetClipboardText(GetWorkflowUrl(build));
+		}
+	}
+
+	private static void OpenBranchInBrowser(Build build, BranchName branch)
+	{
+		if (build.Owner.BuildProvider is GitHub)
+		{
+			OpenUrl(GetBranchUrl(build, branch));
+		}
+	}
+
+	private static void CopyBranchUrl(Build build, BranchName branch)
+	{
+		if (build.Owner.BuildProvider is GitHub)
+		{
+			ImGui.SetClipboardText(GetBranchUrl(build, branch));
+		}
+	}
+
+	private static void OpenRunInBrowser(Run run)
+	{
+		if (run.Owner.BuildProvider is GitHub)
+		{
+			OpenUrl(GetRunUrl(run));
+		}
+	}
+
+	private static void CopyRunUrl(Run run)
+	{
+		if (run.Owner.BuildProvider is GitHub)
+		{
+			ImGui.SetClipboardText(GetRunUrl(run));
+		}
+	}
+
+	private static string GetRepositoryUrl(Build build) => $"https://github.com/{build.Owner.Name}/{build.Repository.Name}";
+
+	private static string GetWorkflowUrl(Build build) => $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/actions/workflows/{build.Id}";
+
+	private static string GetBranchUrl(Build build, BranchName branch) => $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/tree/{branch}";
+
+	private static string GetRunUrl(Run run) => $"https://github.com/{run.Owner.Name}/{run.Repository.Name}/actions/runs/{run.Id}";
+
+	private static void RefreshBuildData(Build build)
+	{
+		// Queue the build for immediate update
+		if (BuildSyncCollection.TryGetValue(build.Id, out BuildSync? buildSync))
+		{
+			buildSync.ResetTimer();
+		}
+	}
+
+	private static void RerunLatestWorkflow(GitHub gitHubProvider, Run latestRun, Build build) =>
+		ExecuteGitHubApiAction(async () => await gitHubProvider.RerunWorkflowAsync(latestRun).ConfigureAwait(false), build);
+
+	private static void CancelRunningWorkflow(GitHub gitHubProvider, Run latestRun, Build build) =>
+		ExecuteGitHubApiAction(async () => await gitHubProvider.CancelWorkflowAsync(latestRun).ConfigureAwait(false), build);
+
+	private static void TriggerWorkflowOnBranch(GitHub gitHubProvider, Build build, BranchName branch) =>
+		ExecuteGitHubApiAction(async () => await gitHubProvider.TriggerWorkflowAsync(build, branch).ConfigureAwait(false), build);
+
+	private static void ExecuteGitHubApiAction(Func<Task<bool>> apiAction, Build build)
+	{
+		_ = Task.Run(async () =>
+		{
+			try
+			{
+				bool success = await apiAction().ConfigureAwait(false);
+				if (success)
+				{
+					// Trigger immediate refresh of the build data
+					RefreshBuildData(build);
+				}
+			}
+			catch (Octokit.ApiException ex)
+			{
+				// Log the error but don't crash the application
+				Console.WriteLine($"GitHub API action failed: {ex.Message}");
+			}
+		});
+	}
+
+	private static void OpenUrl(string url)
+	{
+		try
+		{
+			// Use platform-specific command to open URL
+			if (OperatingSystem.IsWindows())
+			{
+				Process.Start(new ProcessStartInfo
+				{
+					FileName = url,
+					UseShellExecute = true
+				});
+			}
+			else if (OperatingSystem.IsLinux())
+			{
+				Process.Start("xdg-open", url);
+			}
+			else if (OperatingSystem.IsMacOS())
+			{
+				Process.Start("open", url);
+			}
+		}
+#pragma warning disable CA1031 // Do not catch general exception types
+		catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or PlatformNotSupportedException)
+#pragma warning restore CA1031 // Do not catch general exception types
+		{
+			Console.WriteLine($"Failed to open URL '{url}': {ex.Message}");
+		}
 	}
 
 	private static void RenderErrorsColumn(Run run, Build build, BranchName branch)

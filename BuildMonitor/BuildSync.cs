@@ -17,6 +17,8 @@ internal sealed class BuildSync
 
 	internal BuildSync() => UpdateTimer.Start();
 
+	internal void ResetTimer() => UpdateTimer.Restart();
+
 	internal async Task UpdateAsync()
 	{
 		await Build.Owner.BuildProvider.UpdateBuildAsync(Build).ConfigureAwait(false);

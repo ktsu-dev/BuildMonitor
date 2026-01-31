@@ -21,10 +21,7 @@
     <PackageReference Include="Microsoft.SourceLink.AzureRepos.Git" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" />
     <PackageReference Include="Octokit" />
-    <PackageReference Include="Polyfill">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
+    <PackageReference Include="Polyfill" />
   </ItemGroup>
 
 </Project>
