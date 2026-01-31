@@ -531,18 +531,14 @@ internal static class BuildMonitor
 				{
 					CancelRunningWorkflow(gitHubProvider, latestRun, build);
 				}
-			}
 
-			// Workflow Dispatch
-			if (build.Owner.BuildProvider is GitHub gitHubDispatchProvider)
-			{
+				// Trigger workflow dispatch
 				if (ImGui.MenuItem("Trigger Workflow on Branch"))
 				{
-					TriggerWorkflowOnBranch(gitHubDispatchProvider, build, branch);
+					TriggerWorkflowOnBranch(gitHubProvider, build, branch);
 				}
 			}
 
-			// Re-run Workflow (if supported in the future)
 			ImGui.Separator();
 			if (ImGui.MenuItem("Refresh Build Data"))
 			{
@@ -636,35 +632,24 @@ internal static class BuildMonitor
 
 	private static void RerunLatestWorkflow(GitHub gitHubProvider, Run latestRun, Build build)
 	{
-		Task.Run(async () =>
-		{
-			bool success = await gitHubProvider.RerunWorkflowAsync(latestRun).ConfigureAwait(false);
-			if (success)
-			{
-				// Trigger immediate refresh of the build data
-				RefreshBuildData(build);
-			}
-		});
+		ExecuteGitHubApiAction(async () => await gitHubProvider.RerunWorkflowAsync(latestRun).ConfigureAwait(false), build);
 	}
 
 	private static void CancelRunningWorkflow(GitHub gitHubProvider, Run latestRun, Build build)
 	{
-		Task.Run(async () =>
-		{
-			bool success = await gitHubProvider.CancelWorkflowAsync(latestRun).ConfigureAwait(false);
-			if (success)
-			{
-				// Trigger immediate refresh of the build data
-				RefreshBuildData(build);
-			}
-		});
+		ExecuteGitHubApiAction(async () => await gitHubProvider.CancelWorkflowAsync(latestRun).ConfigureAwait(false), build);
 	}
 
 	private static void TriggerWorkflowOnBranch(GitHub gitHubProvider, Build build, BranchName branch)
 	{
+		ExecuteGitHubApiAction(async () => await gitHubProvider.TriggerWorkflowAsync(build, branch).ConfigureAwait(false), build);
+	}
+
+	private static void ExecuteGitHubApiAction(Func<Task<bool>> apiAction, Build build)
+	{
 		Task.Run(async () =>
 		{
-			bool success = await gitHubProvider.TriggerWorkflowAsync(build, branch).ConfigureAwait(false);
+			bool success = await apiAction().ConfigureAwait(false);
 			if (success)
 			{
 				// Trigger immediate refresh of the build data
