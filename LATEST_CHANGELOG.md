@@ -1,7 +1,6 @@
-## v1.2.14-pre.3 (prerelease)
+## v1.2.14 (patch)
 
-Changes since v1.2.14-pre.2:
+Changes since v1.2.13:
 
-- Sync COPYRIGHT.md ([@ktsu[bot]](https://github.com/ktsu[bot]))
-- Sync global.json ([@ktsu[bot]](https://github.com/ktsu[bot]))
-- Merge remote-tracking branch 'refs/remotes/origin/main' ([@ktsu[bot]](https://github.com/ktsu[bot]))
+- update deps ([@matt-edmondson](https://github.com/matt-edmondson))
+- rate limit display ([@matt-edmondson](https://github.com/matt-edmondson))

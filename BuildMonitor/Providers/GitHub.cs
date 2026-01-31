@@ -318,11 +318,17 @@ internal sealed partial class GitHub : BuildProvider
 		await RequestSemaphore.WaitAsync().ConfigureAwait(false);
 		try
 		{
-			await Task.Delay((int)RateLimitSleep.TotalMilliseconds).ConfigureAwait(false);
+			// Use smart waiting: if rate limited with a known reset time, wait until reset
+			TimeSpan waitTime = GetRateLimitWaitTime();
+			await Task.Delay(waitTime).ConfigureAwait(false);
 
 			try
 			{
 				await BuildMonitor.MakeRequestAsync(name, action).ConfigureAwait(false);
+
+				// Update rate limit budget from successful response for pre-emptive pacing
+				UpdateRateLimitFromApiInfo();
+
 				ClearStatus();
 			}
 			catch (AuthorizationException)
@@ -360,6 +366,22 @@ internal sealed partial class GitHub : BuildProvider
 		finally
 		{
 			RequestSemaphore.Release();
+		}
+	}
+
+	/// <summary>
+	/// Updates the rate limit budget from the last API response.
+	/// Uses Octokit's GetLastApiInfo() to retrieve rate limit headers.
+	/// </summary>
+	private void UpdateRateLimitFromApiInfo()
+	{
+		ApiInfo? apiInfo = GitHubClient.GetLastApiInfo();
+		if (apiInfo?.RateLimit != null)
+		{
+			UpdateRateLimitBudget(
+				apiInfo.RateLimit.Remaining,
+				apiInfo.RateLimit.Limit,
+				apiInfo.RateLimit.Reset);
 		}
 	}
 

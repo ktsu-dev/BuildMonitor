@@ -800,11 +800,23 @@ internal static class BuildMonitor
 		{
 			ImGuiWidgets.ColorIndicator(GetProviderStatusColor(provider.Status), true);
 			ImGui.SameLine();
-			ImGui.TextUnformatted($"{provider.Name}: {GetProviderStatusLabel(provider.Status)}");
 
-			if (ImGui.IsItemHovered() && !string.IsNullOrEmpty(provider.StatusMessage))
+			// Build status text with rate limit info if available
+			string statusText = $"{provider.Name}: {GetProviderStatusLabel(provider.Status)}";
+			if (provider.RateLimitDisplay != null)
 			{
-				ImGui.SetTooltip(provider.StatusMessage);
+				statusText += $" [{provider.RateLimitDisplay}]";
+			}
+			ImGui.TextUnformatted(statusText);
+
+			// Show detailed tooltip with status message and rate limit details
+			if (ImGui.IsItemHovered())
+			{
+				string? tooltip = BuildProviderTooltip(provider);
+				if (!string.IsNullOrEmpty(tooltip))
+				{
+					ImGui.SetTooltip(tooltip);
+				}
 			}
 
 			ImGui.SameLine();
@@ -812,6 +824,23 @@ internal static class BuildMonitor
 			ImGui.SameLine();
 		}
 		ImGui.NewLine();
+	}
+
+	private static string? BuildProviderTooltip(BuildProvider provider)
+	{
+		List<string> lines = [];
+
+		if (!string.IsNullOrEmpty(provider.StatusMessage))
+		{
+			lines.Add(provider.StatusMessage);
+		}
+
+		if (provider.RateLimitDetailedStatus != null)
+		{
+			lines.Add(provider.RateLimitDetailedStatus);
+		}
+
+		return lines.Count > 0 ? string.Join("\n", lines) : null;
 	}
 
 	private static async Task UpdateAsync()
