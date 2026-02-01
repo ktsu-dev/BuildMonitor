@@ -374,6 +374,67 @@ internal abstract class BuildProvider
 		return RateLimitResetTime.Value > DateTimeOffset.UtcNow;
 	}
 
+	/// <summary>
+	/// The percentage of budget remaining below which we enter "low budget" mode.
+	/// In low budget mode, only high-priority requests are processed.
+	/// </summary>
+	private const double LowBudgetThreshold = 0.15; // 15% of budget remaining
+
+	/// <summary>
+	/// The percentage of budget remaining below which we enter "critical budget" mode.
+	/// In critical mode, even medium-priority requests are skipped.
+	/// </summary>
+	private const double CriticalBudgetThreshold = 0.05; // 5% of budget remaining
+
+	/// <summary>
+	/// Gets the current budget percentage (0.0 to 1.0).
+	/// Returns 1.0 if budget info is not available (assume full budget).
+	/// </summary>
+	[JsonIgnore]
+	internal double BudgetPercentage
+	{
+		get
+		{
+			if (!RateLimitBudgetRemaining.HasValue || !RateLimitBudgetLimit.HasValue || RateLimitBudgetLimit.Value == 0)
+			{
+				return 1.0;
+			}
+			return (double)RateLimitBudgetRemaining.Value / RateLimitBudgetLimit.Value;
+		}
+	}
+
+	/// <summary>
+	/// Returns true if budget is low and we should skip low-priority requests.
+	/// </summary>
+	[JsonIgnore]
+	internal bool IsLowBudget => BudgetPercentage < LowBudgetThreshold;
+
+	/// <summary>
+	/// Returns true if budget is critically low and we should only process high-priority requests.
+	/// </summary>
+	[JsonIgnore]
+	internal bool IsCriticalBudget => BudgetPercentage < CriticalBudgetThreshold;
+
+	/// <summary>
+	/// Gets the maximum allowed priority for requests given the current budget.
+	/// </summary>
+	[JsonIgnore]
+	internal RequestPriority MaxAllowedPriority
+	{
+		get
+		{
+			if (IsCriticalBudget)
+			{
+				return RequestPriority.High;
+			}
+			if (IsLowBudget)
+			{
+				return RequestPriority.Medium;
+			}
+			return RequestPriority.Low;
+		}
+	}
+
 	private static string FormatTimeSpan(TimeSpan timeSpan)
 	{
 		if (timeSpan.TotalHours >= 1)

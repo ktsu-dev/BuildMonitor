@@ -1245,10 +1245,18 @@ internal static class BuildMonitor
 	{
 		if (!ProviderRefreshTimer.IsRunning || ProviderRefreshTimer.Elapsed.TotalSeconds >= ProviderRefreshTimeout)
 		{
-			// Gather all owners across all providers
+			// Gather all owners across all providers, skipping providers with low budget
+			// Discovery operations are low priority and should be skipped when budget is constrained
 			List<(BuildProvider Provider, Owner Owner)> allOwners = [];
 			foreach ((BuildProviderName _, BuildProvider? provider) in AppData.BuildProviders)
 			{
+				// Skip discovery for providers in low budget mode
+				if (provider.IsLowBudget)
+				{
+					Log.Info($"{provider.Name}: Skipping discovery due to low budget ({provider.BudgetPercentage:P0} remaining)");
+					continue;
+				}
+
 				foreach ((OwnerName _, Owner? owner) in provider.Owners)
 				{
 					allOwners.Add((provider, owner));
@@ -1319,7 +1327,11 @@ internal static class BuildMonitor
 
 	private static async Task UpdateRunsAsync()
 	{
-		List<KeyValuePair<RunId, RunSync>> runSyncs = [.. RunSyncCollection.Where(b => b.Value.ShouldUpdate)];
+		// Get runs that should update and filter by provider budget priority
+		List<KeyValuePair<RunId, RunSync>> runSyncs = [.. RunSyncCollection
+			.Where(b => b.Value.ShouldUpdate)
+			.Where(b => b.Value.Priority <= b.Value.Run.Owner.BuildProvider.MaxAllowedPriority)
+			.OrderBy(b => b.Value.Priority)];
 
 		// Update all runs concurrently (semaphore limits per-provider concurrency)
 		await Task.WhenAll(runSyncs.Select(kvp => kvp.Value.UpdateAsync())).ConfigureAwait(false);
@@ -1327,7 +1339,11 @@ internal static class BuildMonitor
 
 	private static async Task UpdateBuildsAsync()
 	{
-		List<KeyValuePair<BuildId, BuildSync>> buildSyncs = [.. BuildSyncCollection.Where(b => b.Value.ShouldUpdate)];
+		// Get builds that should update and filter by provider budget priority
+		List<KeyValuePair<BuildId, BuildSync>> buildSyncs = [.. BuildSyncCollection
+			.Where(b => b.Value.ShouldUpdate)
+			.Where(b => b.Value.Priority <= b.Value.Build.Owner.BuildProvider.MaxAllowedPriority)
+			.OrderBy(b => b.Value.Priority)];
 
 		// Update all builds concurrently (semaphore limits per-provider concurrency)
 		await Task.WhenAll(buildSyncs.Select(kvp => kvp.Value.UpdateAsync())).ConfigureAwait(false);

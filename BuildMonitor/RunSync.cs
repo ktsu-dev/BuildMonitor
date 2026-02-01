@@ -20,6 +20,12 @@ internal sealed class RunSync
 	/// </summary>
 	internal bool IsOrphaned => !Run.Build.Runs.ContainsKey(Run.Id);
 
+	/// <summary>
+	/// Gets the priority of this run for API request scheduling.
+	/// Running runs are always high priority since they're actively changing.
+	/// </summary>
+	internal RequestPriority Priority => Run.IsOngoing ? RequestPriority.High : RequestPriority.Low;
+
 	internal bool ShouldUpdate => !IsOrphaned && Run.IsOngoing && UpdateTimer.Elapsed.TotalSeconds >= UpdateIntervalCurrent;
 
 	internal RunSync() => UpdateTimer.Start();
