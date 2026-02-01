@@ -13,9 +13,6 @@
     <PackageReference Include="Humanizer.Core" ExcludeAssets="analyzers" />
     <PackageReference Include="ktsu.AppDataStorage" />
     <PackageReference Include="ktsu.Extensions" />
-    <PackageReference Include="ktsu.ImGui.App" />
-    <PackageReference Include="ktsu.ImGui.Popups" />
-    <PackageReference Include="ktsu.ImGui.Widgets" />
     <PackageReference Include="ktsu.Semantics.Strings" />
     <PackageReference Include="ktsu.TextFilter" />
     <PackageReference Include="Microsoft.SourceLink.AzureRepos.Git" />
@@ -23,6 +20,13 @@
     <PackageReference Include="Microsoft.TeamFoundationServer.Client" />
     <PackageReference Include="Octokit" />
     <PackageReference Include="Polyfill" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\ImGuiApp\ImGui.App\ImGui.App.csproj" />
+    <ProjectReference Include="..\..\ImGuiApp\ImGui.Popups\ImGui.Popups.csproj" />
+    <ProjectReference Include="..\..\ImGuiApp\ImGui.Styler\ImGui.Styler.csproj" />
+    <ProjectReference Include="..\..\ImGuiApp\ImGui.Widgets\ImGui.Widgets.csproj" />
   </ItemGroup>
 
 </Project>

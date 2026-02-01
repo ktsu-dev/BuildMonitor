@@ -91,6 +91,16 @@ internal static class BuildMonitor
 	private static ImGuiPopups.Prompt ErrorDetailsPopup { get; } = new();
 	private static string CurrentErrorDetails { get; set; } = string.Empty;
 
+	private static ImGuiWidgets.TabPanel OwnerTabPanel { get; } = new("OwnerTabPanel", false, true, OnOwnerTabChanged);
+	private static HashSet<string> CurrentOwnerTabIds { get; } = [];
+	private const string AllOwnersTabId = "__all__";
+
+	private static void OnOwnerTabChanged(string tabId)
+	{
+		AppData.SelectedOwnerTabId = tabId;
+		QueueSaveAppData();
+	}
+
 	private static float GetColumnWidth(string columnName)
 	{
 		if (AppData.ColumnWidths.TryGetValue(columnName, out float width) &&
@@ -250,7 +260,126 @@ internal static class BuildMonitor
 		}
 
 		RenderProviderStatusBar();
+		UpdateOwnerTabs();
+		RenderOwnerTabFilter();
+		OwnerTabPanel.Draw();
 
+		ShowPopupsIfRequired();
+		SaveSettingsIfRequired();
+	}
+
+	private static void UpdateOwnerTabs()
+	{
+		// Get all current owners across all providers
+		List<Owner> allOwners = [.. AppData.BuildProviders
+			.SelectMany(p => p.Value.Owners)
+			.Select(o => o.Value)
+			.OrderBy(o => o.Name.ToString())];
+
+		// Create set of owner IDs we should have
+		HashSet<string> expectedTabIds = [AllOwnersTabId];
+		foreach (Owner owner in allOwners)
+		{
+			expectedTabIds.Add(owner.Name.ToString());
+		}
+
+		// Add "All" tab if not present
+		if (!CurrentOwnerTabIds.Contains(AllOwnersTabId))
+		{
+			_ = OwnerTabPanel.AddTab(AllOwnersTabId, Strings.All, RenderAllOwnersTab);
+			_ = CurrentOwnerTabIds.Add(AllOwnersTabId);
+		}
+
+		// Add new owner tabs
+		foreach (Owner owner in allOwners)
+		{
+			string tabId = owner.Name.ToString();
+			if (!CurrentOwnerTabIds.Contains(tabId))
+			{
+				Owner capturedOwner = owner;
+				_ = OwnerTabPanel.AddTab(tabId, tabId, () => RenderOwnerTab(capturedOwner));
+				_ = CurrentOwnerTabIds.Add(tabId);
+			}
+		}
+
+		// Remove tabs for owners that no longer exist
+		List<string> tabsToRemove = [.. CurrentOwnerTabIds.Where(id => !expectedTabIds.Contains(id))];
+		foreach (string tabId in tabsToRemove)
+		{
+			_ = OwnerTabPanel.RemoveTab(tabId);
+			_ = CurrentOwnerTabIds.Remove(tabId);
+		}
+
+		// Restore selected tab if set
+		if (AppData.SelectedOwnerTabId != null &&
+			CurrentOwnerTabIds.Contains(AppData.SelectedOwnerTabId) &&
+			OwnerTabPanel.ActiveTabId != AppData.SelectedOwnerTabId)
+		{
+			int tabIndex = OwnerTabPanel.GetTabIndex(AppData.SelectedOwnerTabId);
+			if (tabIndex >= 0)
+			{
+				OwnerTabPanel.ActiveTabIndex = tabIndex;
+			}
+		}
+	}
+
+	private static void RenderOwnerTabFilter()
+	{
+		ImGui.TextUnformatted(Strings.FilterTabs);
+		ImGui.SameLine();
+		ImGui.SetNextItemWidth(200);
+
+		string filterText = AppData.FilterOwnerTab;
+		TextFilterType filterType = AppData.FilterOwnerTabType;
+		TextFilterMatchOptions filterMatchOptions = AppData.FilterOwnerTabMatchOptions;
+
+		ImGuiWidgets.SearchBox("##OwnerTabFilter", ref filterText, ref filterType, ref filterMatchOptions);
+
+		if (filterText != AppData.FilterOwnerTab ||
+			filterType != AppData.FilterOwnerTabType ||
+			filterMatchOptions != AppData.FilterOwnerTabMatchOptions)
+		{
+			AppData.FilterOwnerTab = filterText;
+			AppData.FilterOwnerTabType = filterType;
+			AppData.FilterOwnerTabMatchOptions = filterMatchOptions;
+			QueueSaveAppData();
+		}
+
+		// Update tab visibility based on filter
+		foreach (string tabId in CurrentOwnerTabIds)
+		{
+			ImGuiWidgets.Tab? tab = OwnerTabPanel.GetTabById(tabId);
+			if (tab == null)
+			{
+				continue;
+			}
+
+			if (tabId == AllOwnersTabId)
+			{
+				// Always show "All" tab
+				tab.IsVisible = true;
+			}
+			else if (string.IsNullOrEmpty(AppData.FilterOwnerTab))
+			{
+				tab.IsVisible = true;
+			}
+			else
+			{
+				tab.IsVisible = TextFilter.IsMatch(
+					tabId.ToUpperInvariant(),
+					"*" + AppData.FilterOwnerTab.ToUpperInvariant() + "*",
+					AppData.FilterOwnerTabType,
+					AppData.FilterOwnerTabMatchOptions);
+			}
+		}
+	}
+
+	private static void RenderAllOwnersTab() => RenderBuildTable(null);
+
+	private static void RenderOwnerTab(Owner owner) => RenderBuildTable(owner);
+
+	private static void RenderBuildTable(Owner? filterOwner)
+	{
 		if (ImGui.BeginTable(Strings.Builds, 12, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
 		{
 			foreach (string columnName in DefaultColumnWidths.Keys)
@@ -263,9 +392,15 @@ internal static class BuildMonitor
 			RenderFilterRow();
 
 			// Group runs by (Build, Branch) and iterate
-			IOrderedEnumerable<(Build Build, BranchName Branch, List<Run> Runs)> buildBranches = AppData.BuildProviders
-				.SelectMany(p => p.Value.Owners)
-				.SelectMany(o => o.Value.Repositories)
+			IEnumerable<(BuildProviderName Name, BuildProvider Provider)> providers = AppData.BuildProviders
+				.Select(p => (p.Key, p.Value));
+
+			IEnumerable<(Owner Owner, BuildProvider Provider)> owners = filterOwner != null
+				? [(filterOwner, filterOwner.BuildProvider)]
+				: providers.SelectMany(p => p.Provider.Owners.Select(o => (o.Value, p.Provider)));
+
+			IOrderedEnumerable<(Build Build, BranchName Branch, List<Run> Runs)> buildBranches = owners
+				.SelectMany(o => o.Owner.Repositories)
 				.SelectMany(r => r.Value.Builds)
 				.SelectMany(b => b.Value.Runs.Values
 					.GroupBy(r => r.Branch)
@@ -285,9 +420,6 @@ internal static class BuildMonitor
 			}
 
 			ImGui.EndTable();
-
-			ShowPopupsIfRequired();
-			SaveSettingsIfRequired();
 		}
 	}
 
