@@ -1,6 +1,5 @@
-## v1.2.16 (patch)
+## v1.2.17 (patch)
 
-Changes since v1.2.15:
+Changes since v1.2.16:
 
-- Enhance error handling in Azure DevOps provider and update package vulnerability suppression ([@matt-edmondson](https://github.com/matt-edmondson))
-- Refactor Azure DevOps provider to streamline status handling and remove unused variable ([@matt-edmondson](https://github.com/matt-edmondson))
+- Add filtering options for owner and repository in AppData, enhance Azure DevOps and GitHub provider menus, and implement project discovery functionality ([@matt-edmondson](https://github.com/matt-edmondson))
