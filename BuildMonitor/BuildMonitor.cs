@@ -75,7 +75,8 @@ internal static class BuildMonitor
 	private static readonly Dictionary<string, float> DefaultColumnWidths = new()
 	{
 		["##buildStatus"] = 30f,
-		[Strings.Repository] = 200f,
+		[Strings.Owner] = 150f,
+		[Strings.Repository] = 150f,
 		[Strings.BuildName] = 200f,
 		[Strings.Branch] = 150f,
 		[Strings.Status] = 80f,
@@ -190,6 +191,14 @@ internal static class BuildMonitor
 		ImGui.TableNextRow();
 		ImGui.TableNextColumn(); // Skip status column
 
+		string filterOwner = AppData.FilterOwner;
+		TextFilterType filterOwnerType = AppData.FilterOwnerType;
+		TextFilterMatchOptions filterOwnerMatchOptions = AppData.FilterOwnerMatchOptions;
+		RenderFilterSearchBox("##FilterOwner", ref filterOwner, ref filterOwnerType, ref filterOwnerMatchOptions);
+		AppData.FilterOwner = filterOwner;
+		AppData.FilterOwnerType = filterOwnerType;
+		AppData.FilterOwnerMatchOptions = filterOwnerMatchOptions;
+
 		string filterRepository = AppData.FilterRepository;
 		TextFilterType filterRepositoryType = AppData.FilterRepositoryType;
 		TextFilterMatchOptions filterRepositoryMatchOptions = AppData.FilterRepositoryMatchOptions;
@@ -242,7 +251,7 @@ internal static class BuildMonitor
 
 		RenderProviderStatusBar();
 
-		if (ImGui.BeginTable(Strings.Builds, 11, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
+		if (ImGui.BeginTable(Strings.Builds, 12, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
 		{
 			foreach (string columnName in DefaultColumnWidths.Keys)
 			{
@@ -309,12 +318,39 @@ internal static class BuildMonitor
 		return displayName;
 	}
 
+	private static string MakeRepositoryDisplayName(Build build)
+	{
+		string repoName = build.Repository.Name;
+		string ownerName = build.Owner.Name;
+
+		// Remove owner name prefix if present (e.g., "ktsu-dev-" from "ktsu-dev-BuildMonitor")
+		if (repoName.StartsWithOrdinal(ownerName + "-"))
+		{
+			repoName = repoName.RemovePrefix(ownerName + "-");
+		}
+		else if (repoName.StartsWithOrdinal(ownerName + "."))
+		{
+			repoName = repoName.RemovePrefix(ownerName + ".");
+		}
+		else if (repoName.StartsWithOrdinal(ownerName + "_"))
+		{
+			repoName = repoName.RemovePrefix(ownerName + "_");
+		}
+
+		return repoName;
+	}
+
 	private static bool ShouldShowBuildBranch(Build build, BranchName branch)
 	{
 		bool shouldShow = true;
+		if (!string.IsNullOrEmpty(AppData.FilterOwner))
+		{
+			shouldShow &= TextFilter.IsMatch(build.Owner.Name.ToString().ToUpperInvariant(), "*" + AppData.FilterOwner.ToUpperInvariant() + "*", AppData.FilterOwnerType, AppData.FilterOwnerMatchOptions);
+		}
+
 		if (!string.IsNullOrEmpty(AppData.FilterRepository))
 		{
-			string displayRepository = $"{build.Owner.Name}/{build.Repository.Name}";
+			string displayRepository = MakeRepositoryDisplayName(build);
 			shouldShow &= TextFilter.IsMatch(displayRepository.ToUpperInvariant(), "*" + AppData.FilterRepository.ToUpperInvariant() + "*", AppData.FilterRepositoryType, AppData.FilterRepositoryMatchOptions);
 		}
 
@@ -374,11 +410,11 @@ internal static class BuildMonitor
 			return;
 		}
 
-		RenderBuildBranchRowColumns(build, branch, branchRuns, latestRun);
-		RenderBuildBranchContextMenu(build, branch, latestRun);
+		bool shouldOpenContextMenu = RenderBuildBranchRowColumns(build, branch, branchRuns, latestRun);
+		RenderBuildBranchContextMenu(build, branch, latestRun, shouldOpenContextMenu);
 	}
 
-	private static void RenderBuildBranchRowColumns(Build build, BranchName branch, List<Run> branchRuns, Run latestRun)
+	private static bool RenderBuildBranchRowColumns(Build build, BranchName branch, List<Run> branchRuns, Run latestRun)
 	{
 		bool isOngoing = latestRun.IsOngoing;
 		TimeSpan estimate = build.CalculateEstimatedDuration();
@@ -386,86 +422,139 @@ internal static class BuildMonitor
 		TimeSpan eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
 		double progress = duration.TotalSeconds / estimate.TotalSeconds;
 
+		bool shouldOpenContextMenu = false;
+
 		ImGui.TableNextRow();
-		RenderStatusColumn(build, latestRun);
-		RenderTextColumn($"{build.Owner.Name}/{build.Repository.Name}");
-		RenderTextColumn(MakeBuildDisplayName(build));
-		RenderTextColumn(branch);
-		RenderTextColumn($"{latestRun.Status}");
-		RenderTextColumn(latestRun.Started.ToLocalTime().ToString("yyyy-MM-dd HH:mm zzz", CultureInfo.InvariantCulture));
-		RenderDurationColumn(duration);
-		RenderHistoryColumn(branchRuns);
-		RenderProgressColumn(isOngoing, progress);
-		RenderEtaColumn(isOngoing, eta);
-		RenderErrorsColumnIfVisible(latestRun, build, branch);
+		shouldOpenContextMenu |= RenderStatusColumn(build, latestRun);
+		shouldOpenContextMenu |= RenderTextColumn(build.Owner.Name);
+		shouldOpenContextMenu |= RenderTextColumn(MakeRepositoryDisplayName(build));
+		shouldOpenContextMenu |= RenderTextColumn(MakeBuildDisplayName(build));
+		shouldOpenContextMenu |= RenderTextColumn(branch);
+		shouldOpenContextMenu |= RenderTextColumn($"{latestRun.Status}");
+		shouldOpenContextMenu |= RenderTextColumn(latestRun.Started.ToLocalTime().ToString("yyyy-MM-dd HH:mm zzz", CultureInfo.InvariantCulture));
+		shouldOpenContextMenu |= RenderDurationColumn(duration);
+		shouldOpenContextMenu |= RenderHistoryColumn(branchRuns);
+		shouldOpenContextMenu |= RenderProgressColumn(isOngoing, progress);
+		shouldOpenContextMenu |= RenderEtaColumn(isOngoing, eta);
+		shouldOpenContextMenu |= RenderErrorsColumnIfVisible(latestRun, build, branch);
+
+		return shouldOpenContextMenu;
 	}
 
-	private static void RenderStatusColumn(Build build, Run latestRun)
+	private static bool RenderStatusColumn(Build build, Run latestRun)
 	{
+		bool shouldOpenContextMenu = false;
 		if (ImGui.TableNextColumn())
 		{
 			ImColor statusColor = IsBuildUpdating(build)
 				? Color.Palette.Basic.Cyan
 				: GetStatusColor(latestRun.Status);
 			ImGuiWidgets.ColorIndicator(statusColor, true);
+			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 		}
+
+		return shouldOpenContextMenu;
 	}
 
-	private static void RenderTextColumn(string text)
+	private static bool RenderTextColumn(string text)
 	{
+		bool shouldOpenContextMenu = false;
 		if (ImGui.TableNextColumn())
 		{
 			ImGui.TextUnformatted(text);
+			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 		}
+
+		return shouldOpenContextMenu;
 	}
 
-	private static void RenderDurationColumn(TimeSpan duration)
+	private static bool RenderDurationColumn(TimeSpan duration)
 	{
+		bool shouldOpenContextMenu = false;
 		if (ImGui.TableNextColumn())
 		{
 			string format = MakeDurationFormat(duration);
 			ImGui.TextUnformatted(duration.ToString(format, CultureInfo.InvariantCulture));
+			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 		}
+
+		return shouldOpenContextMenu;
 	}
 
-	private static void RenderHistoryColumn(List<Run> branchRuns)
+	private static bool RenderHistoryColumn(List<Run> branchRuns)
 	{
+		bool shouldOpenContextMenu = false;
 		if (ImGui.TableNextColumn())
 		{
 			ShowBranchHistory(branchRuns);
+			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 		}
+
+		return shouldOpenContextMenu;
 	}
 
-	private static void RenderProgressColumn(bool isOngoing, double progress)
+	private static bool RenderProgressColumn(bool isOngoing, double progress)
 	{
-		if (ImGui.TableNextColumn() && isOngoing)
-		{
-			ImGui.ProgressBar((float)progress, new(-1, ImGui.GetFrameHeight()), $"{progress:P0}");
-		}
-	}
-
-	private static void RenderEtaColumn(bool isOngoing, TimeSpan eta)
-	{
-		if (ImGui.TableNextColumn() && isOngoing)
-		{
-			string format = MakeDurationFormat(eta);
-			ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString(format, CultureInfo.InvariantCulture) : "???");
-		}
-	}
-
-	private static void RenderErrorsColumnIfVisible(Run latestRun, Build build, BranchName branch)
-	{
+		bool shouldOpenContextMenu = false;
 		if (ImGui.TableNextColumn())
 		{
-			RenderErrorsColumn(latestRun, build, branch);
+			if (isOngoing)
+			{
+				ImGui.ProgressBar((float)progress, new(-1, ImGui.GetFrameHeight()), $"{progress:P0}");
+			}
+			else
+			{
+				ImGui.Dummy(new(1, 1));
+			}
+
+			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 		}
+
+		return shouldOpenContextMenu;
 	}
 
-	private static void RenderBuildBranchContextMenu(Build build, BranchName branch, Run latestRun)
+	private static bool RenderEtaColumn(bool isOngoing, TimeSpan eta)
+	{
+		bool shouldOpenContextMenu = false;
+		if (ImGui.TableNextColumn())
+		{
+			if (isOngoing)
+			{
+				string format = MakeDurationFormat(eta);
+				ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString(format, CultureInfo.InvariantCulture) : "???");
+			}
+			else
+			{
+				ImGui.Dummy(new(1, 1));
+			}
+
+			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
+		}
+
+		return shouldOpenContextMenu;
+	}
+
+	private static bool RenderErrorsColumnIfVisible(Run latestRun, Build build, BranchName branch)
+	{
+		bool shouldOpenContextMenu = false;
+		if (ImGui.TableNextColumn())
+		{
+			shouldOpenContextMenu = RenderErrorsColumn(latestRun, build, branch);
+		}
+
+		return shouldOpenContextMenu;
+	}
+
+	private static void RenderBuildBranchContextMenu(Build build, BranchName branch, Run latestRun, bool shouldOpenContextMenu)
 	{
 		string contextMenuId = $"ContextMenu_{build.Owner.Name}_{build.Repository.Name}_{build.Name}_{branch}";
 
-		if (ImGui.BeginPopupContextItem(contextMenuId))
+		if (shouldOpenContextMenu)
+		{
+			ImGui.OpenPopup(contextMenuId);
+		}
+
+		if (ImGui.BeginPopup(contextMenuId))
 		{
 			RenderRepositoryContextMenuItems(build);
 			RenderWorkflowContextMenuItems(build);
@@ -709,11 +798,12 @@ internal static class BuildMonitor
 		}
 	}
 
-	private static void RenderErrorsColumn(Run run, Build build, BranchName branch)
+	private static bool RenderErrorsColumn(Run run, Build build, BranchName branch)
 	{
 		if (run.Errors.Count == 0)
 		{
-			return;
+			ImGui.Dummy(new(1, 1));
+			return ImGui.IsItemClicked(ImGuiMouseButton.Right);
 		}
 
 		string errorSummary = string.Join("; ", run.Errors);
@@ -744,6 +834,8 @@ internal static class BuildMonitor
 			displayText = errorSummary[..charCount] + ellipsis;
 		}
 
+		bool shouldOpenContextMenu = false;
+
 		// Make the text clickable (use run ID for unique widget ID)
 		using (new ScopedTextColor(Color.Palette.Basic.Red))
 		{
@@ -761,6 +853,8 @@ internal static class BuildMonitor
 					ImGuiPopups.PromptTextLayoutType.Wrapped,
 					new System.Numerics.Vector2(600, 400));
 			}
+
+			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 		}
 
 		// Show tooltip on hover
@@ -768,6 +862,8 @@ internal static class BuildMonitor
 		{
 			ImGui.SetTooltip(errorSummary);
 		}
+
+		return shouldOpenContextMenu;
 	}
 
 	private static bool IsBuildUpdating(Build build)

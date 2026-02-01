@@ -18,6 +18,10 @@ internal sealed class AppData : AppData<AppData>
 
 	public Dictionary<string, float> ColumnWidths { get; set; } = [];
 
+	public string FilterOwner { get; set; } = string.Empty;
+	public TextFilterType FilterOwnerType { get; set; } = TextFilterType.Glob;
+	public TextFilterMatchOptions FilterOwnerMatchOptions { get; set; } = TextFilterMatchOptions.ByWordAny;
+
 	public string FilterRepository { get; set; } = string.Empty;
 	public TextFilterType FilterRepositoryType { get; set; } = TextFilterType.Glob;
 	public TextFilterMatchOptions FilterRepositoryMatchOptions { get; set; } = TextFilterMatchOptions.ByWordAny;

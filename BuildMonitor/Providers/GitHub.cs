@@ -23,12 +23,80 @@ internal sealed partial class GitHub : BuildProvider
 	private IActionsWorkflowsClient GitHubWorkflows => GitHubActions.Workflows;
 	private IActionsWorkflowRunsClient GitHubRuns => GitHubWorkflows.Runs;
 	private IActionsWorkflowJobsClient GitHubJobs => GitHubWorkflows.Jobs;
+	private bool ShouldDiscoverOwners { get; set; }
+
 	private void UpdateGitHubClientCredentials()
 	{
 		if (!string.IsNullOrEmpty(AccountId) && !string.IsNullOrEmpty(Token))
 		{
 			GitHubClient.Credentials = new(AccountId, Token);
 		}
+	}
+
+	internal override void ShowMenu()
+	{
+		if (Hexa.NET.ImGui.ImGui.BeginMenu(Name))
+		{
+			if (Hexa.NET.ImGui.ImGui.MenuItem(Strings.SetCredentials))
+			{
+				TriggerCredentialsPopup();
+			}
+
+			if (Hexa.NET.ImGui.ImGui.MenuItem(Strings.DiscoverAllOwners))
+			{
+				ShouldDiscoverOwners = true;
+			}
+
+			if (Hexa.NET.ImGui.ImGui.MenuItem(Strings.AddOwner))
+			{
+				TriggerAddOwnerPopup();
+			}
+
+			Hexa.NET.ImGui.ImGui.EndMenu();
+		}
+	}
+
+	internal override void Tick()
+	{
+		base.Tick();
+
+		if (ShouldDiscoverOwners)
+		{
+			ShouldDiscoverOwners = false;
+			_ = DiscoverOwnersAsync();
+		}
+	}
+
+	internal async Task DiscoverOwnersAsync()
+	{
+		if (AccountId.IsEmpty() || Token.IsEmpty())
+		{
+			return;
+		}
+
+		UpdateGitHubClientCredentials();
+
+		await MakeGitHubRequestAsync($"{Name}/discover", async () =>
+		{
+			// Add the authenticated user as an owner
+			User currentUser = await GitHubClient.User.Current().ConfigureAwait(false);
+			OwnerName userName = currentUser.Login.As<OwnerName>();
+			if (Owners.TryAdd(userName, CreateOwner(userName)))
+			{
+				BuildMonitor.QueueSaveAppData();
+			}
+
+			// Add all organizations the user belongs to
+			IReadOnlyList<Organization> organizations = await GitHubClient.Organization.GetAllForCurrent().ConfigureAwait(false);
+			foreach (Organization org in organizations)
+			{
+				OwnerName orgName = org.Login.As<OwnerName>();
+				if (Owners.TryAdd(orgName, CreateOwner(orgName)))
+				{
+					BuildMonitor.QueueSaveAppData();
+				}
+			}
+		}).ConfigureAwait(false);
 	}
 
 	internal override async Task UpdateRepositoriesAsync(Owner owner)
@@ -41,8 +109,30 @@ internal sealed partial class GitHub : BuildProvider
 		UpdateGitHubClientCredentials();
 		await MakeGitHubRequestAsync($"{Name}/{owner.Name}", async () =>
 		{
-			IReadOnlyList<Octokit.Repository> userRepositories = await GitHubRepository.GetAllForUser(owner.Name).ConfigureAwait(false);
-			IReadOnlyList<Octokit.Repository> organizationRepositories = await GitHubRepository.GetAllForOrg(owner.Name).ConfigureAwait(false);
+			// Try to get repositories for user - this works for both users and orgs
+			IReadOnlyList<Octokit.Repository> userRepositories;
+			try
+			{
+				userRepositories = await GitHubRepository.GetAllForUser(owner.Name).ConfigureAwait(false);
+			}
+			catch (NotFoundException)
+			{
+				// Owner might be an org-only account, try org repos instead
+				userRepositories = [];
+			}
+
+			// Try to get organization repositories - this only works for orgs
+			IReadOnlyList<Octokit.Repository> organizationRepositories;
+			try
+			{
+				organizationRepositories = await GitHubRepository.GetAllForOrg(owner.Name).ConfigureAwait(false);
+			}
+			catch (NotFoundException)
+			{
+				// Owner is not an organization, that's fine
+				organizationRepositories = [];
+			}
+
 			IEnumerable<Octokit.Repository> allRepositories = userRepositories.Concat(organizationRepositories);
 
 			foreach (Octokit.Repository? gitHubRepository in allRepositories)

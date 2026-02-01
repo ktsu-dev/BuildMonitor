@@ -22,6 +22,7 @@ internal sealed class AzureDevOps : BuildProvider
 	private VssConnection? Connection { get; set; }
 	private ProjectHttpClient? ProjectClient { get; set; }
 	private BuildHttpClient? BuildClient { get; set; }
+	private bool ShouldDiscoverProjects { get; set; }
 
 	private void UpdateAzureDevOpsClientCredentials()
 	{
@@ -35,22 +36,59 @@ internal sealed class AzureDevOps : BuildProvider
 				ProjectClient = Connection.GetClient<ProjectHttpClient>();
 				BuildClient = Connection.GetClient<BuildHttpClient>();
 			}
-			catch (VssServiceException)
+			catch (VssServiceException ex)
 			{
 				Connection = null;
 				ProjectClient = null;
 				BuildClient = null;
+				SetStatus(ProviderStatus.Error, $"{Strings.ConnectionErrorMessage} {ex.Message}");
 			}
-			catch (UriFormatException)
+			catch (UriFormatException ex)
 			{
 				Connection = null;
 				ProjectClient = null;
 				BuildClient = null;
+				SetStatus(ProviderStatus.Error, $"Invalid organization name: {ex.Message}");
 			}
 		}
 	}
 
-	internal override async Task UpdateRepositoriesAsync(Owner owner)
+	internal override void ShowMenu()
+	{
+		if (Hexa.NET.ImGui.ImGui.BeginMenu(Name))
+		{
+			if (Hexa.NET.ImGui.ImGui.MenuItem(Strings.SetCredentials))
+			{
+				// Trigger credentials popup via base class mechanism
+				TriggerCredentialsPopup();
+			}
+
+			if (Hexa.NET.ImGui.ImGui.MenuItem(Strings.DiscoverAllProjects))
+			{
+				ShouldDiscoverProjects = true;
+			}
+
+			if (Hexa.NET.ImGui.ImGui.MenuItem(Strings.AddOwner))
+			{
+				TriggerAddOwnerPopup();
+			}
+
+			Hexa.NET.ImGui.ImGui.EndMenu();
+		}
+	}
+
+	internal override void Tick()
+	{
+		base.Tick();
+
+		if (ShouldDiscoverProjects)
+		{
+			ShouldDiscoverProjects = false;
+			_ = DiscoverProjectsAsync();
+		}
+	}
+
+	internal async Task DiscoverProjectsAsync()
 	{
 		if (AccountId.IsEmpty() || Token.IsEmpty())
 		{
@@ -63,16 +101,54 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
+		await MakeAzureDevOpsRequestAsync($"{Name}/discover", async () =>
+		{
+			IEnumerable<TeamProjectReference> projects = await ProjectClient.GetProjects().ConfigureAwait(false);
+
+			foreach (TeamProjectReference? project in projects)
+			{
+				OwnerName ownerName = project.Name.As<OwnerName>();
+				if (Owners.TryAdd(ownerName, CreateOwner(ownerName)))
+				{
+					// Create the repository entry for this project
+					Owner owner = Owners[ownerName];
+					RepositoryId repositoryId = project.Id.ToString().As<RepositoryId>();
+					RepositoryName repositoryName = project.Name.As<RepositoryName>();
+					Repository repository = owner.CreateRepository(repositoryName, repositoryId);
+					owner.Repositories.TryAdd(repositoryId, repository);
+					BuildMonitor.QueueSaveAppData();
+				}
+			}
+		}).ConfigureAwait(false);
+	}
+
+	internal override async Task UpdateRepositoriesAsync(Owner owner)
+	{
+		if (AccountId.IsEmpty() || Token.IsEmpty())
+		{
+			return;
+		}
+
+		UpdateAzureDevOpsClientCredentials();
+		if (ProjectClient == null)
+		{
+			// Status already set by UpdateAzureDevOpsClientCredentials if there was an error
+			return;
+		}
+
 		await MakeAzureDevOpsRequestAsync($"{Name}/{owner.Name}", async () =>
 		{
 			// In Azure DevOps, projects are the top-level containers
 			// The owner name represents a project in Azure DevOps
 			IEnumerable<TeamProjectReference> projects = await ProjectClient.GetProjects().ConfigureAwait(false);
 
+			bool foundProject = false;
 			foreach (TeamProjectReference? project in projects)
 			{
-				if (project.Name == owner.Name)
+				// Use case-insensitive comparison for project names
+				if (string.Equals(project.Name, owner.Name, StringComparison.OrdinalIgnoreCase))
 				{
+					foundProject = true;
 					RepositoryId repositoryId = project.Id.ToString().As<RepositoryId>();
 					RepositoryName repositoryName = project.Name.As<RepositoryName>();
 					Repository repository = owner.CreateRepository(repositoryName, repositoryId);
@@ -82,6 +158,11 @@ internal sealed class AzureDevOps : BuildProvider
 					}
 					break;
 				}
+			}
+
+			if (!foundProject)
+			{
+				SetStatus(ProviderStatus.Error, $"Project '{owner.Name}' not found in organization '{AccountId}'");
 			}
 		}).ConfigureAwait(false);
 	}
@@ -177,7 +258,12 @@ internal sealed class AzureDevOps : BuildProvider
 		// For LastUpdated, use current time if not finished yet (in-progress builds)
 		run.LastUpdated = build.FinishTime ?? DateTimeOffset.UtcNow;
 
-		run.Branch = (build.SourceBranch ?? string.Empty).As<BranchName>();
+		string branch = build.SourceBranch ?? string.Empty;
+		if (branch.StartsWith("refs/heads/", StringComparison.Ordinal))
+		{
+			branch = branch["refs/heads/".Length..];
+		}
+		run.Branch = branch.As<BranchName>();
 
 		run.Status = build.Status switch
 		{

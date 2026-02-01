@@ -22,8 +22,11 @@ internal static class Strings
 	internal static string Token { get; } = nameof(Token).Titleize();
 	internal static string Set { get; } = nameof(Set).Titleize();
 	internal static string AddOwner { get; } = nameof(AddOwner).Titleize();
+	internal static string DiscoverAllProjects { get; } = nameof(DiscoverAllProjects).Titleize();
+	internal static string DiscoverAllOwners { get; } = nameof(DiscoverAllOwners).Titleize();
 	internal static string OwnerName { get; } = nameof(OwnerName).Titleize();
 	internal static string Builds { get; } = nameof(Builds).Titleize();
+	internal static string Owner { get; } = nameof(Owner).Titleize();
 	internal static string Repository { get; } = nameof(Repository).Titleize();
 	internal static string BuildName { get; } = nameof(BuildName).Titleize();
 	internal static string History { get; } = nameof(History).Titleize();

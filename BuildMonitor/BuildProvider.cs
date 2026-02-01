@@ -179,7 +179,7 @@ internal abstract class BuildProvider
 		};
 	}
 
-	internal void ShowMenu()
+	internal virtual void ShowMenu()
 	{
 		if (ImGui.BeginMenu(Name))
 		{
@@ -197,7 +197,11 @@ internal abstract class BuildProvider
 		}
 	}
 
-	internal void Tick()
+	protected void TriggerCredentialsPopup() => ShouldShowAccountIdPopup = true;
+
+	protected void TriggerAddOwnerPopup() => ShouldShowAddOwnerPopup = true;
+
+	internal virtual void Tick()
 	{
 		if (ShouldShowAccountIdPopup)
 		{
