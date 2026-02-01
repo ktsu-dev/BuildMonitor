@@ -235,7 +235,7 @@ internal static class BuildMonitor
 			UpdateTask = UpdateAsync();
 		}
 
-		foreach ((BuildProviderName? name, BuildProvider? buildProvider) in AppData.BuildProviders)
+		foreach ((BuildProviderName? _, BuildProvider? buildProvider) in AppData.BuildProviders)
 		{
 			buildProvider.Tick();
 		}
@@ -374,6 +374,12 @@ internal static class BuildMonitor
 			return;
 		}
 
+		RenderBuildBranchRowColumns(build, branch, branchRuns, latestRun);
+		RenderBuildBranchContextMenu(build, branch, latestRun);
+	}
+
+	private static void RenderBuildBranchRowColumns(Build build, BranchName branch, List<Run> branchRuns, Run latestRun)
+	{
 		bool isOngoing = latestRun.IsOngoing;
 		TimeSpan estimate = build.CalculateEstimatedDuration();
 		TimeSpan duration = isOngoing ? DateTimeOffset.UtcNow - latestRun.Started : latestRun.Duration;
@@ -381,172 +387,178 @@ internal static class BuildMonitor
 		double progress = duration.TotalSeconds / estimate.TotalSeconds;
 
 		ImGui.TableNextRow();
+		RenderStatusColumn(build, latestRun);
+		RenderTextColumn($"{build.Owner.Name}/{build.Repository.Name}");
+		RenderTextColumn(MakeBuildDisplayName(build));
+		RenderTextColumn(branch);
+		RenderTextColumn($"{latestRun.Status}");
+		RenderTextColumn(latestRun.Started.ToLocalTime().ToString("yyyy-MM-dd HH:mm zzz", CultureInfo.InvariantCulture));
+		RenderDurationColumn(duration);
+		RenderHistoryColumn(branchRuns);
+		RenderProgressColumn(isOngoing, progress);
+		RenderEtaColumn(isOngoing, eta);
+		RenderErrorsColumnIfVisible(latestRun, build, branch);
+	}
+
+	private static void RenderStatusColumn(Build build, Run latestRun)
+	{
 		if (ImGui.TableNextColumn())
 		{
-			if (IsBuildUpdating(build))
-			{
-				ImGuiWidgets.ColorIndicator(Color.Palette.Basic.Cyan, true);
-			}
-			else
-			{
-				ImGuiWidgets.ColorIndicator(GetStatusColor(latestRun.Status), true);
-			}
+			ImColor statusColor = IsBuildUpdating(build)
+				? Color.Palette.Basic.Cyan
+				: GetStatusColor(latestRun.Status);
+			ImGuiWidgets.ColorIndicator(statusColor, true);
 		}
+	}
 
+	private static void RenderTextColumn(string text)
+	{
 		if (ImGui.TableNextColumn())
 		{
-			ImGui.TextUnformatted($"{build.Owner.Name}/{build.Repository.Name}");
+			ImGui.TextUnformatted(text);
 		}
+	}
 
-		if (ImGui.TableNextColumn())
-		{
-			string displayName = MakeBuildDisplayName(build);
-			ImGui.TextUnformatted(displayName);
-		}
-
-		if (ImGui.TableNextColumn())
-		{
-			ImGui.TextUnformatted(branch);
-		}
-
-		if (ImGui.TableNextColumn())
-		{
-			ImGui.TextUnformatted($"{latestRun.Status}");
-		}
-
-		if (ImGui.TableNextColumn())
-		{
-			ImGui.TextUnformatted(latestRun.Started.ToLocalTime().ToString("yyyy-MM-dd HH:mm zzz", CultureInfo.InvariantCulture));
-		}
-
+	private static void RenderDurationColumn(TimeSpan duration)
+	{
 		if (ImGui.TableNextColumn())
 		{
 			string format = MakeDurationFormat(duration);
 			ImGui.TextUnformatted(duration.ToString(format, CultureInfo.InvariantCulture));
 		}
+	}
 
+	private static void RenderHistoryColumn(List<Run> branchRuns)
+	{
 		if (ImGui.TableNextColumn())
 		{
 			ShowBranchHistory(branchRuns);
 		}
+	}
 
+	private static void RenderProgressColumn(bool isOngoing, double progress)
+	{
 		if (ImGui.TableNextColumn() && isOngoing)
 		{
 			ImGui.ProgressBar((float)progress, new(-1, ImGui.GetFrameHeight()), $"{progress:P0}");
 		}
+	}
 
+	private static void RenderEtaColumn(bool isOngoing, TimeSpan eta)
+	{
 		if (ImGui.TableNextColumn() && isOngoing)
 		{
 			string format = MakeDurationFormat(eta);
 			ImGui.TextUnformatted(eta > TimeSpan.Zero ? eta.ToString(format, CultureInfo.InvariantCulture) : "???");
 		}
+	}
 
+	private static void RenderErrorsColumnIfVisible(Run latestRun, Build build, BranchName branch)
+	{
 		if (ImGui.TableNextColumn())
 		{
 			RenderErrorsColumn(latestRun, build, branch);
 		}
-
-		// Context menu for the row
-		RenderBuildBranchContextMenu(build, branch, latestRun);
 	}
 
 	private static void RenderBuildBranchContextMenu(Build build, BranchName branch, Run latestRun)
 	{
-		// Create a unique ID for the context menu based on the row
 		string contextMenuId = $"ContextMenu_{build.Owner.Name}_{build.Repository.Name}_{build.Name}_{branch}";
 
 		if (ImGui.BeginPopupContextItem(contextMenuId))
 		{
-			ImGui.SeparatorText("Repository");
-
-			// Open Repository in Browser
-			if (ImGui.MenuItem("Open Repository in Browser"))
-			{
-				OpenRepositoryInBrowser(build);
-			}
-
-			// Copy Repository URL
-			if (ImGui.MenuItem("Copy Repository URL"))
-			{
-				CopyRepositoryUrl(build);
-			}
-
-			ImGui.Separator();
-			ImGui.SeparatorText("Workflow");
-
-			// Open Workflow in Browser
-			if (ImGui.MenuItem("Open Workflow in Browser"))
-			{
-				OpenWorkflowInBrowser(build);
-			}
-
-			// Copy Workflow URL
-			if (ImGui.MenuItem("Copy Workflow URL"))
-			{
-				CopyWorkflowUrl(build);
-			}
-
-			ImGui.Separator();
-			ImGui.SeparatorText("Branch");
-
-			// Open Branch in Browser
-			if (ImGui.MenuItem("Open Branch in Browser"))
-			{
-				OpenBranchInBrowser(build, branch);
-			}
-
-			// Copy Branch URL
-			if (ImGui.MenuItem("Copy Branch URL"))
-			{
-				CopyBranchUrl(build, branch);
-			}
-
-			ImGui.Separator();
-			ImGui.SeparatorText("Latest Run");
-
-			// Open Latest Run in Browser
-			if (ImGui.MenuItem("Open Latest Run in Browser"))
-			{
-				OpenRunInBrowser(latestRun);
-			}
-
-			// Copy Latest Run URL
-			if (ImGui.MenuItem("Copy Latest Run URL"))
-			{
-				CopyRunUrl(latestRun);
-			}
-
-			// API Actions for Latest Run
-			if (build.Owner.BuildProvider is GitHub gitHubProvider)
-			{
-				ImGui.Separator();
-
-				// Re-run workflow (only if not currently running)
-				if (!latestRun.IsOngoing && ImGui.MenuItem("Re-run Latest Workflow"))
-				{
-					RerunLatestWorkflow(gitHubProvider, latestRun, build);
-				}
-
-				// Cancel workflow (only if currently running)
-				if (latestRun.IsOngoing && ImGui.MenuItem("Cancel Running Workflow"))
-				{
-					CancelRunningWorkflow(gitHubProvider, latestRun, build);
-				}
-
-				// Trigger workflow dispatch
-				if (ImGui.MenuItem("Trigger Workflow on Branch"))
-				{
-					TriggerWorkflowOnBranch(gitHubProvider, build, branch);
-				}
-			}
-
-			ImGui.Separator();
-			if (ImGui.MenuItem("Refresh Build Data"))
-			{
-				RefreshBuildData(build);
-			}
-
+			RenderRepositoryContextMenuItems(build);
+			RenderWorkflowContextMenuItems(build);
+			RenderBranchContextMenuItems(build, branch);
+			RenderLatestRunContextMenuItems(build, branch, latestRun);
+			RenderRefreshContextMenuItem(build);
 			ImGui.EndPopup();
+		}
+	}
+
+	private static void RenderRepositoryContextMenuItems(Build build)
+	{
+		ImGui.SeparatorText("Repository");
+		if (ImGui.MenuItem("Open Repository in Browser"))
+		{
+			OpenRepositoryInBrowser(build);
+		}
+		if (ImGui.MenuItem("Copy Repository URL"))
+		{
+			CopyRepositoryUrl(build);
+		}
+	}
+
+	private static void RenderWorkflowContextMenuItems(Build build)
+	{
+		ImGui.Separator();
+		ImGui.SeparatorText("Workflow");
+		if (ImGui.MenuItem("Open Workflow in Browser"))
+		{
+			OpenWorkflowInBrowser(build);
+		}
+		if (ImGui.MenuItem("Copy Workflow URL"))
+		{
+			CopyWorkflowUrl(build);
+		}
+	}
+
+	private static void RenderBranchContextMenuItems(Build build, BranchName branch)
+	{
+		ImGui.Separator();
+		ImGui.SeparatorText("Branch");
+		if (ImGui.MenuItem("Open Branch in Browser"))
+		{
+			OpenBranchInBrowser(build, branch);
+		}
+		if (ImGui.MenuItem("Copy Branch URL"))
+		{
+			CopyBranchUrl(build, branch);
+		}
+	}
+
+	private static void RenderLatestRunContextMenuItems(Build build, BranchName branch, Run latestRun)
+	{
+		ImGui.Separator();
+		ImGui.SeparatorText("Latest Run");
+		if (ImGui.MenuItem("Open Latest Run in Browser"))
+		{
+			OpenRunInBrowser(latestRun);
+		}
+		if (ImGui.MenuItem("Copy Latest Run URL"))
+		{
+			CopyRunUrl(latestRun);
+		}
+
+		if (build.Owner.BuildProvider is GitHub gitHubProvider)
+		{
+			RenderGitHubApiContextMenuItems(gitHubProvider, build, branch, latestRun);
+		}
+	}
+
+	private static void RenderGitHubApiContextMenuItems(GitHub gitHubProvider, Build build, BranchName branch, Run latestRun)
+	{
+		ImGui.Separator();
+		if (!latestRun.IsOngoing && ImGui.MenuItem("Re-run Latest Workflow"))
+		{
+			RerunLatestWorkflow(gitHubProvider, latestRun, build);
+		}
+		if (latestRun.IsOngoing && ImGui.MenuItem("Cancel Running Workflow"))
+		{
+			CancelRunningWorkflow(gitHubProvider, latestRun, build);
+		}
+		if (ImGui.MenuItem("Trigger Workflow on Branch"))
+		{
+			TriggerWorkflowOnBranch(gitHubProvider, build, branch);
+		}
+	}
+
+	private static void RenderRefreshContextMenuItem(Build build)
+	{
+		ImGui.Separator();
+		if (ImGui.MenuItem("Refresh Build Data"))
+		{
+			RefreshBuildData(build);
 		}
 	}
 
@@ -676,11 +688,17 @@ internal static class BuildMonitor
 			}
 			else if (OperatingSystem.IsLinux())
 			{
+				// S4036: xdg-open is the standard way to open URLs on Linux
+#pragma warning disable S4036
 				Process.Start("xdg-open", url);
+#pragma warning restore S4036
 			}
 			else if (OperatingSystem.IsMacOS())
 			{
+				// S4036: open is the standard way to open URLs on macOS
+#pragma warning disable S4036
 				Process.Start("open", url);
+#pragma warning restore S4036
 			}
 		}
 #pragma warning disable CA1031 // Do not catch general exception types
@@ -901,7 +919,7 @@ internal static class BuildMonitor
 	private static void PruneCompletedRuns()
 	{
 		List<KeyValuePair<RunId, RunSync>> completedRunSyncs = [.. RunSyncCollection.Where(b => !b.Value.Run.IsOngoing)];
-		foreach ((RunId? runId, RunSync? runSync) in completedRunSyncs)
+		foreach ((RunId? runId, RunSync? _) in completedRunSyncs)
 		{
 			_ = RunSyncCollection.Remove(runId, out _);
 		}

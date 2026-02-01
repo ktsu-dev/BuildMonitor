@@ -179,7 +179,6 @@ internal sealed class AzureDevOps : BuildProvider
 
 		run.Branch = (build.SourceBranch ?? string.Empty).As<BranchName>();
 
-		RunStatus previousStatus = run.Status;
 		run.Status = build.Status switch
 		{
 			BuildStatus.NotStarted => RunStatus.Pending,
