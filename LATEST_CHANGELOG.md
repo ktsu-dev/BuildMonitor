@@ -1,5 +1,5 @@
-## v1.2.20 (patch)
+## v1.2.21 (patch)
 
-Changes since v1.2.19:
+Changes since v1.2.20:
 
-- Refactor GitHub client credential updates to use owner-specific tokens in request methods ([@matt-edmondson](https://github.com/matt-edmondson))
+- Refactor GitHub client management to use owner-specific instances for improved concurrency handling ([@matt-edmondson](https://github.com/matt-edmondson))
