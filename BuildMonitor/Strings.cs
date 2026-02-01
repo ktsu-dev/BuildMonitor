@@ -56,4 +56,7 @@ internal static class Strings
 	internal static string Logs { get; } = nameof(Logs).Titleize();
 	internal static string ClearLogs { get; } = nameof(ClearLogs).Titleize();
 	internal static string NoWorkflows { get; } = "No workflows";
+	internal static string SetOwnerToken { get; } = "Set Token for Owner";
+	internal static string ClearOwnerToken { get; } = "Clear Owner Token";
+	internal static string OwnerHasToken { get; } = "(has token)";
 }

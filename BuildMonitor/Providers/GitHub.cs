@@ -13,6 +13,7 @@ using ktsu.Extensions;
 using ktsu.Semantics.Strings;
 using Octokit;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Provider class requires many type dependencies for GitHub API integration")]
 internal sealed partial class GitHub : BuildProvider
 {
 	internal static BuildProviderName BuildProviderName => nameof(GitHub).As<BuildProviderName>();
@@ -25,13 +26,33 @@ internal sealed partial class GitHub : BuildProvider
 	private IActionsWorkflowJobsClient GitHubJobs => GitHubWorkflows.Jobs;
 	private bool ShouldDiscoverOwners { get; set; }
 
-	private void UpdateGitHubClientCredentials()
+	/// <summary>
+	/// Updates GitHub client credentials, using owner-specific token if available.
+	/// </summary>
+	/// <param name="owner">Optional owner to check for specific token.</param>
+	private void UpdateGitHubClientCredentials(Owner? owner = null)
 	{
-		if (!string.IsNullOrEmpty(AccountId) && !string.IsNullOrEmpty(Token))
+		// Use owner-specific token if available, otherwise fall back to provider token
+		string tokenToUse = owner?.HasToken == true ? owner.Token : Token;
+
+		if (!string.IsNullOrEmpty(AccountId) && !string.IsNullOrEmpty(tokenToUse))
 		{
-			GitHubClient.Credentials = new(AccountId, Token);
+			GitHubClient.Credentials = new(AccountId, tokenToUse);
 		}
 	}
+
+	/// <summary>
+	/// Checks if we have valid credentials for the specified owner.
+	/// </summary>
+	/// <param name="owner">Optional owner to check for specific token.</param>
+	/// <returns>True if valid credentials are available.</returns>
+	private bool HasValidCredentials(Owner? owner = null)
+	{
+		string tokenToUse = owner?.HasToken == true ? owner.Token : Token;
+		return !AccountId.IsEmpty() && !string.IsNullOrEmpty(tokenToUse);
+	}
+
+	private Owner? OwnerPendingTokenPopup { get; set; }
 
 	internal override void ShowMenu()
 	{
@@ -52,9 +73,44 @@ internal sealed partial class GitHub : BuildProvider
 				TriggerAddOwnerPopup();
 			}
 
+			// Owner token submenu
+			if (!Owners.IsEmpty && Hexa.NET.ImGui.ImGui.BeginMenu(Strings.SetOwnerToken))
+			{
+				foreach ((OwnerName ownerName, Owner owner) in Owners.OrderBy(o => o.Key.ToString()))
+				{
+					string menuLabel = owner.HasToken
+						? $"{ownerName} {Strings.OwnerHasToken}"
+						: ownerName.ToString();
+
+					if (Hexa.NET.ImGui.ImGui.MenuItem(menuLabel))
+					{
+						OwnerPendingTokenPopup = owner;
+					}
+				}
+
+				Hexa.NET.ImGui.ImGui.Separator();
+				if (Hexa.NET.ImGui.ImGui.BeginMenu(Strings.ClearOwnerToken))
+				{
+					foreach ((OwnerName ownerName, Owner owner) in Owners.Where(o => o.Value.HasToken).OrderBy(o => o.Key.ToString()))
+					{
+						if (Hexa.NET.ImGui.ImGui.MenuItem(ownerName.ToString()))
+						{
+							owner.Token = new();
+							BuildMonitor.QueueSaveAppData();
+							Log.Info($"GitHub: Cleared token for owner {ownerName}");
+						}
+					}
+					Hexa.NET.ImGui.ImGui.EndMenu();
+				}
+
+				Hexa.NET.ImGui.ImGui.EndMenu();
+			}
+
 			Hexa.NET.ImGui.ImGui.EndMenu();
 		}
 	}
+
+	private ktsu.ImGui.Popups.ImGuiPopups.InputString OwnerTokenPopup { get; } = new();
 
 	internal override void Tick()
 	{
@@ -65,11 +121,26 @@ internal sealed partial class GitHub : BuildProvider
 			ShouldDiscoverOwners = false;
 			_ = DiscoverOwnersAsync();
 		}
+
+		// Handle owner token popup
+		if (OwnerPendingTokenPopup is not null)
+		{
+			Owner owner = OwnerPendingTokenPopup;
+			OwnerPendingTokenPopup = null;
+			OwnerTokenPopup.Open($"{Strings.SetOwnerToken}: {owner.Name}", Strings.Token, string.Empty, (result) =>
+			{
+				owner.Token = result.As<BuildProviderToken>();
+				BuildMonitor.QueueSaveAppData();
+				Log.Info($"GitHub: Set token for owner {owner.Name}");
+			});
+		}
+
+		_ = OwnerTokenPopup.ShowIfOpen();
 	}
 
 	internal async Task DiscoverOwnersAsync()
 	{
-		if (AccountId.IsEmpty() || Token.IsEmpty())
+		if (!HasValidCredentials())
 		{
 			return;
 		}
@@ -106,12 +177,12 @@ internal sealed partial class GitHub : BuildProvider
 
 	internal override async Task UpdateRepositoriesAsync(Owner owner)
 	{
-		if (AccountId.IsEmpty() || Token.IsEmpty())
+		if (!HasValidCredentials(owner))
 		{
 			return;
 		}
 
-		UpdateGitHubClientCredentials();
+		UpdateGitHubClientCredentials(owner);
 		await MakeGitHubRequestAsync($"{Name}/{owner.Name}", async () =>
 		{
 			List<Octokit.Repository> allRepositories = [];
@@ -198,12 +269,12 @@ internal sealed partial class GitHub : BuildProvider
 
 	internal override async Task UpdateBuildsAsync(Repository repository)
 	{
-		if (AccountId.IsEmpty() || Token.IsEmpty())
+		if (!HasValidCredentials(repository.Owner))
 		{
 			return;
 		}
 
-		UpdateGitHubClientCredentials();
+		UpdateGitHubClientCredentials(repository.Owner);
 		try
 		{
 			await MakeGitHubRequestAsync($"{Name}/{repository.Owner.Name}/{repository.Name}", async () =>
@@ -230,12 +301,12 @@ internal sealed partial class GitHub : BuildProvider
 
 	internal override async Task UpdateBuildAsync(Build build)
 	{
-		if (AccountId.IsEmpty() || Token.IsEmpty())
+		if (!HasValidCredentials(build.Owner))
 		{
 			return;
 		}
 
-		UpdateGitHubClientCredentials();
+		UpdateGitHubClientCredentials(build.Owner);
 		try
 		{
 			await MakeGitHubRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/{build.Name}", async () =>
@@ -264,12 +335,12 @@ internal sealed partial class GitHub : BuildProvider
 
 	internal override async Task UpdateRunAsync(Run run)
 	{
-		if (AccountId.IsEmpty() || Token.IsEmpty())
+		if (!HasValidCredentials(run.Owner))
 		{
 			return;
 		}
 
-		UpdateGitHubClientCredentials();
+		UpdateGitHubClientCredentials(run.Owner);
 
 		try
 		{
@@ -573,12 +644,12 @@ internal sealed partial class GitHub : BuildProvider
 	/// <returns>True if the operation was successful, false otherwise.</returns>
 	internal async Task<bool> RerunWorkflowAsync(Run run)
 	{
-		if (AccountId.IsEmpty() || Token.IsEmpty())
+		if (!HasValidCredentials(run.Owner))
 		{
 			return false;
 		}
 
-		UpdateGitHubClientCredentials();
+		UpdateGitHubClientCredentials(run.Owner);
 		try
 		{
 			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/rerun/{run.Id}", async () => await GitHubRuns.Rerun(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false)).ConfigureAwait(false);
@@ -601,12 +672,12 @@ internal sealed partial class GitHub : BuildProvider
 	/// <returns>True if the operation was successful, false otherwise.</returns>
 	internal async Task<bool> CancelWorkflowAsync(Run run)
 	{
-		if (AccountId.IsEmpty() || Token.IsEmpty())
+		if (!HasValidCredentials(run.Owner))
 		{
 			return false;
 		}
 
-		UpdateGitHubClientCredentials();
+		UpdateGitHubClientCredentials(run.Owner);
 		try
 		{
 			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/cancel/{run.Id}", async () => await GitHubRuns.Cancel(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false)).ConfigureAwait(false);
@@ -630,12 +701,12 @@ internal sealed partial class GitHub : BuildProvider
 	/// <returns>True if the operation was successful, false otherwise.</returns>
 	internal async Task<bool> TriggerWorkflowAsync(Build build, BranchName branch)
 	{
-		if (AccountId.IsEmpty() || Token.IsEmpty())
+		if (!HasValidCredentials(build.Owner))
 		{
 			return false;
 		}
 
-		UpdateGitHubClientCredentials();
+		UpdateGitHubClientCredentials(build.Owner);
 		try
 		{
 			await MakeGitHubRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/dispatch/{build.Name}", async () =>
