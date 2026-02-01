@@ -13,7 +13,13 @@ internal sealed class BuildSync
 
 	private const int UpdateInterval = 60;
 
-	internal bool ShouldUpdate => UpdateTimer.Elapsed.TotalSeconds >= UpdateInterval;
+	/// <summary>
+	/// Returns true if the build no longer exists in its parent repository's builds collection.
+	/// This happens when the build/workflow is deleted or the repository is removed.
+	/// </summary>
+	internal bool IsOrphaned => !Build.Repository.Builds.ContainsKey(Build.Id);
+
+	internal bool ShouldUpdate => !IsOrphaned && UpdateTimer.Elapsed.TotalSeconds >= UpdateInterval;
 
 	internal BuildSync() => UpdateTimer.Start();
 

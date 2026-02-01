@@ -14,7 +14,13 @@ internal sealed class RunSync
 	private const int UpdateIntervalMin = 10;
 	private const int UpdateIntervalMax = 60;
 
-	internal bool ShouldUpdate => Run.IsOngoing && UpdateTimer.Elapsed.TotalSeconds >= UpdateIntervalCurrent;
+	/// <summary>
+	/// Returns true if the run no longer exists in its parent build's runs collection.
+	/// This happens when the run is deleted or the build/repository is removed.
+	/// </summary>
+	internal bool IsOrphaned => !Run.Build.Runs.ContainsKey(Run.Id);
+
+	internal bool ShouldUpdate => !IsOrphaned && Run.IsOngoing && UpdateTimer.Elapsed.TotalSeconds >= UpdateIntervalCurrent;
 
 	internal RunSync() => UpdateTimer.Start();
 

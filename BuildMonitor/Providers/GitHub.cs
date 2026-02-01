@@ -328,8 +328,11 @@ internal sealed partial class GitHub : BuildProvider
 		}
 		catch (NotFoundException)
 		{
-			// Repository not found
-			repository.Owner.Repositories.TryRemove(repository.Id, out _);
+			// Repository no longer exists (deleted or inaccessible)
+			if (repository.Owner.Repositories.TryRemove(repository.Id, out _))
+			{
+				Log.Warning($"GitHub: Repository not found, removed: {repository.Owner.Name}/{repository.Name}");
+			}
 		}
 	}
 
@@ -361,8 +364,11 @@ internal sealed partial class GitHub : BuildProvider
 		}
 		catch (NotFoundException)
 		{
-			// Build not found
-			build.Repository.Builds.TryRemove(build.Id, out _);
+			// Build/workflow no longer exists (deleted)
+			if (build.Repository.Builds.TryRemove(build.Id, out _))
+			{
+				Log.Warning($"GitHub: Build not found, removed: {build.Owner.Name}/{build.Repository.Name}/{build.Name}");
+			}
 		}
 	}
 
@@ -383,8 +389,11 @@ internal sealed partial class GitHub : BuildProvider
 		}
 		catch (NotFoundException)
 		{
-			// Run not found
-			run.Build.Runs.TryRemove(run.Id, out _);
+			// Run no longer exists (deleted or expired)
+			if (run.Build.Runs.TryRemove(run.Id, out _))
+			{
+				Log.Warning($"GitHub: Run not found, removed: {run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}/{run.Name}");
+			}
 		}
 	}
 

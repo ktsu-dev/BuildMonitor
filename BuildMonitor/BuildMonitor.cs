@@ -1292,15 +1292,28 @@ internal static class BuildMonitor
 			UpdateRunsAsync()
 		).ConfigureAwait(false);
 
-		PruneCompletedRuns();
+		PruneOrphanedAndCompletedSyncs();
 	}
 
-	private static void PruneCompletedRuns()
+	private static void PruneOrphanedAndCompletedSyncs()
 	{
-		List<KeyValuePair<RunId, RunSync>> completedRunSyncs = [.. RunSyncCollection.Where(b => !b.Value.Run.IsOngoing)];
-		foreach ((RunId? runId, RunSync? _) in completedRunSyncs)
+		// Prune orphaned build syncs (builds that no longer exist in their repository)
+		List<KeyValuePair<BuildId, BuildSync>> orphanedBuildSyncs = [.. BuildSyncCollection.Where(b => b.Value.IsOrphaned)];
+		foreach ((BuildId? buildId, BuildSync? _) in orphanedBuildSyncs)
+		{
+			_ = BuildSyncCollection.Remove(buildId, out _);
+			Log.Info($"Pruned orphaned build sync: {buildId}");
+		}
+
+		// Prune orphaned and completed run syncs
+		List<KeyValuePair<RunId, RunSync>> runSyncsToRemove = [.. RunSyncCollection.Where(b => b.Value.IsOrphaned || !b.Value.Run.IsOngoing)];
+		foreach ((RunId? runId, RunSync? runSync) in runSyncsToRemove)
 		{
 			_ = RunSyncCollection.Remove(runId, out _);
+			if (runSync.IsOrphaned)
+			{
+				Log.Info($"Pruned orphaned run sync: {runId}");
+			}
 		}
 	}
 
