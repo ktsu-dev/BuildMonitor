@@ -38,7 +38,8 @@ internal sealed class Run
 
 	internal TimeSpan CalculateETA()
 	{
-		TimeSpan estimate = Build.CalculateEstimatedDuration();
+		// Use branch-specific estimation for more accurate ETA
+		TimeSpan estimate = Build.CalculateEstimatedDuration(Branch);
 		TimeSpan duration = IsOngoing ? DateTimeOffset.UtcNow - Started : Duration;
 		return duration < estimate ? estimate - duration : TimeSpan.Zero;
 	}

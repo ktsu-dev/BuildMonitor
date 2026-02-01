@@ -677,10 +677,11 @@ internal static class BuildMonitor
 	private static bool RenderBuildBranchRowColumns(Build build, BranchName branch, List<Run> branchRuns, Run latestRun)
 	{
 		bool isOngoing = latestRun.IsOngoing;
-		TimeSpan estimate = build.CalculateEstimatedDuration();
+		// Use branch-specific estimation for more accurate estimates
+		TimeSpan estimate = build.CalculateEstimatedDuration(branch);
 		TimeSpan duration = isOngoing ? DateTimeOffset.UtcNow - latestRun.Started : latestRun.Duration;
 		TimeSpan eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
-		double progress = duration.TotalSeconds / estimate.TotalSeconds;
+		double progress = estimate > TimeSpan.Zero ? duration.TotalSeconds / estimate.TotalSeconds : 0;
 
 		bool shouldOpenContextMenu = false;
 

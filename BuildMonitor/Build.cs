@@ -5,7 +5,6 @@
 namespace ktsu.BuildMonitor;
 
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using ktsu.Semantics.Strings;
 
 internal sealed record class BuildName : SemanticString<BuildName> { }
@@ -13,7 +12,6 @@ internal sealed record class BuildId : SemanticString<BuildId> { }
 
 internal sealed class Build
 {
-	private const int NumRecentRuns = 10;
 	private readonly Lock _updateLock = new();
 
 	public BuildName Name { get; set; } = new();
@@ -27,13 +25,21 @@ internal sealed class Build
 	public TimeSpan LastDuration => LastUpdated - LastStarted;
 	public RunStatus LastStatus { get; set; }
 	internal bool IsOngoing => !Runs.IsEmpty && LastStatus is RunStatus.Pending or RunStatus.Running;
-	internal TimeSpan CalculateEstimatedDuration()
-	{
-		List<Run> recentRuns = [.. Runs.Values.Where(r => r.Status == RunStatus.Success).OrderByDescending(r => r.Started).Skip(1).Take(NumRecentRuns)];
-		return recentRuns.Count == 0
-			? TimeSpan.Zero
-			: TimeSpan.FromSeconds(recentRuns.Average(r => r.Duration.TotalSeconds));
-	}
+
+	/// <summary>
+	/// Calculates the estimated duration for this build using sophisticated statistical methods.
+	/// Uses all successful runs across all branches.
+	/// </summary>
+	/// <returns>The estimated duration, or TimeSpan.Zero if insufficient data.</returns>
+	internal TimeSpan CalculateEstimatedDuration() => DurationEstimator.EstimateDuration(this);
+
+	/// <summary>
+	/// Calculates the estimated duration for this build on a specific branch.
+	/// Falls back to overall build estimation if branch has insufficient data.
+	/// </summary>
+	/// <param name="branch">The branch to estimate for.</param>
+	/// <returns>The estimated duration, or TimeSpan.Zero if insufficient data.</returns>
+	internal TimeSpan CalculateEstimatedDuration(BranchName branch) => DurationEstimator.EstimateDuration(this, branch);
 
 	internal TimeSpan CalculateETA()
 	{
