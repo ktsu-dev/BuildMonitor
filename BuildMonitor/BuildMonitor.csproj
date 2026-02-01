@@ -20,6 +20,7 @@
     <PackageReference Include="ktsu.TextFilter" />
     <PackageReference Include="Microsoft.SourceLink.AzureRepos.Git" />
     <PackageReference Include="Microsoft.SourceLink.GitHub" />
+    <PackageReference Include="Microsoft.TeamFoundationServer.Client" />
     <PackageReference Include="Octokit" />
     <PackageReference Include="Polyfill" />
   </ItemGroup>

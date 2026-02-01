@@ -41,6 +41,7 @@ internal enum ProviderStatus
 }
 
 [JsonDerivedType(typeof(GitHub), nameof(GitHub))]
+[JsonDerivedType(typeof(AzureDevOps), nameof(AzureDevOps))]
 [JsonPolymorphic]
 internal abstract class BuildProvider
 {

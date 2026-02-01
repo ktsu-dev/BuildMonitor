@@ -2,6 +2,12 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
+  <!-- Suppress known vulnerability in transitive dependency from Microsoft.TeamFoundationServer.Client -->
+  <!-- System.Data.SqlClient is deprecated but Microsoft hasn't updated their SDK yet -->
+  <!-- This app doesn't use SQL functionality directly -->
+  <ItemGroup>
+    <NuGetAuditSuppress Include="https://github.com/advisories/GHSA-98g6-xh36-x2p7" />
+  </ItemGroup>
   <ItemGroup>
     <PackageVersion Include="Humanizer.Core" Version="3.0.1" />
     <PackageVersion Include="ktsu.AppDataStorage" Version="1.15.13" />
@@ -13,6 +19,7 @@
     <PackageVersion Include="ktsu.TextFilter" Version="1.5.6" />
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="10.0.102" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.102" />
+    <PackageVersion Include="Microsoft.TeamFoundationServer.Client" Version="19.225.2" />
     <PackageVersion Include="Octokit" Version="14.0.0" />
     <PackageVersion Include="Polyfill" Version="9.7.7" />
   </ItemGroup>
