@@ -23,10 +23,10 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\ImGuiApp\ImGui.App\ImGui.App.csproj" />
-    <ProjectReference Include="..\..\ImGuiApp\ImGui.Popups\ImGui.Popups.csproj" />
-    <ProjectReference Include="..\..\ImGuiApp\ImGui.Styler\ImGui.Styler.csproj" />
-    <ProjectReference Include="..\..\ImGuiApp\ImGui.Widgets\ImGui.Widgets.csproj" />
+    <PackageReference Include="ktsu.ImGui.App" />
+    <PackageReference Include="ktsu.ImGui.Popups" />
+    <PackageReference Include="ktsu.ImGui.Styler" />
+    <PackageReference Include="ktsu.ImGui.Widgets" />
   </ItemGroup>
 
 </Project>

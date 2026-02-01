@@ -14,6 +14,7 @@
     <PackageVersion Include="ktsu.Extensions" Version="1.5.10" />
     <PackageVersion Include="ktsu.ImGui.App" Version="2.2.8" />
     <PackageVersion Include="ktsu.ImGui.Popups" Version="2.2.8" />
+    <PackageVersion Include="ktsu.ImGui.Styler" Version="2.2.8" />
     <PackageVersion Include="ktsu.ImGui.Widgets" Version="2.2.8" />
     <PackageVersion Include="ktsu.Semantics.Strings" Version="1.0.29" />
     <PackageVersion Include="ktsu.TextFilter" Version="1.5.6" />
