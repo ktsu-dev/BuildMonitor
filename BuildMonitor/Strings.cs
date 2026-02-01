@@ -55,4 +55,5 @@ internal static class Strings
 	internal static string All { get; } = nameof(All).Titleize();
 	internal static string Logs { get; } = nameof(Logs).Titleize();
 	internal static string ClearLogs { get; } = nameof(ClearLogs).Titleize();
+	internal static string NoWorkflows { get; } = "No workflows";
 }

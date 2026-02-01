@@ -424,6 +424,12 @@ internal static class BuildMonitor
 				? [(filterOwner, filterOwner.BuildProvider)]
 				: providers.SelectMany(p => p.Provider.Owners.Select(o => (o.Value, p.Provider)));
 
+			// Collect all repositories for tracking which ones have builds/runs
+			List<Repository> allRepositories = [.. owners
+				.SelectMany(o => o.Owner.Repositories.Values)];
+
+			HashSet<RepositoryId> repositoriesWithRows = [];
+
 			IOrderedEnumerable<(Build Build, BranchName Branch, List<Run> Runs)> buildBranches = owners
 				.SelectMany(o => o.Owner.Repositories)
 				.SelectMany(r => r.Value.Builds)
@@ -435,6 +441,13 @@ internal static class BuildMonitor
 			foreach ((Build build, BranchName branch, List<Run> branchRuns) in buildBranches)
 			{
 				RenderBuildBranchRow(build, branch, branchRuns);
+				_ = repositoriesWithRows.Add(build.Repository.Id);
+			}
+
+			// Show repositories that have no workflows/builds
+			foreach (Repository repository in allRepositories.Where(r => !repositoriesWithRows.Contains(r.Id)))
+			{
+				RenderEmptyRepositoryRow(repository);
 			}
 
 			int saveColIndex = 0;
@@ -569,6 +582,95 @@ internal static class BuildMonitor
 
 		bool shouldOpenContextMenu = RenderBuildBranchRowColumns(build, branch, branchRuns, latestRun);
 		RenderBuildBranchContextMenu(build, branch, latestRun, shouldOpenContextMenu);
+	}
+
+	private static void RenderEmptyRepositoryRow(Repository repository)
+	{
+		if (!ShouldShowEmptyRepository(repository))
+		{
+			return;
+		}
+
+		ImGui.TableNextRow();
+
+		// Status column - gray indicator for no builds
+		if (ImGui.TableNextColumn())
+		{
+			ImGuiWidgets.ColorIndicator(Color.Palette.Neutral.Gray, true);
+		}
+
+		// Owner column
+		_ = RenderTextColumn(repository.Owner.Name);
+
+		// Repository column
+		_ = RenderTextColumn(MakeRepositoryDisplayName(repository));
+
+		// Build Name column - show "No workflows" in gray
+		if (ImGui.TableNextColumn())
+		{
+			using (new ScopedTextColor(Color.Palette.Neutral.Gray))
+			{
+				ImGui.TextUnformatted(Strings.NoWorkflows);
+			}
+		}
+
+		// Remaining columns - empty
+		for (int i = 0; i < 8; i++)
+		{
+			if (ImGui.TableNextColumn())
+			{
+				ImGui.Dummy(new(1, 1));
+			}
+		}
+	}
+
+	private static bool ShouldShowEmptyRepository(Repository repository)
+	{
+		bool shouldShow = true;
+
+		if (!string.IsNullOrEmpty(AppData.FilterOwner))
+		{
+			shouldShow &= TextFilter.IsMatch(repository.Owner.Name.ToString().ToUpperInvariant(), "*" + AppData.FilterOwner.ToUpperInvariant() + "*", AppData.FilterOwnerType, AppData.FilterOwnerMatchOptions);
+		}
+
+		if (!string.IsNullOrEmpty(AppData.FilterRepository))
+		{
+			string displayRepository = MakeRepositoryDisplayName(repository);
+			shouldShow &= TextFilter.IsMatch(displayRepository.ToUpperInvariant(), "*" + AppData.FilterRepository.ToUpperInvariant() + "*", AppData.FilterRepositoryType, AppData.FilterRepositoryMatchOptions);
+		}
+
+		// If there's a build name, branch, or status filter, hide empty repositories
+		// (they can't match these filters since they have no builds/runs)
+		if (!string.IsNullOrEmpty(AppData.FilterBuildName) ||
+			!string.IsNullOrEmpty(AppData.FilterBranch) ||
+			!string.IsNullOrEmpty(AppData.FilterStatus))
+		{
+			return false;
+		}
+
+		return shouldShow;
+	}
+
+	private static string MakeRepositoryDisplayName(Repository repository)
+	{
+		string repoName = repository.Name;
+		string ownerName = repository.Owner.Name;
+
+		// Remove owner name prefix if present (e.g., "ktsu-dev-" from "ktsu-dev-BuildMonitor")
+		if (repoName.StartsWithOrdinal(ownerName + "-"))
+		{
+			repoName = repoName.RemovePrefix(ownerName + "-");
+		}
+		else if (repoName.StartsWithOrdinal(ownerName + "."))
+		{
+			repoName = repoName.RemovePrefix(ownerName + ".");
+		}
+		else if (repoName.StartsWithOrdinal(ownerName + "_"))
+		{
+			repoName = repoName.RemovePrefix(ownerName + "_");
+		}
+
+		return repoName;
 	}
 
 	private static bool RenderBuildBranchRowColumns(Build build, BranchName branch, List<Run> branchRuns, Run latestRun)
