@@ -146,7 +146,6 @@ internal sealed partial class GitHub : BuildProvider
 		}
 
 		Log.Info($"GitHub: Discovering owners for account {AccountId}");
-		UpdateGitHubClientCredentials();
 
 		await MakeGitHubRequestAsync($"{Name}/discover", async () =>
 		{
@@ -182,7 +181,6 @@ internal sealed partial class GitHub : BuildProvider
 			return;
 		}
 
-		UpdateGitHubClientCredentials(owner);
 		await MakeGitHubRequestAsync($"{Name}/{owner.Name}", async () =>
 		{
 			List<Octokit.Repository> allRepositories = [];
@@ -264,7 +262,7 @@ internal sealed partial class GitHub : BuildProvider
 			{
 				Log.Info($"GitHub: Repository update for {owner.Name}: {newRepos} new, {archivedRepos} archived removed, {owner.Repositories.Count} total");
 			}
-		}).ConfigureAwait(false);
+		}, owner).ConfigureAwait(false);
 	}
 
 	internal override async Task UpdateBuildsAsync(Repository repository)
@@ -274,7 +272,6 @@ internal sealed partial class GitHub : BuildProvider
 			return;
 		}
 
-		UpdateGitHubClientCredentials(repository.Owner);
 		try
 		{
 			await MakeGitHubRequestAsync($"{Name}/{repository.Owner.Name}/{repository.Name}", async () =>
@@ -290,7 +287,7 @@ internal sealed partial class GitHub : BuildProvider
 						BuildMonitor.QueueSaveAppData();
 					}
 				}
-			}).ConfigureAwait(false);
+			}, repository.Owner).ConfigureAwait(false);
 		}
 		catch (NotFoundException)
 		{
@@ -306,7 +303,6 @@ internal sealed partial class GitHub : BuildProvider
 			return;
 		}
 
-		UpdateGitHubClientCredentials(build.Owner);
 		try
 		{
 			await MakeGitHubRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/{build.Name}", async () =>
@@ -324,7 +320,7 @@ internal sealed partial class GitHub : BuildProvider
 				Run run = build.Runs.GetOrCreate(runId, build.CreateRun(runName, runId));
 				await UpdateRunFromWorkflowAsync(run, gitHubRun).ConfigureAwait(false);
 			}
-		}).ConfigureAwait(false);
+		}, build.Owner).ConfigureAwait(false);
 		}
 		catch (NotFoundException)
 		{
@@ -340,15 +336,13 @@ internal sealed partial class GitHub : BuildProvider
 			return;
 		}
 
-		UpdateGitHubClientCredentials(run.Owner);
-
 		try
 		{
 			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}/{run.Name}", async () =>
 			{
 				WorkflowRun gitHubRun = await GitHubRuns.Get(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
 				await UpdateRunFromWorkflowAsync(run, gitHubRun).ConfigureAwait(false);
-			}).ConfigureAwait(false);
+			}, run.Owner).ConfigureAwait(false);
 		}
 		catch (NotFoundException)
 		{
@@ -529,11 +523,15 @@ internal sealed partial class GitHub : BuildProvider
 	}
 
 	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0010:Add missing cases", Justification = "<Pending>")]
-	internal async Task MakeGitHubRequestAsync(string name, Func<Task> action)
+	internal async Task MakeGitHubRequestAsync(string name, Func<Task> action, Owner? owner = null)
 	{
 		await RequestSemaphore.WaitAsync().ConfigureAwait(false);
 		try
 		{
+			// Set credentials after acquiring semaphore to avoid race conditions
+			// when multiple concurrent requests use different owner tokens
+			UpdateGitHubClientCredentials(owner);
+
 			// Use smart waiting: if rate limited with a known reset time, wait until reset
 			TimeSpan waitTime = GetRateLimitWaitTime();
 			await Task.Delay(waitTime).ConfigureAwait(false);
@@ -649,10 +647,9 @@ internal sealed partial class GitHub : BuildProvider
 			return false;
 		}
 
-		UpdateGitHubClientCredentials(run.Owner);
 		try
 		{
-			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/rerun/{run.Id}", async () => await GitHubRuns.Rerun(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false)).ConfigureAwait(false);
+			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/rerun/{run.Id}", async () => await GitHubRuns.Rerun(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false), run.Owner).ConfigureAwait(false);
 			return true;
 		}
 		catch (NotFoundException)
@@ -677,10 +674,9 @@ internal sealed partial class GitHub : BuildProvider
 			return false;
 		}
 
-		UpdateGitHubClientCredentials(run.Owner);
 		try
 		{
-			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/cancel/{run.Id}", async () => await GitHubRuns.Cancel(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false)).ConfigureAwait(false);
+			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/cancel/{run.Id}", async () => await GitHubRuns.Cancel(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false), run.Owner).ConfigureAwait(false);
 			return true;
 		}
 		catch (NotFoundException)
@@ -706,7 +702,6 @@ internal sealed partial class GitHub : BuildProvider
 			return false;
 		}
 
-		UpdateGitHubClientCredentials(build.Owner);
 		try
 		{
 			await MakeGitHubRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/dispatch/{build.Name}", async () =>
@@ -716,7 +711,7 @@ internal sealed partial class GitHub : BuildProvider
 					Inputs = new Dictionary<string, object>()
 				};
 				await GitHubActions.Workflows.CreateDispatch(build.Owner.Name, build.Repository.Name, long.Parse(build.Id, CultureInfo.InvariantCulture), createWorkflowDispatch).ConfigureAwait(false);
-			}).ConfigureAwait(false);
+			}, build.Owner).ConfigureAwait(false);
 			return true;
 		}
 		catch (NotFoundException)
