@@ -29,7 +29,7 @@ internal sealed class Build
 	internal bool IsOngoing => !Runs.IsEmpty && LastStatus is RunStatus.Pending or RunStatus.Running;
 	internal TimeSpan CalculateEstimatedDuration()
 	{
-		List<Run> recentRuns = [.. Runs.Values.Where(r => r.Status != RunStatus.Canceled).OrderByDescending(r => r.Started).Skip(1).Take(NumRecentRuns)];
+		List<Run> recentRuns = [.. Runs.Values.Where(r => r.Status == RunStatus.Success).OrderByDescending(r => r.Started).Skip(1).Take(NumRecentRuns)];
 		return recentRuns.Count == 0
 			? TimeSpan.Zero
 			: TimeSpan.FromSeconds(recentRuns.Average(r => r.Duration.TotalSeconds));

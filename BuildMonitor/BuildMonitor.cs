@@ -86,6 +86,7 @@ internal static class BuildMonitor
 		[Strings.Status] = 80f,
 		[Strings.LastRun] = 180f,
 		[Strings.Duration] = 80f,
+		[Strings.Estimate] = 80f,
 		[Strings.History] = 80f,
 		[Strings.Progress] = 100f,
 		[Strings.ETA] = 80f,
@@ -404,7 +405,7 @@ internal static class BuildMonitor
 
 	private static void RenderBuildTable(Owner? filterOwner, BuildProvider? filterProvider)
 	{
-		if (ImGui.BeginTable(Strings.Builds, 12, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
+		if (ImGui.BeginTable(Strings.Builds, 13, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
 		{
 			foreach (string columnName in DefaultColumnWidths.Keys)
 			{
@@ -615,7 +616,7 @@ internal static class BuildMonitor
 		}
 
 		// Remaining columns - empty
-		for (int i = 0; i < 8; i++)
+		for (int i = 0; i < 9; i++)
 		{
 			if (ImGui.TableNextColumn())
 			{
@@ -692,6 +693,7 @@ internal static class BuildMonitor
 		shouldOpenContextMenu |= RenderTextColumn($"{latestRun.Status}");
 		shouldOpenContextMenu |= RenderTextColumn(latestRun.Started.ToLocalTime().ToString("yyyy-MM-dd HH:mm zzz", CultureInfo.InvariantCulture));
 		shouldOpenContextMenu |= RenderDurationColumn(duration);
+		shouldOpenContextMenu |= RenderEstimateColumn(estimate);
 		shouldOpenContextMenu |= RenderHistoryColumn(branchRuns);
 		shouldOpenContextMenu |= RenderProgressColumn(isOngoing, progress);
 		shouldOpenContextMenu |= RenderEtaColumn(isOngoing, eta);
@@ -734,6 +736,27 @@ internal static class BuildMonitor
 		{
 			string format = MakeDurationFormat(duration);
 			ImGui.TextUnformatted(duration.ToString(format, CultureInfo.InvariantCulture));
+			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
+		}
+
+		return shouldOpenContextMenu;
+	}
+
+	private static bool RenderEstimateColumn(TimeSpan estimate)
+	{
+		bool shouldOpenContextMenu = false;
+		if (ImGui.TableNextColumn())
+		{
+			if (estimate > TimeSpan.Zero)
+			{
+				string format = MakeDurationFormat(estimate);
+				ImGui.TextUnformatted(estimate.ToString(format, CultureInfo.InvariantCulture));
+			}
+			else
+			{
+				ImGui.Dummy(new(1, 1));
+			}
+
 			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 		}
 
