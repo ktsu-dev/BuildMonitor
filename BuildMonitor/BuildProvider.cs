@@ -240,6 +240,7 @@ internal abstract class BuildProvider
 
 	internal void OnAuthenticationFailure()
 	{
+		Log.Error($"{Name}: Authentication failed - credentials cleared");
 		AccountId = new();
 		Token = new();
 		SetStatus(ProviderStatus.AuthFailed, Strings.AuthFailedMessage);
@@ -258,11 +259,13 @@ internal abstract class BuildProvider
 			if (timeUntilReset > TimeSpan.Zero)
 			{
 				message = $"{Strings.RateLimitedMessage} {Strings.ResetsAt}: {resetTime.Value.ToLocalTime():HH:mm:ss} ({Strings.WaitingFor} {FormatTimeSpan(timeUntilReset)})";
+				Log.Warning($"{Name}: Rate limited - resets at {resetTime.Value.ToLocalTime():HH:mm:ss} (waiting {FormatTimeSpan(timeUntilReset)})");
 			}
 			else
 			{
 				// Reset time already passed, use minimal delay
 				message = $"{Strings.RateLimitedMessage} {Strings.ResetsAt}: {resetTime.Value.ToLocalTime():HH:mm:ss} ({Strings.ResetImminent})";
+				Log.Warning($"{Name}: Rate limited - reset imminent");
 			}
 		}
 		else
@@ -270,6 +273,7 @@ internal abstract class BuildProvider
 			// No reset time available, use incremental backoff
 			RateLimitSleep += TimeSpan.FromMilliseconds(500);
 			message = $"{Strings.RateLimitedMessage} {Strings.Delay}: {RateLimitSleep.TotalMilliseconds}ms";
+			Log.Warning($"{Name}: Rate limited - using backoff delay of {RateLimitSleep.TotalMilliseconds}ms");
 		}
 		SetStatus(ProviderStatus.RateLimited, message);
 	}

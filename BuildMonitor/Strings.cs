@@ -52,6 +52,7 @@ internal static class Strings
 	internal static string ResetImminent { get; } = "reset imminent";
 	internal static string RateLimitBudget { get; } = "API Budget";
 	internal static string ResetsIn { get; } = "resets in";
-	internal static string FilterTabs { get; } = "Filter Tabs:";
 	internal static string All { get; } = nameof(All).Titleize();
+	internal static string Logs { get; } = nameof(Logs).Titleize();
+	internal static string ClearLogs { get; } = nameof(ClearLogs).Titleize();
 }

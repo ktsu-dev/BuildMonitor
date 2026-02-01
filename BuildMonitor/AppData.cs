@@ -38,9 +38,5 @@ internal sealed class AppData : AppData<AppData>
 	public TextFilterType FilterBranchType { get; set; } = TextFilterType.Glob;
 	public TextFilterMatchOptions FilterBranchMatchOptions { get; set; } = TextFilterMatchOptions.ByWordAny;
 
-	public string FilterOwnerTab { get; set; } = string.Empty;
-	public TextFilterType FilterOwnerTabType { get; set; } = TextFilterType.Glob;
-	public TextFilterMatchOptions FilterOwnerTabMatchOptions { get; set; } = TextFilterMatchOptions.ByWordAny;
-
 	public string? SelectedOwnerTabId { get; set; }
 }

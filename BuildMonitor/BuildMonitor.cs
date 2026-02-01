@@ -17,6 +17,7 @@ using ktsu.ImGui.Widgets;
 using ktsu.ImGui.Popups;
 using ktsu.TextFilter;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Main application class orchestrates many components")]
 internal static class BuildMonitor
 {
 	internal static AppData AppData { get; set; } = new();
@@ -57,6 +58,8 @@ internal static class BuildMonitor
 
 	private static void OnStart()
 	{
+		Log.Info("Build Monitor starting...");
+
 		bool needsSave = false;
 
 		needsSave |= AppData.BuildProviders.TryAdd(GitHub.BuildProviderName, new GitHub());
@@ -69,6 +72,7 @@ internal static class BuildMonitor
 			QueueSaveAppData();
 		}
 
+		Log.Info($"Initialized {AppData.BuildProviders.Count} build providers");
 		UpdateTask = UpdateAsync();
 	}
 
@@ -94,6 +98,7 @@ internal static class BuildMonitor
 	private static ImGuiWidgets.TabPanel OwnerTabPanel { get; } = new("OwnerTabPanel", false, true, OnOwnerTabChanged);
 	private static HashSet<string> CurrentOwnerTabIds { get; } = [];
 	private const string AllOwnersTabId = "__all__";
+	private const string LogsTabId = "__logs__";
 
 	private static void OnOwnerTabChanged(string tabId)
 	{
@@ -261,7 +266,6 @@ internal static class BuildMonitor
 
 		RenderProviderStatusBar();
 		UpdateOwnerTabs();
-		RenderOwnerTabFilter();
 		OwnerTabPanel.Draw();
 
 		ShowPopupsIfRequired();
@@ -273,7 +277,8 @@ internal static class BuildMonitor
 		// Build expected tabs based on provider type:
 		// - GitHub: one tab per owner (org/user)
 		// - Azure DevOps: one tab per account (the provider itself)
-		HashSet<string> expectedTabIds = [AllOwnersTabId];
+		// - Always include Logs tab
+		HashSet<string> expectedTabIds = [AllOwnersTabId, LogsTabId];
 		Dictionary<string, (string Label, Action Content)> tabsToCreate = [];
 
 		foreach ((BuildProviderName providerName, BuildProvider provider) in AppData.BuildProviders)
@@ -323,6 +328,13 @@ internal static class BuildMonitor
 			_ = CurrentOwnerTabIds.Add(tabId);
 		}
 
+		// Add "Logs" tab if not present (add at the end)
+		if (!CurrentOwnerTabIds.Contains(LogsTabId))
+		{
+			_ = OwnerTabPanel.AddTab(LogsTabId, Strings.Logs, RenderLogsTab);
+			_ = CurrentOwnerTabIds.Add(LogsTabId);
+		}
+
 		// Remove tabs that no longer exist
 		List<string> tabsToRemove = [.. CurrentOwnerTabIds.Where(id => !expectedTabIds.Contains(id))];
 		foreach (string tabId in tabsToRemove)
@@ -344,63 +356,51 @@ internal static class BuildMonitor
 		}
 	}
 
-	private static void RenderOwnerTabFilter()
-	{
-		ImGui.TextUnformatted(Strings.FilterTabs);
-		ImGui.SameLine();
-		ImGui.SetNextItemWidth(200);
-
-		string filterText = AppData.FilterOwnerTab;
-		TextFilterType filterType = AppData.FilterOwnerTabType;
-		TextFilterMatchOptions filterMatchOptions = AppData.FilterOwnerTabMatchOptions;
-
-		ImGuiWidgets.SearchBox("##OwnerTabFilter", ref filterText, ref filterType, ref filterMatchOptions);
-
-		if (filterText != AppData.FilterOwnerTab ||
-			filterType != AppData.FilterOwnerTabType ||
-			filterMatchOptions != AppData.FilterOwnerTabMatchOptions)
-		{
-			AppData.FilterOwnerTab = filterText;
-			AppData.FilterOwnerTabType = filterType;
-			AppData.FilterOwnerTabMatchOptions = filterMatchOptions;
-			QueueSaveAppData();
-		}
-
-		// Update tab visibility based on filter (match against tab label, not ID)
-		foreach (string tabId in CurrentOwnerTabIds)
-		{
-			ImGuiWidgets.Tab? tab = OwnerTabPanel.GetTabById(tabId);
-			if (tab == null)
-			{
-				continue;
-			}
-
-			if (tabId == AllOwnersTabId)
-			{
-				// Always show "All" tab
-				tab.IsVisible = true;
-			}
-			else if (string.IsNullOrEmpty(AppData.FilterOwnerTab))
-			{
-				tab.IsVisible = true;
-			}
-			else
-			{
-				// Match against the tab label (the display name)
-				tab.IsVisible = TextFilter.IsMatch(
-					tab.Label.ToUpperInvariant(),
-					"*" + AppData.FilterOwnerTab.ToUpperInvariant() + "*",
-					AppData.FilterOwnerTabType,
-					AppData.FilterOwnerTabMatchOptions);
-			}
-		}
-	}
-
 	private static void RenderAllOwnersTab() => RenderBuildTable(null, null);
 
 	private static void RenderOwnerTab(Owner owner) => RenderBuildTable(owner, null);
 
 	private static void RenderProviderTab(BuildProvider provider) => RenderBuildTable(null, provider);
+
+	private static void RenderLogsTab()
+	{
+		if (ImGui.Button(Strings.ClearLogs))
+		{
+			Log.Clear();
+		}
+
+		ImGui.Separator();
+
+		// Create a scrollable region for logs
+		if (ImGui.BeginChild("LogsScrollRegion", new System.Numerics.Vector2(0, 0), ImGuiChildFlags.None, ImGuiWindowFlags.HorizontalScrollbar))
+		{
+			foreach (LogEntry entry in Log.GetEntries())
+			{
+				ImColor color = entry.Level switch
+				{
+					LogLevel.Debug => Color.Palette.Neutral.Gray,
+					LogLevel.Info => Color.Palette.Neutral.White,
+					LogLevel.Warning => Color.Palette.Basic.Yellow,
+					LogLevel.Error => Color.Palette.Basic.Red,
+					_ => Color.Palette.Neutral.White,
+				};
+
+				using (new ScopedTextColor(color))
+				{
+					string timestamp = entry.Timestamp.ToString("HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture);
+					string levelStr = entry.Level.ToString().ToUpperInvariant();
+					ImGui.TextUnformatted($"[{timestamp}] [{levelStr}] {entry.Message}");
+				}
+			}
+
+			// Auto-scroll to bottom if we're already at the bottom
+			if (ImGui.GetScrollY() >= ImGui.GetScrollMaxY() - 20)
+			{
+				ImGui.SetScrollHereY(1.0f);
+			}
+		}
+		ImGui.EndChild();
+	}
 
 	private static void RenderBuildTable(Owner? filterOwner, BuildProvider? filterProvider)
 	{

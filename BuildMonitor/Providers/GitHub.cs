@@ -74,6 +74,7 @@ internal sealed partial class GitHub : BuildProvider
 			return;
 		}
 
+		Log.Info($"GitHub: Discovering owners for account {AccountId}");
 		UpdateGitHubClientCredentials();
 
 		await MakeGitHubRequestAsync($"{Name}/discover", async () =>
@@ -83,6 +84,7 @@ internal sealed partial class GitHub : BuildProvider
 			OwnerName userName = currentUser.Login.As<OwnerName>();
 			if (Owners.TryAdd(userName, CreateOwner(userName)))
 			{
+				Log.Info($"GitHub: Discovered user owner: {userName}");
 				BuildMonitor.QueueSaveAppData();
 			}
 
@@ -93,9 +95,12 @@ internal sealed partial class GitHub : BuildProvider
 				OwnerName orgName = org.Login.As<OwnerName>();
 				if (Owners.TryAdd(orgName, CreateOwner(orgName)))
 				{
+					Log.Info($"GitHub: Discovered organization owner: {orgName}");
 					BuildMonitor.QueueSaveAppData();
 				}
 			}
+
+			Log.Info($"GitHub: Owner discovery complete. Found {Owners.Count} owners");
 		}).ConfigureAwait(false);
 	}
 
@@ -109,32 +114,57 @@ internal sealed partial class GitHub : BuildProvider
 		UpdateGitHubClientCredentials();
 		await MakeGitHubRequestAsync($"{Name}/{owner.Name}", async () =>
 		{
-			// Try to get repositories for user - this works for both users and orgs
-			IReadOnlyList<Octokit.Repository> userRepositories;
+			List<Octokit.Repository> allRepositories = [];
+
+			// Check if this owner is the authenticated user - if so, use GetAllForCurrent to get private repos
+			User? currentUser = null;
 			try
 			{
-				userRepositories = await GitHubRepository.GetAllForUser(owner.Name).ConfigureAwait(false);
+				currentUser = await GitHubClient.User.Current().ConfigureAwait(false);
 			}
-			catch (NotFoundException)
+			catch (AuthorizationException)
 			{
-				// Owner might be an org-only account, try org repos instead
-				userRepositories = [];
+				// Not authenticated, can't get current user
 			}
 
-			// Try to get organization repositories - this only works for orgs
-			IReadOnlyList<Octokit.Repository> organizationRepositories;
-			try
+			if (currentUser != null && currentUser.Login.Equals(owner.Name.ToString(), StringComparison.OrdinalIgnoreCase))
 			{
-				organizationRepositories = await GitHubRepository.GetAllForOrg(owner.Name).ConfigureAwait(false);
+				// This is the authenticated user - get all repos including private ones
+				IReadOnlyList<Octokit.Repository> currentUserRepos = await GitHubRepository.GetAllForCurrent().ConfigureAwait(false);
+				allRepositories.AddRange(currentUserRepos);
+				Log.Info($"GitHub: Found {currentUserRepos.Count} repositories for authenticated user {owner.Name} (including private)");
 			}
-			catch (NotFoundException)
+			else
 			{
-				// Owner is not an organization, that's fine
-				organizationRepositories = [];
+				// Try to get repositories for user - this works for both users and orgs but only public repos
+				IReadOnlyList<Octokit.Repository> userRepositories;
+				try
+				{
+					userRepositories = await GitHubRepository.GetAllForUser(owner.Name).ConfigureAwait(false);
+					allRepositories.AddRange(userRepositories);
+				}
+				catch (NotFoundException)
+				{
+					// Owner might be an org-only account, try org repos instead
+					userRepositories = [];
+				}
+
+				// Try to get organization repositories - this only works for orgs
+				IReadOnlyList<Octokit.Repository> organizationRepositories;
+				try
+				{
+					organizationRepositories = await GitHubRepository.GetAllForOrg(owner.Name).ConfigureAwait(false);
+					allRepositories.AddRange(organizationRepositories);
+				}
+				catch (NotFoundException)
+				{
+					// Owner is not an organization, that's fine
+					organizationRepositories = [];
+				}
 			}
 
-			IEnumerable<Octokit.Repository> allRepositories = userRepositories.Concat(organizationRepositories);
-
+			int newRepos = 0;
+			int archivedRepos = 0;
 			foreach (Octokit.Repository? gitHubRepository in allRepositories)
 			{
 				RepositoryId repositoryId = gitHubRepository.Id.ToString(CultureInfo.InvariantCulture).As<RepositoryId>();
@@ -143,6 +173,7 @@ internal sealed partial class GitHub : BuildProvider
 				{
 					if (owner.Repositories.TryRemove(repositoryId, out _))
 					{
+						archivedRepos++;
 						BuildMonitor.QueueSaveAppData();
 					}
 					continue;
@@ -152,8 +183,15 @@ internal sealed partial class GitHub : BuildProvider
 				Repository repository = owner.CreateRepository(repositoryName, repositoryId);
 				if (owner.Repositories.TryAdd(repositoryId, repository))
 				{
+					newRepos++;
+					Log.Info($"GitHub: Discovered repository: {owner.Name}/{repositoryName}");
 					BuildMonitor.QueueSaveAppData();
 				}
+			}
+
+			if (newRepos > 0 || archivedRepos > 0)
+			{
+				Log.Info($"GitHub: Repository update for {owner.Name}: {newRepos} new, {archivedRepos} archived removed, {owner.Repositories.Count} total");
 			}
 		}).ConfigureAwait(false);
 	}
@@ -271,6 +309,23 @@ internal sealed partial class GitHub : BuildProvider
 			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Stale => RunStatus.Failure,
 			_ => throw new InvalidOperationException(),
 		};
+
+		// Log status transitions
+		if (previousStatus != run.Status)
+		{
+			if (run.Status == RunStatus.Failure)
+			{
+				Log.Warning($"Build failed: {run.Owner.Name}/{run.Repository.Name}/{run.Build.Name} on {run.Branch}");
+			}
+			else if (run.Status == RunStatus.Success && previousStatus == RunStatus.Running)
+			{
+				Log.Info($"Build succeeded: {run.Owner.Name}/{run.Repository.Name}/{run.Build.Name} on {run.Branch}");
+			}
+			else if (run.Status == RunStatus.Running && previousStatus != RunStatus.Running)
+			{
+				Log.Info($"Build started: {run.Owner.Name}/{run.Repository.Name}/{run.Build.Name} on {run.Branch}");
+			}
+		}
 
 		// Fetch error details if the run just failed or is a failure without errors
 		if (run.Status == RunStatus.Failure && (previousStatus != RunStatus.Failure || run.Errors.Count == 0))
@@ -450,6 +505,7 @@ internal sealed partial class GitHub : BuildProvider
 			}
 			catch (HttpRequestException ex)
 			{
+				Log.Error($"{Name}: Connection error - {ex.Message}");
 				SetStatus(ProviderStatus.Error, $"{Strings.ConnectionErrorMessage} {ex.Message}");
 			}
 		}
