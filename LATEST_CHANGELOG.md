@@ -1,5 +1,7 @@
-## v1.2.17 (patch)
+## v1.2.18 (patch)
 
-Changes since v1.2.16:
+Changes since v1.2.17:
 
-- Add filtering options for owner and repository in AppData, enhance Azure DevOps and GitHub provider menus, and implement project discovery functionality ([@matt-edmondson](https://github.com/matt-edmondson))
+- Implement logging system and enhance GitHub provider with detailed logging for owner discovery and repository updates ([@matt-edmondson](https://github.com/matt-edmondson))
+- Add owner tab filtering functionality and update related UI components ([@matt-edmondson](https://github.com/matt-edmondson))
+- Enhance owner tab management by creating tabs based on provider type and updating tab visibility logic ([@matt-edmondson](https://github.com/matt-edmondson))
