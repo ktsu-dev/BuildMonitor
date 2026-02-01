@@ -270,17 +270,43 @@ internal static class BuildMonitor
 
 	private static void UpdateOwnerTabs()
 	{
-		// Get all current owners across all providers
-		List<Owner> allOwners = [.. AppData.BuildProviders
-			.SelectMany(p => p.Value.Owners)
-			.Select(o => o.Value)
-			.OrderBy(o => o.Name.ToString())];
-
-		// Create set of owner IDs we should have
+		// Build expected tabs based on provider type:
+		// - GitHub: one tab per owner (org/user)
+		// - Azure DevOps: one tab per account (the provider itself)
 		HashSet<string> expectedTabIds = [AllOwnersTabId];
-		foreach (Owner owner in allOwners)
+		Dictionary<string, (string Label, Action Content)> tabsToCreate = [];
+
+		foreach ((BuildProviderName providerName, BuildProvider provider) in AppData.BuildProviders)
 		{
-			expectedTabIds.Add(owner.Name.ToString());
+			if (provider is GitHub)
+			{
+				// GitHub: create tabs per owner
+				foreach ((OwnerName ownerName, Owner owner) in provider.Owners)
+				{
+					string tabId = $"GitHub:{ownerName}";
+					expectedTabIds.Add(tabId);
+					if (!CurrentOwnerTabIds.Contains(tabId))
+					{
+						Owner capturedOwner = owner;
+						tabsToCreate[tabId] = (ownerName.ToString(), () => RenderOwnerTab(capturedOwner));
+					}
+				}
+			}
+			else if (provider is AzureDevOps adoProvider)
+			{
+				// Azure DevOps: create one tab per account
+				string accountId = adoProvider.AccountId;
+				if (!string.IsNullOrEmpty(accountId) && !adoProvider.Owners.IsEmpty)
+				{
+					string tabId = $"ADO:{accountId}";
+					expectedTabIds.Add(tabId);
+					if (!CurrentOwnerTabIds.Contains(tabId))
+					{
+						BuildProvider capturedProvider = provider;
+						tabsToCreate[tabId] = (accountId, () => RenderProviderTab(capturedProvider));
+					}
+				}
+			}
 		}
 
 		// Add "All" tab if not present
@@ -290,19 +316,14 @@ internal static class BuildMonitor
 			_ = CurrentOwnerTabIds.Add(AllOwnersTabId);
 		}
 
-		// Add new owner tabs
-		foreach (Owner owner in allOwners)
+		// Add new tabs (sorted by label for consistent ordering)
+		foreach ((string tabId, (string label, Action content)) in tabsToCreate.OrderBy(t => t.Value.Label))
 		{
-			string tabId = owner.Name.ToString();
-			if (!CurrentOwnerTabIds.Contains(tabId))
-			{
-				Owner capturedOwner = owner;
-				_ = OwnerTabPanel.AddTab(tabId, tabId, () => RenderOwnerTab(capturedOwner));
-				_ = CurrentOwnerTabIds.Add(tabId);
-			}
+			_ = OwnerTabPanel.AddTab(tabId, label, content);
+			_ = CurrentOwnerTabIds.Add(tabId);
 		}
 
-		// Remove tabs for owners that no longer exist
+		// Remove tabs that no longer exist
 		List<string> tabsToRemove = [.. CurrentOwnerTabIds.Where(id => !expectedTabIds.Contains(id))];
 		foreach (string tabId in tabsToRemove)
 		{
@@ -345,7 +366,7 @@ internal static class BuildMonitor
 			QueueSaveAppData();
 		}
 
-		// Update tab visibility based on filter
+		// Update tab visibility based on filter (match against tab label, not ID)
 		foreach (string tabId in CurrentOwnerTabIds)
 		{
 			ImGuiWidgets.Tab? tab = OwnerTabPanel.GetTabById(tabId);
@@ -365,8 +386,9 @@ internal static class BuildMonitor
 			}
 			else
 			{
+				// Match against the tab label (the display name)
 				tab.IsVisible = TextFilter.IsMatch(
-					tabId.ToUpperInvariant(),
+					tab.Label.ToUpperInvariant(),
 					"*" + AppData.FilterOwnerTab.ToUpperInvariant() + "*",
 					AppData.FilterOwnerTabType,
 					AppData.FilterOwnerTabMatchOptions);
@@ -374,11 +396,13 @@ internal static class BuildMonitor
 		}
 	}
 
-	private static void RenderAllOwnersTab() => RenderBuildTable(null);
+	private static void RenderAllOwnersTab() => RenderBuildTable(null, null);
 
-	private static void RenderOwnerTab(Owner owner) => RenderBuildTable(owner);
+	private static void RenderOwnerTab(Owner owner) => RenderBuildTable(owner, null);
 
-	private static void RenderBuildTable(Owner? filterOwner)
+	private static void RenderProviderTab(BuildProvider provider) => RenderBuildTable(null, provider);
+
+	private static void RenderBuildTable(Owner? filterOwner, BuildProvider? filterProvider)
 	{
 		if (ImGui.BeginTable(Strings.Builds, 12, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
 		{
@@ -392,8 +416,9 @@ internal static class BuildMonitor
 			RenderFilterRow();
 
 			// Group runs by (Build, Branch) and iterate
-			IEnumerable<(BuildProviderName Name, BuildProvider Provider)> providers = AppData.BuildProviders
-				.Select(p => (p.Key, p.Value));
+			IEnumerable<(BuildProviderName Name, BuildProvider Provider)> providers = filterProvider != null
+				? [(filterProvider.Name, filterProvider)]
+				: AppData.BuildProviders.Select(p => (p.Key, p.Value));
 
 			IEnumerable<(Owner Owner, BuildProvider Provider)> owners = filterOwner != null
 				? [(filterOwner, filterOwner.BuildProvider)]

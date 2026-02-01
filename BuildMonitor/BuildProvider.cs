@@ -47,7 +47,7 @@ internal abstract class BuildProvider
 {
 	internal abstract BuildProviderName Name { get; }
 	[JsonInclude]
-	protected BuildProviderAccountId AccountId { get; private set; } = new();
+	internal BuildProviderAccountId AccountId { get; private set; } = new();
 	[JsonInclude]
 	protected BuildProviderToken Token { get; private set; } = new();
 	[JsonInclude]
