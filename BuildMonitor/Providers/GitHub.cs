@@ -18,28 +18,65 @@ internal sealed partial class GitHub : BuildProvider
 {
 	internal static BuildProviderName BuildProviderName => nameof(GitHub).As<BuildProviderName>();
 	internal override BuildProviderName Name => BuildProviderName;
-	private GitHubClient GitHubClient { get; } = new(new ProductHeaderValue(Strings.FullyQualifiedApplicationName));
-	private IRepositoriesClient GitHubRepository => GitHubClient.Repository;
-	private IActionsClient GitHubActions => GitHubClient.Actions;
+
+	/// <summary>
+	/// Cache of GitHubClient instances per token to avoid race conditions
+	/// when multiple concurrent requests use different tokens.
+	/// </summary>
+	private System.Collections.Concurrent.ConcurrentDictionary<string, GitHubClient> TokenClients { get; } = new();
+
+	/// <summary>
+	/// The currently active GitHubClient for the current async context.
+	/// Set by SetCurrentClient before each API operation.
+	/// Uses AsyncLocal to properly flow through async/await calls.
+	/// </summary>
+	private AsyncLocal<GitHubClient?> CurrentClientLocal { get; } = new();
+
+	private GitHubClient? CurrentClient
+	{
+		get => CurrentClientLocal.Value;
+		set => CurrentClientLocal.Value = value;
+	}
+
+	private IRepositoriesClient GitHubRepository => CurrentClient!.Repository;
+	private IActionsClient GitHubActions => CurrentClient!.Actions;
 	private IActionsWorkflowsClient GitHubWorkflows => GitHubActions.Workflows;
 	private IActionsWorkflowRunsClient GitHubRuns => GitHubWorkflows.Runs;
 	private IActionsWorkflowJobsClient GitHubJobs => GitHubWorkflows.Jobs;
 	private bool ShouldDiscoverOwners { get; set; }
 
 	/// <summary>
-	/// Updates GitHub client credentials, using owner-specific token if available.
+	/// Gets or creates a GitHubClient for the specified owner's token.
+	/// Each unique token gets its own client instance to avoid race conditions.
 	/// </summary>
 	/// <param name="owner">Optional owner to check for specific token.</param>
-	private void UpdateGitHubClientCredentials(Owner? owner = null)
+	/// <returns>A GitHubClient configured with the appropriate credentials.</returns>
+	private GitHubClient GetClientForOwner(Owner? owner = null)
 	{
-		// Use owner-specific token if available, otherwise fall back to provider token
 		string tokenToUse = owner?.HasToken == true ? owner.Token : Token;
 
-		if (!string.IsNullOrEmpty(AccountId) && !string.IsNullOrEmpty(tokenToUse))
+		if (string.IsNullOrEmpty(tokenToUse))
 		{
-			GitHubClient.Credentials = new(AccountId, tokenToUse);
+			// Return a client without credentials if no token
+			return TokenClients.GetOrAdd(string.Empty, _ =>
+				new GitHubClient(new ProductHeaderValue(Strings.FullyQualifiedApplicationName)));
 		}
+
+		return TokenClients.GetOrAdd(tokenToUse, token =>
+		{
+			GitHubClient client = new(new ProductHeaderValue(Strings.FullyQualifiedApplicationName))
+			{
+				Credentials = new Credentials(AccountId, token)
+			};
+			return client;
+		});
 	}
+
+	/// <summary>
+	/// Sets the current client for this async context.
+	/// Must be called before any API operations.
+	/// </summary>
+	private void SetCurrentClient(Owner? owner = null) => CurrentClient = GetClientForOwner(owner);
 
 	/// <summary>
 	/// Checks if we have valid credentials for the specified owner.
@@ -150,7 +187,7 @@ internal sealed partial class GitHub : BuildProvider
 		await MakeGitHubRequestAsync($"{Name}/discover", async () =>
 		{
 			// Add the authenticated user as an owner
-			User currentUser = await GitHubClient.User.Current().ConfigureAwait(false);
+			User currentUser = await CurrentClient!.User.Current().ConfigureAwait(false);
 			OwnerName userName = currentUser.Login.As<OwnerName>();
 			if (Owners.TryAdd(userName, CreateOwner(userName)))
 			{
@@ -159,7 +196,7 @@ internal sealed partial class GitHub : BuildProvider
 			}
 
 			// Add all organizations the user belongs to
-			IReadOnlyList<Organization> organizations = await GitHubClient.Organization.GetAllForCurrent().ConfigureAwait(false);
+			IReadOnlyList<Organization> organizations = await CurrentClient!.Organization.GetAllForCurrent().ConfigureAwait(false);
 			foreach (Organization org in organizations)
 			{
 				OwnerName orgName = org.Login.As<OwnerName>();
@@ -189,7 +226,7 @@ internal sealed partial class GitHub : BuildProvider
 			User? currentUser = null;
 			try
 			{
-				currentUser = await GitHubClient.User.Current().ConfigureAwait(false);
+				currentUser = await CurrentClient!.User.Current().ConfigureAwait(false);
 			}
 			catch (AuthorizationException)
 			{
@@ -528,9 +565,10 @@ internal sealed partial class GitHub : BuildProvider
 		await RequestSemaphore.WaitAsync().ConfigureAwait(false);
 		try
 		{
-			// Set credentials after acquiring semaphore to avoid race conditions
-			// when multiple concurrent requests use different owner tokens
-			UpdateGitHubClientCredentials(owner);
+			// Set the current client for this request - each token gets its own
+			// GitHubClient instance to avoid race conditions when multiple
+			// concurrent requests use different owner tokens
+			SetCurrentClient(owner);
 
 			// Use smart waiting: if rate limited with a known reset time, wait until reset
 			TimeSpan waitTime = GetRateLimitWaitTime();
@@ -590,7 +628,7 @@ internal sealed partial class GitHub : BuildProvider
 	/// </summary>
 	private void UpdateRateLimitFromApiInfo()
 	{
-		ApiInfo? apiInfo = GitHubClient.GetLastApiInfo();
+		ApiInfo? apiInfo = CurrentClient?.GetLastApiInfo();
 		if (apiInfo?.RateLimit != null)
 		{
 			UpdateRateLimitBudget(
