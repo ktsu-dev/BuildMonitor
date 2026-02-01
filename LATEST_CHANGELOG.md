@@ -1,7 +1,5 @@
-## v1.2.22 (patch)
+## v1.2.23 (patch)
 
-Changes since v1.2.21:
+Changes since v1.2.22:
 
-- Add Estimate column and update related rendering logic in BuildMonitor ([@matt-edmondson](https://github.com/matt-edmondson))
-- Enhance sync management by adding orphan detection for builds and runs, improving cleanup logic and update conditions ([@matt-edmondson](https://github.com/matt-edmondson))
-- Implement branch-specific duration estimation and add DurationEstimator class for improved accuracy ([@matt-edmondson](https://github.com/matt-edmondson))
+- Implement budget-based request prioritization for builds and runs, enhancing update logic and efficiency ([@matt-edmondson](https://github.com/matt-edmondson))
