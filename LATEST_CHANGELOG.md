@@ -1,5 +1,5 @@
-## v1.2.19 (patch)
+## v1.2.20 (patch)
 
-Changes since v1.2.18:
+Changes since v1.2.19:
 
-- Add owner-specific token management and related UI updates for GitHub provider ([@matt-edmondson](https://github.com/matt-edmondson))
+- Refactor GitHub client credential updates to use owner-specific tokens in request methods ([@matt-edmondson](https://github.com/matt-edmondson))
