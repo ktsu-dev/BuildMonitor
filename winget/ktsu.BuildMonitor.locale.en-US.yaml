@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.10.0.schema.json
+PackageIdentifier: ktsu.BuildMonitor
+PackageVersion: 1.2.24-pre.5
+PackageLocale: en-US
+Publisher: ktsu.dev contributors
+PublisherUrl: https://github.com/ktsu-dev
+PublisherSupportUrl: https://github.com/ktsu-dev/BuildMonitor/issues
+# PrivacyUrl:
+Author: ktsu.dev contributors
+PackageName: ktsu.BuildMonitor
+PackageUrl: https://github.com/ktsu-dev/BuildMonitor
+License: MIT
+LicenseUrl: https://github.com/ktsu-dev/BuildMonitor/blob/main/LICENSE.md
+Copyright: Copyright (c) ktsu.dev contributors
+# CopyrightUrl:
+ShortDescription: A desktop application for monitoring CI/CD build statuses across multiple providers.
+Description: A desktop application for monitoring CI/CD build statuses across multiple providers in real-time.
+Moniker: buildmonitor
+Tags:
+- dotnet
+- csharp
+
+ReleaseNotes: |-
+  See full changelog at: https://github.com/ktsu-dev/BuildMonitor/blob/main/CHANGELOG.md
+ReleaseNotesUrl: https://github.com/ktsu-dev/BuildMonitor/releases/tag/v1.2.24-pre.5
+# PurchaseUrl:
+# InstallationNotes:
+Documentations:
+- DocumentLabel: README
+  DocumentUrl: https://github.com/ktsu-dev/BuildMonitor/blob/main/README.md
+ManifestType: defaultLocale
+ManifestVersion: 1.10.0
