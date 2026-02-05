@@ -1,5 +1,3 @@
-## v1.2.24 (patch)
+## v1.2.24
 
-Changes since v1.2.23:
-
-- Fix winget manafest generator ([@matt-edmondson](https://github.com/matt-edmondson))
+No significant changes detected since v1.2.24.

@@ -1,3 +1,6 @@
+## v1.2.24
+
+No significant changes detected since v1.2.24.
 ## v1.2.24 (patch)
 
 Changes since v1.2.23:
@@ -28,10 +31,7 @@ Changes since v1.2.24-pre.1:
 - Sync global.json ([@ktsu[bot]](https://github.com/ktsu[bot]))
 ## v1.2.24-pre.1 (prerelease)
 
-Changes since v1.2.23:
-
-- Bump the ktsu group with 5 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
-- Bump Polyfill from 9.7.7 to 9.8.0 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+Incremental prerelease update.
 ## v1.2.23 (patch)
 
 Changes since v1.2.22:
