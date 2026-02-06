@@ -1,6 +1,5 @@
-## v1.2.26 (patch)
+## v1.2.27-pre.1 (prerelease)
 
-Changes since v1.2.25:
+Changes since v1.2.26:
 
-- Enhance winget manifest update script by restoring packages for SDK properties and improving packageId resolution logic ([@matt-edmondson](https://github.com/matt-edmondson))
-- Enhance build visibility checks and update filtering logic for runs and builds ([@matt-edmondson](https://github.com/matt-edmondson))
+- Bump the ktsu group with 1 update ([@dependabot[bot]](https://github.com/dependabot[bot]))
