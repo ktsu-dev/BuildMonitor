@@ -70,6 +70,11 @@ internal sealed class BuildSync
 		_ => UpdateIntervalLow,
 	};
 
+	internal TimeSpan TimeRemaining => TimeSpan.FromSeconds(
+		Math.Max(0, UpdateInterval - UpdateTimer.Elapsed.TotalSeconds));
+
+	internal double UpdateProgress => Math.Clamp(UpdateTimer.Elapsed.TotalSeconds / UpdateInterval, 0, 1);
+
 	internal bool ShouldUpdate => !IsOrphaned && UpdateTimer.Elapsed.TotalSeconds >= UpdateInterval;
 
 	internal BuildSync() => UpdateTimer.Start();

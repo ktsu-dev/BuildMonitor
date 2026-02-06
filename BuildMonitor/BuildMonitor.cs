@@ -91,6 +91,7 @@ internal static class BuildMonitor
 		[Strings.Progress] = 100f,
 		[Strings.ETA] = 80f,
 		[Strings.Errors] = 200f,
+		[Strings.NextUpdate] = 80f,
 	};
 
 	private static ImGuiPopups.Prompt ErrorDetailsPopup { get; } = new();
@@ -405,7 +406,7 @@ internal static class BuildMonitor
 
 	private static void RenderBuildTable(Owner? filterOwner, BuildProvider? filterProvider)
 	{
-		if (ImGui.BeginTable(Strings.Builds, 13, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
+		if (ImGui.BeginTable(Strings.Builds, 14, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
 		{
 			foreach (string columnName in DefaultColumnWidths.Keys)
 			{
@@ -616,7 +617,7 @@ internal static class BuildMonitor
 		}
 
 		// Remaining columns - empty
-		for (int i = 0; i < 9; i++)
+		for (int i = 0; i < 10; i++)
 		{
 			if (ImGui.TableNextColumn())
 			{
@@ -699,6 +700,7 @@ internal static class BuildMonitor
 		shouldOpenContextMenu |= RenderProgressColumn(isOngoing, progress);
 		shouldOpenContextMenu |= RenderEtaColumn(isOngoing, eta);
 		shouldOpenContextMenu |= RenderErrorsColumnIfVisible(latestRun, build, branch);
+		shouldOpenContextMenu |= RenderNextUpdateColumn(build);
 
 		return shouldOpenContextMenu;
 	}
@@ -823,6 +825,29 @@ internal static class BuildMonitor
 		if (ImGui.TableNextColumn())
 		{
 			shouldOpenContextMenu = RenderErrorsColumn(latestRun, build, branch);
+		}
+
+		return shouldOpenContextMenu;
+	}
+
+	private static bool RenderNextUpdateColumn(Build build)
+	{
+		bool shouldOpenContextMenu = false;
+		if (ImGui.TableNextColumn())
+		{
+			if (BuildSyncCollection.TryGetValue(build.Id, out BuildSync? buildSync))
+			{
+				float progress = (float)buildSync.UpdateProgress;
+				TimeSpan remaining = buildSync.TimeRemaining;
+				string label = remaining.ToString(@"m\:ss", CultureInfo.InvariantCulture);
+				ImGui.ProgressBar(progress, new(-1, ImGui.GetFrameHeight()), label);
+			}
+			else
+			{
+				ImGui.Dummy(new(1, 1));
+			}
+
+			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 		}
 
 		return shouldOpenContextMenu;
