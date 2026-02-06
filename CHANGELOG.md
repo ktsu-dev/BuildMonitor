@@ -1,6 +1,8 @@
-## v1.2.24
+## v1.2.25 (patch)
 
-No significant changes detected since v1.2.24.
+Changes since v1.2.24:
+
+- Add Next Update column to build table and enhance BuildSync with progress tracking ([@matt-edmondson](https://github.com/matt-edmondson))
 ## v1.2.24 (patch)
 
 Changes since v1.2.23:
