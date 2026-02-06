@@ -16,7 +16,7 @@ internal sealed class AppData : AppData<AppData>
 
 	public ConcurrentDictionary<BuildProviderName, BuildProvider> BuildProviders { get; set; } = [];
 
-	public Dictionary<string, float> ColumnWidths { get; set; } = [];
+	public ConcurrentDictionary<string, float> ColumnWidths { get; set; } = [];
 
 	public string FilterOwner { get; set; } = string.Empty;
 	public TextFilterType FilterOwnerType { get; set; } = TextFilterType.Glob;

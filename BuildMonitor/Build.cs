@@ -66,10 +66,18 @@ internal sealed class Build
 	{
 		lock (_updateLock)
 		{
-			if (run.LastUpdated > LastUpdated)
+			// Use Started time to track the most recently initiated run,
+			// not LastUpdated which can change when older runs are re-fetched
+			if (run.Started > LastStarted)
 			{
-				LastUpdated = run.LastUpdated;
 				LastStarted = run.Started;
+				LastUpdated = run.LastUpdated;
+				LastStatus = run.Status;
+			}
+			else if (run.Started == LastStarted && run.LastUpdated > LastUpdated)
+			{
+				// Same run being updated with newer data
+				LastUpdated = run.LastUpdated;
 				LastStatus = run.Status;
 			}
 		}

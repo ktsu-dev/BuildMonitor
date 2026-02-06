@@ -32,7 +32,7 @@ internal static class BuildMonitor
 	private static ConcurrentDictionary<BuildId, BuildSync> BuildSyncCollection { get; } = [];
 	internal static ConcurrentDictionary<RunId, RunSync> RunSyncCollection { get; } = [];
 
-	private static Task UpdateTask { get; set; } = new(() => { });
+	private static Task UpdateTask { get; set; } = Task.CompletedTask;
 
 	internal static ConcurrentDictionary<string, DateTimeOffset> ActiveRequests { get; set; } = [];
 
@@ -255,7 +255,7 @@ internal static class BuildMonitor
 		{
 			if (UpdateTask.IsFaulted && UpdateTask.Exception is not null)
 			{
-				throw UpdateTask.Exception;
+				Log.Error($"Update loop failed: {UpdateTask.Exception.InnerException?.Message ?? UpdateTask.Exception.Message}");
 			}
 
 			UpdateTask = UpdateAsync();
@@ -406,7 +406,7 @@ internal static class BuildMonitor
 
 	private static void RenderBuildTable(Owner? filterOwner, BuildProvider? filterProvider)
 	{
-		if (ImGui.BeginTable(Strings.Builds, 14, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
+		if (ImGui.BeginTable(Strings.Builds, DefaultColumnWidths.Count, ImGuiTableFlags.Resizable | ImGuiTableFlags.RowBg))
 		{
 			foreach (string columnName in DefaultColumnWidths.Keys)
 			{
@@ -1074,10 +1074,12 @@ internal static class BuildMonitor
 					RefreshBuildData(build);
 				}
 			}
-			catch (Octokit.ApiException ex)
+			// Fire-and-forget task must catch all exceptions to prevent unobserved task exceptions
+#pragma warning disable CA1031
+			catch (Exception ex)
+#pragma warning restore CA1031
 			{
-				// Log the error but don't crash the application
-				Console.WriteLine($"GitHub API action failed: {ex.Message}");
+				Log.Error($"GitHub API action failed: {ex.Message}");
 			}
 		});
 	}
@@ -1450,7 +1452,13 @@ internal static class BuildMonitor
 	internal static async Task MakeRequestAsync(string name, Func<Task> action)
 	{
 		_ = ActiveRequests.TryAdd(name, DateTimeOffset.UtcNow);
-		await action.Invoke().ConfigureAwait(false);
-		_ = ActiveRequests.TryRemove(name, out _);
+		try
+		{
+			await action.Invoke().ConfigureAwait(false);
+		}
+		finally
+		{
+			_ = ActiveRequests.TryRemove(name, out _);
+		}
 	}
 }

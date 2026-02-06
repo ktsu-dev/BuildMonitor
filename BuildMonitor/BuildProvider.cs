@@ -162,12 +162,12 @@ internal abstract class BuildProvider
 	/// <summary>
 	/// Controls the maximum number of concurrent requests to this provider.
 	/// </summary>
-	protected int MaxConcurrentRequests { get; set; } = 5;
+	private const int MaxConcurrentRequests = 5;
 
 	/// <summary>
 	/// Semaphore to limit concurrent requests to this provider.
 	/// </summary>
-	internal SemaphoreSlim RequestSemaphore { get; } = new(5, 5);
+	internal SemaphoreSlim RequestSemaphore { get; } = new(MaxConcurrentRequests, MaxConcurrentRequests);
 
 	internal Owner CreateOwner(OwnerName name)
 	{

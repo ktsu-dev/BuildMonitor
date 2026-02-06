@@ -156,7 +156,13 @@ internal sealed partial class GitHub : BuildProvider
 		if (ShouldDiscoverOwners)
 		{
 			ShouldDiscoverOwners = false;
-			_ = DiscoverOwnersAsync();
+			_ = DiscoverOwnersAsync().ContinueWith(t =>
+			{
+				if (t.IsFaulted)
+				{
+					Log.Error($"GitHub: Owner discovery failed: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}");
+				}
+			}, TaskScheduler.Default);
 		}
 
 		// Handle owner token popup
@@ -397,14 +403,9 @@ internal sealed partial class GitHub : BuildProvider
 		}
 	}
 
-	private async Task UpdateRunFromWorkflowAsync(Run run, WorkflowRun gitHubRun)
+	private static RunStatus MapWorkflowRunStatus(WorkflowRun gitHubRun)
 	{
-		run.Started = gitHubRun.RunStartedAt;
-		run.LastUpdated = gitHubRun.UpdatedAt;
-		run.Branch = gitHubRun.HeadBranch.As<BranchName>();
-
-		RunStatus previousStatus = run.Status;
-		run.Status = gitHubRun.Conclusion switch
+		RunStatus status = gitHubRun.Conclusion switch
 		{
 			_ when gitHubRun.Status == WorkflowRunStatus.Requested => RunStatus.Pending,
 			_ when gitHubRun.Status == WorkflowRunStatus.Queued => RunStatus.Pending,
@@ -418,8 +419,27 @@ internal sealed partial class GitHub : BuildProvider
 			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.TimedOut => RunStatus.Failure,
 			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.ActionRequired => RunStatus.Failure,
 			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Stale => RunStatus.Failure,
-			_ => throw new InvalidOperationException(),
+			_ => RunStatus.Pending,
 		};
+
+		if (status == RunStatus.Pending &&
+			gitHubRun.Status != WorkflowRunStatus.Requested &&
+			gitHubRun.Status != WorkflowRunStatus.Queued)
+		{
+			Log.Warning($"GitHub: Unhandled workflow status: {gitHubRun.Status}, conclusion: {gitHubRun.Conclusion} - treating as Pending");
+		}
+
+		return status;
+	}
+
+	private async Task UpdateRunFromWorkflowAsync(Run run, WorkflowRun gitHubRun)
+	{
+		run.Started = gitHubRun.RunStartedAt;
+		run.LastUpdated = gitHubRun.UpdatedAt;
+		run.Branch = gitHubRun.HeadBranch.As<BranchName>();
+
+		RunStatus previousStatus = run.Status;
+		run.Status = MapWorkflowRunStatus(gitHubRun);
 
 		// Log status transitions
 		if (previousStatus != run.Status)

@@ -22,34 +22,52 @@ internal sealed class AzureDevOps : BuildProvider
 	private VssConnection? Connection { get; set; }
 	private ProjectHttpClient? ProjectClient { get; set; }
 	private BuildHttpClient? BuildClient { get; set; }
+	private string? LastAccountId { get; set; }
+	private string? LastToken { get; set; }
 	private bool ShouldDiscoverProjects { get; set; }
 
-	private void UpdateAzureDevOpsClientCredentials()
+	private void EnsureAzureDevOpsClients()
 	{
-		if (!string.IsNullOrEmpty(AccountId) && !string.IsNullOrEmpty(Token))
+		if (string.IsNullOrEmpty(AccountId) || string.IsNullOrEmpty(Token))
 		{
-			try
-			{
-				Uri collectionUri = new($"https://dev.azure.com/{AccountId}");
-				VssBasicCredential credentials = new(string.Empty, Token);
-				Connection = new(collectionUri, credentials);
-				ProjectClient = Connection.GetClient<ProjectHttpClient>();
-				BuildClient = Connection.GetClient<BuildHttpClient>();
-			}
-			catch (VssServiceException ex)
-			{
-				Connection = null;
-				ProjectClient = null;
-				BuildClient = null;
-				SetStatus(ProviderStatus.Error, $"{Strings.ConnectionErrorMessage} {ex.Message}");
-			}
-			catch (UriFormatException ex)
-			{
-				Connection = null;
-				ProjectClient = null;
-				BuildClient = null;
-				SetStatus(ProviderStatus.Error, $"Invalid organization name: {ex.Message}");
-			}
+			return;
+		}
+
+		// Only recreate when credentials have changed
+		if (Connection != null && LastAccountId == AccountId.ToString() && LastToken == Token.ToString())
+		{
+			return;
+		}
+
+		// Dispose old connection before creating a new one
+		Connection?.Dispose();
+		Connection = null;
+		ProjectClient = null;
+		BuildClient = null;
+
+		try
+		{
+			Uri collectionUri = new($"https://dev.azure.com/{AccountId}");
+			VssBasicCredential credentials = new(string.Empty, Token);
+			Connection = new(collectionUri, credentials);
+			ProjectClient = Connection.GetClient<ProjectHttpClient>();
+			BuildClient = Connection.GetClient<BuildHttpClient>();
+			LastAccountId = AccountId.ToString();
+			LastToken = Token.ToString();
+		}
+		catch (VssServiceException ex)
+		{
+			Connection = null;
+			ProjectClient = null;
+			BuildClient = null;
+			SetStatus(ProviderStatus.Error, $"{Strings.ConnectionErrorMessage} {ex.Message}");
+		}
+		catch (UriFormatException ex)
+		{
+			Connection = null;
+			ProjectClient = null;
+			BuildClient = null;
+			SetStatus(ProviderStatus.Error, $"Invalid organization name: {ex.Message}");
 		}
 	}
 
@@ -84,7 +102,13 @@ internal sealed class AzureDevOps : BuildProvider
 		if (ShouldDiscoverProjects)
 		{
 			ShouldDiscoverProjects = false;
-			_ = DiscoverProjectsAsync();
+			_ = DiscoverProjectsAsync().ContinueWith(t =>
+			{
+				if (t.IsFaulted)
+				{
+					Log.Error($"Azure DevOps: Project discovery failed: {t.Exception?.InnerException?.Message ?? t.Exception?.Message}");
+				}
+			}, TaskScheduler.Default);
 		}
 	}
 
@@ -95,7 +119,7 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		UpdateAzureDevOpsClientCredentials();
+		EnsureAzureDevOpsClients();
 		if (ProjectClient == null)
 		{
 			return;
@@ -129,7 +153,7 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		UpdateAzureDevOpsClientCredentials();
+		EnsureAzureDevOpsClients();
 		if (ProjectClient == null)
 		{
 			// Status already set by UpdateAzureDevOpsClientCredentials if there was an error
@@ -174,7 +198,7 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		UpdateAzureDevOpsClientCredentials();
+		EnsureAzureDevOpsClients();
 		if (BuildClient == null)
 		{
 			return;
@@ -203,7 +227,7 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		UpdateAzureDevOpsClientCredentials();
+		EnsureAzureDevOpsClients();
 		if (BuildClient == null)
 		{
 			return;
@@ -234,7 +258,7 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		UpdateAzureDevOpsClientCredentials();
+		EnsureAzureDevOpsClients();
 		if (BuildClient == null)
 		{
 			return;
