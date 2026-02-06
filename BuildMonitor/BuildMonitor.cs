@@ -512,6 +512,18 @@ internal static class BuildMonitor
 		return repoName;
 	}
 
+	private static bool IsBuildVisible(Build build)
+	{
+		// Builds with no runs yet should always update to discover new runs
+		List<BranchName> branches = [.. build.Runs.Values.Select(r => r.Branch).Distinct()];
+		if (branches.Count == 0)
+		{
+			return true;
+		}
+
+		return branches.Any(branch => ShouldShowBuildBranch(build, branch));
+	}
+
 	private static bool ShouldShowBuildBranch(Build build, BranchName branch)
 	{
 		bool shouldShow = true;
@@ -1352,9 +1364,10 @@ internal static class BuildMonitor
 
 	private static async Task UpdateRunsAsync()
 	{
-		// Get runs that should update and filter by provider budget priority
+		// Get runs that should update, skipping filtered builds, and filter by provider budget priority
 		List<KeyValuePair<RunId, RunSync>> runSyncs = [.. RunSyncCollection
 			.Where(b => b.Value.ShouldUpdate)
+			.Where(b => IsBuildVisible(b.Value.Run.Build))
 			.Where(b => b.Value.Priority <= b.Value.Run.Owner.BuildProvider.MaxAllowedPriority)
 			.OrderBy(b => b.Value.Priority)];
 
@@ -1364,9 +1377,10 @@ internal static class BuildMonitor
 
 	private static async Task UpdateBuildsAsync()
 	{
-		// Get builds that should update and filter by provider budget priority
+		// Get builds that should update, skipping filtered builds, and filter by provider budget priority
 		List<KeyValuePair<BuildId, BuildSync>> buildSyncs = [.. BuildSyncCollection
 			.Where(b => b.Value.ShouldUpdate)
+			.Where(b => IsBuildVisible(b.Value.Build))
 			.Where(b => b.Value.Priority <= b.Value.Build.Owner.BuildProvider.MaxAllowedPriority)
 			.OrderBy(b => b.Value.Priority)];
 
