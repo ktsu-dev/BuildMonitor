@@ -1,3 +1,6 @@
+## v1.2.27
+
+No significant changes detected since v1.2.27.
 ## v1.2.27 (patch)
 
 Changes since v1.2.26:
@@ -5,9 +8,7 @@ Changes since v1.2.26:
 - Add logging and fix an issue where github repos would be fetched for the wrong owners ([@matt-edmondson](https://github.com/matt-edmondson))
 ## v1.2.27-pre.1 (prerelease)
 
-Changes since v1.2.26:
-
-- Bump the ktsu group with 1 update ([@dependabot[bot]](https://github.com/dependabot[bot]))
+Incremental prerelease update.
 ## v1.2.26 (patch)
 
 Changes since v1.2.25:
