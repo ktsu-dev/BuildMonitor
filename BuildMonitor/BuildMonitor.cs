@@ -1450,7 +1450,11 @@ internal static class BuildMonitor
 	internal static async Task MakeRequestAsync(string name, Func<Task> action)
 	{
 		_ = ActiveRequests.TryAdd(name, DateTimeOffset.UtcNow);
+		Log.Debug($"API request started: {name}");
+		System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
 		await action.Invoke().ConfigureAwait(false);
+		sw.Stop();
+		Log.Debug($"API request completed: {name} ({sw.ElapsedMilliseconds}ms)");
 		_ = ActiveRequests.TryRemove(name, out _);
 	}
 }

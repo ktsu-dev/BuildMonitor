@@ -236,9 +236,17 @@ internal sealed partial class GitHub : BuildProvider
 			if (currentUser != null && currentUser.Login.Equals(owner.Name.ToString(), StringComparison.OrdinalIgnoreCase))
 			{
 				// This is the authenticated user - get all repos including private ones
+				// Filter to only repos owned by this user (GetAllForCurrent returns repos from all orgs the user has access to)
 				IReadOnlyList<Octokit.Repository> currentUserRepos = await GitHubRepository.GetAllForCurrent().ConfigureAwait(false);
-				allRepositories.AddRange(currentUserRepos);
-				Log.Info($"GitHub: Found {currentUserRepos.Count} repositories for authenticated user {owner.Name} (including private)");
+				int totalCount = currentUserRepos.Count;
+				foreach (Octokit.Repository repo in currentUserRepos)
+				{
+					if (repo.Owner.Login.Equals(owner.Name.ToString(), StringComparison.OrdinalIgnoreCase))
+					{
+						allRepositories.Add(repo);
+					}
+				}
+				Log.Info($"GitHub: Found {allRepositories.Count} repositories owned by authenticated user {owner.Name} (filtered from {totalCount} accessible repos)");
 			}
 			else
 			{
@@ -581,6 +589,10 @@ internal sealed partial class GitHub : BuildProvider
 
 			// Use smart waiting: if rate limited with a known reset time, wait until reset
 			TimeSpan waitTime = GetRateLimitWaitTime();
+			if (waitTime > BaseRequestDelay)
+			{
+				Log.Debug($"{Name}: Rate limit pacing - waiting {waitTime.TotalMilliseconds:F0}ms before request '{name}'");
+			}
 			await Task.Delay(waitTime).ConfigureAwait(false);
 
 			try
@@ -594,6 +606,7 @@ internal sealed partial class GitHub : BuildProvider
 			}
 			catch (AuthorizationException)
 			{
+				Log.Error($"{Name}: AuthorizationException for request '{name}'");
 				OnAuthenticationFailure();
 			}
 			catch (ApiException e)
@@ -605,17 +618,21 @@ internal sealed partial class GitHub : BuildProvider
 						// Check if this is a rate limit response before clearing credentials
 						if (IsRateLimitResponse(e))
 						{
+							Log.Warning($"{Name}: 403 Rate limited for request '{name}'");
 							OnRateLimitExceeded(ParseRateLimitResetTime(e));
 						}
 						else
 						{
+							Log.Error($"{Name}: 403 Forbidden for request '{name}' - {e.Message}");
 							OnAuthenticationFailure();
 						}
 						break;
 					case System.Net.HttpStatusCode.TooManyRequests:
+						Log.Warning($"{Name}: 429 Too Many Requests for '{name}'");
 						OnRateLimitExceeded(ParseRateLimitResetTime(e));
 						break;
 					default:
+						Log.Error($"{Name}: ApiException ({e.HttpResponse?.StatusCode}) for request '{name}' - {e.Message}");
 						throw;
 				}
 			}
