@@ -1,6 +1,8 @@
-## v1.2.27
+## v1.2.28-pre.1 (prerelease)
 
-No significant changes detected since v1.2.27.
+Changes since v1.2.27:
+
+- Bump the ktsu group with 4 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
 ## v1.2.27 (patch)
 
 Changes since v1.2.26:
