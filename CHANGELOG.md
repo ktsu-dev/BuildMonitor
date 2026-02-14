@@ -1,3 +1,9 @@
+## v1.2.29 (patch)
+
+Changes since v1.2.28:
+
+- Remove legacy build scripts ([@matt-edmondson](https://github.com/matt-edmondson))
+
 ## v1.2.28 (patch)
 
 Changes since v1.2.27:
@@ -17,9 +23,7 @@ Changes since v1.2.28-pre.1:
 
 ## v1.2.28-pre.1 (prerelease)
 
-Changes since v1.2.27:
-
-- Bump the ktsu group with 4 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
+No significant changes detected since v1.2.28.
 
 ## v1.2.27 (patch)
 
