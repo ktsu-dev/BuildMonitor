@@ -12,9 +12,9 @@ using System.Runtime.InteropServices;
 using Hexa.NET.ImGui;
 using ktsu.Extensions;
 using ktsu.ImGui.App;
+using ktsu.ImGui.Popups;
 using ktsu.ImGui.Styler;
 using ktsu.ImGui.Widgets;
-using ktsu.ImGui.Popups;
 using ktsu.TextFilter;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Main application class orchestrates many components")]
@@ -389,7 +389,7 @@ internal static class BuildMonitor
 
 				using (new ScopedTextColor(color))
 				{
-					string timestamp = entry.Timestamp.ToString("HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture);
+					string timestamp = entry.Timestamp.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture);
 					string levelStr = entry.Level.ToString().ToUpperInvariant();
 					ImGui.TextUnformatted($"[{timestamp}] [{levelStr}] {entry.Message}");
 				}
@@ -617,7 +617,7 @@ internal static class BuildMonitor
 		_ = RenderTextColumn(repository.Owner.Name);
 
 		// Repository column
-		_ = RenderTextColumn(MakeRepositoryDisplayName(repository));
+		_ = RenderRepositoryColumn(repository);
 
 		// Build Name column - show "No workflows" in gray
 		if (ImGui.TableNextColumn())
@@ -701,7 +701,7 @@ internal static class BuildMonitor
 		ImGui.TableNextRow();
 		shouldOpenContextMenu |= RenderStatusColumn(build, latestRun, isOngoing, progress);
 		shouldOpenContextMenu |= RenderTextColumn(build.Owner.Name);
-		shouldOpenContextMenu |= RenderTextColumn(MakeRepositoryDisplayName(build));
+		shouldOpenContextMenu |= RenderRepositoryColumn(build);
 		shouldOpenContextMenu |= RenderTextColumn(MakeBuildDisplayName(build));
 		shouldOpenContextMenu |= RenderTextColumn(branch);
 		shouldOpenContextMenu |= RenderTextColumn($"{latestRun.Status}");
@@ -749,6 +749,64 @@ internal static class BuildMonitor
 		if (ImGui.TableNextColumn())
 		{
 			ImGui.TextUnformatted(text);
+			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
+		}
+
+		return shouldOpenContextMenu;
+	}
+
+	private static bool RenderRepositoryColumn(Build build)
+	{
+		bool shouldOpenContextMenu = false;
+		if (ImGui.TableNextColumn())
+		{
+			string displayName = MakeRepositoryDisplayName(build);
+
+			// Add icons for repository properties (using nerd font icons)
+			string icons = string.Empty;
+			if (build.Repository.IsPrivate)
+			{
+				icons += "\uf023 "; // nf-fa-lock (private)
+			}
+			if (build.Repository.IsFork)
+			{
+				icons += "\uf126 "; // nf-fa-code_fork (fork)
+			}
+			if (build.Repository.IsArchived)
+			{
+				icons += "\uf187 "; // nf-fa-archive (archived)
+			}
+
+			ImGui.TextUnformatted(icons + displayName);
+			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
+		}
+
+		return shouldOpenContextMenu;
+	}
+
+	private static bool RenderRepositoryColumn(Repository repository)
+	{
+		bool shouldOpenContextMenu = false;
+		if (ImGui.TableNextColumn())
+		{
+			string displayName = MakeRepositoryDisplayName(repository);
+
+			// Add icons for repository properties (using nerd font icons)
+			string icons = string.Empty;
+			if (repository.IsPrivate)
+			{
+				icons += "\uf023 "; // nf-fa-lock (private)
+			}
+			if (repository.IsFork)
+			{
+				icons += "\uf126 "; // nf-fa-code_fork (fork)
+			}
+			if (repository.IsArchived)
+			{
+				icons += "\uf187 "; // nf-fa-archive (archived)
+			}
+
+			ImGui.TextUnformatted(icons + displayName);
 			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 		}
 
@@ -1475,7 +1533,7 @@ internal static class BuildMonitor
 	{
 		_ = ActiveRequests.TryAdd(name, DateTimeOffset.UtcNow);
 		Log.Debug($"API request started: {name}");
-		System.Diagnostics.Stopwatch sw = System.Diagnostics.Stopwatch.StartNew();
+		Stopwatch sw = Stopwatch.StartNew();
 		await action.Invoke().ConfigureAwait(false);
 		sw.Stop();
 		Log.Debug($"API request completed: {name} ({sw.ElapsedMilliseconds}ms)");

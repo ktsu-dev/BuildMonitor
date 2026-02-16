@@ -17,6 +17,9 @@ internal sealed class Repository
 	public RepositoryId Id { get; set; } = new();
 	public Owner Owner { get; set; } = new();
 	public bool Enabled { get; set; }
+	public bool IsPrivate { get; set; }
+	public bool IsArchived { get; set; }
+	public bool IsFork { get; set; }
 	public ConcurrentDictionary<BuildId, Build> Builds { get; init; } = [];
 
 	internal Build CreateBuild(BuildName name) => CreateBuild(name, name.As<BuildId>());

@@ -357,7 +357,7 @@ internal sealed class AzureDevOps : BuildProvider
 				Log.Error($"{Name}: VssServiceException for request '{name}' - {ex.Message}");
 				SetStatus(ProviderStatus.Error, $"{Strings.ConnectionErrorMessage} {ex.Message}");
 			}
-			catch (System.Net.Http.HttpRequestException ex)
+			catch (HttpRequestException ex)
 			{
 				Log.Error($"{Name}: HttpRequestException for request '{name}' - {ex.Message}");
 				SetStatus(ProviderStatus.Error, $"{Strings.ConnectionErrorMessage} {ex.Message}");

@@ -147,7 +147,7 @@ internal sealed partial class GitHub : BuildProvider
 		}
 	}
 
-	private ktsu.ImGui.Popups.ImGuiPopups.InputString OwnerTokenPopup { get; } = new();
+	private ImGui.Popups.ImGuiPopups.InputString OwnerTokenPopup { get; } = new();
 
 	internal override void Tick()
 	{
@@ -295,6 +295,9 @@ internal sealed partial class GitHub : BuildProvider
 
 				RepositoryName repositoryName = gitHubRepository.Name.As<RepositoryName>();
 				Repository repository = owner.CreateRepository(repositoryName, repositoryId);
+				repository.IsPrivate = gitHubRepository.Private;
+				repository.IsArchived = gitHubRepository.Archived;
+				repository.IsFork = gitHubRepository.Fork;
 				if (owner.Repositories.TryAdd(repositoryId, repository))
 				{
 					newRepos++;
