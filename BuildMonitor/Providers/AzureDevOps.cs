@@ -124,14 +124,14 @@ internal sealed class AzureDevOps : BuildProvider
 				if (Owners.TryAdd(ownerName, CreateOwner(ownerName)))
 				{
 					Log.Info($"{Name}: Discovered new project '{project.Name}' (ID: {project.Id})");
-					// Create the repository entry for this project
-					Owner owner = Owners[ownerName];
-					RepositoryId repositoryId = project.Id.ToString().As<RepositoryId>();
-					RepositoryName repositoryName = project.Name.As<RepositoryName>();
-					Repository repository = owner.CreateRepository(repositoryName, repositoryId);
-					owner.Repositories.TryAdd(repositoryId, repository);
 					BuildMonitor.QueueSaveAppData();
 				}
+
+				// Always ensure repository entry exists for this project
+				Owner owner = Owners[ownerName];
+				RepositoryId repositoryId = project.Id.ToString().As<RepositoryId>();
+				RepositoryName repositoryName = project.Name.As<RepositoryName>();
+				_ = owner.Repositories.GetOrAdd(repositoryId, _ => owner.CreateRepository(repositoryName, repositoryId));
 			}
 			Log.Info($"{Name}: DiscoverProjects found {projectCount} project(s)");
 		}).ConfigureAwait(false);
@@ -170,8 +170,12 @@ internal sealed class AzureDevOps : BuildProvider
 					foundProject = true;
 					RepositoryId repositoryId = project.Id.ToString().As<RepositoryId>();
 					RepositoryName repositoryName = project.Name.As<RepositoryName>();
-					Repository repository = owner.CreateRepository(repositoryName, repositoryId);
-					if (owner.Repositories.TryAdd(repositoryId, repository))
+
+					// Get existing repository or create new one
+					bool isNew = !owner.Repositories.ContainsKey(repositoryId);
+					_ = owner.Repositories.GetOrAdd(repositoryId, _ => owner.CreateRepository(repositoryName, repositoryId));
+
+					if (isNew)
 					{
 						Log.Info($"{Name}: Added repository '{repositoryName}' (ID: {repositoryId}) for owner '{owner.Name}'");
 						BuildMonitor.QueueSaveAppData();
@@ -214,10 +218,30 @@ internal sealed class AzureDevOps : BuildProvider
 			{
 				BuildName buildName = definition.Name.As<BuildName>();
 				BuildId buildId = definition.Id.ToString(CultureInfo.InvariantCulture).As<BuildId>();
-				Build build = repository.CreateBuild(buildName, buildId);
-				if (repository.Builds.TryAdd(buildId, build))
+
+				// Get existing build or create new one
+				bool isNew = false;
+				Build build = repository.Builds.GetOrAdd(buildId, _ =>
+				{
+					isNew = true;
+					return repository.CreateBuild(buildName, buildId);
+				});
+
+				// Update name if it changed (e.g., build definition renamed)
+				bool hasChanges = false;
+				if (build.Name != buildName)
+				{
+					build.Name = buildName;
+					hasChanges = true;
+				}
+
+				if (isNew)
 				{
 					Log.Info($"{Name}: Added new build definition '{buildName}' (ID: {buildId}) for '{repository.Owner.Name}/{repository.Name}'");
+				}
+
+				if (isNew || hasChanges)
+				{
 					BuildMonitor.QueueSaveAppData();
 				}
 			}

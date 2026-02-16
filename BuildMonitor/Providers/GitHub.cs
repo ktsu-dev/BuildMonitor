@@ -278,6 +278,7 @@ internal sealed partial class GitHub : BuildProvider
 			}
 
 			int newRepos = 0;
+			int updatedRepos = 0;
 			int archivedRepos = 0;
 			foreach (Octokit.Repository? gitHubRepository in allRepositories)
 			{
@@ -294,21 +295,53 @@ internal sealed partial class GitHub : BuildProvider
 				}
 
 				RepositoryName repositoryName = gitHubRepository.Name.As<RepositoryName>();
-				Repository repository = owner.CreateRepository(repositoryName, repositoryId);
-				repository.IsPrivate = gitHubRepository.Private;
-				repository.IsArchived = gitHubRepository.Archived;
-				repository.IsFork = gitHubRepository.Fork;
-				if (owner.Repositories.TryAdd(repositoryId, repository))
+
+				// Get existing repository or create new one
+				bool isNew = false;
+				Repository repository = owner.Repositories.GetOrAdd(repositoryId, _ =>
+				{
+					isNew = true;
+					return owner.CreateRepository(repositoryName, repositoryId);
+				});
+
+				if (isNew)
 				{
 					newRepos++;
 					Log.Info($"GitHub: Discovered repository: {owner.Name}/{repositoryName}");
+				}
+
+				// Always update properties in case they changed
+				bool hasChanges = false;
+				if (repository.IsPrivate != gitHubRepository.Private)
+				{
+					repository.IsPrivate = gitHubRepository.Private;
+					hasChanges = true;
+				}
+				if (repository.IsArchived != gitHubRepository.Archived)
+				{
+					repository.IsArchived = gitHubRepository.Archived;
+					hasChanges = true;
+				}
+				if (repository.IsFork != gitHubRepository.Fork)
+				{
+					repository.IsFork = gitHubRepository.Fork;
+					hasChanges = true;
+				}
+
+				if (hasChanges)
+				{
+					updatedRepos++;
+				}
+
+				if (isNew || hasChanges)
+				{
 					BuildMonitor.QueueSaveAppData();
 				}
 			}
 
-			if (newRepos > 0 || archivedRepos > 0)
+			if (newRepos > 0 || updatedRepos > 0 || archivedRepos > 0)
 			{
-				Log.Info($"GitHub: Repository update for {owner.Name}: {newRepos} new, {archivedRepos} archived removed, {owner.Repositories.Count} total");
+				Log.Info($"GitHub: Repository update for {owner.Name}: {newRepos} new, {updatedRepos} updated, {archivedRepos} archived removed, {owner.Repositories.Count} total");
 			}
 		}, owner).ConfigureAwait(false);
 	}
@@ -329,8 +362,24 @@ internal sealed partial class GitHub : BuildProvider
 				{
 					BuildName buildName = workflow.Name.As<BuildName>();
 					BuildId buildId = workflow.Id.ToString(CultureInfo.InvariantCulture).As<BuildId>();
-					Build build = repository.CreateBuild(buildName, buildId);
-					if (repository.Builds.TryAdd(buildId, build))
+
+					// Get existing build or create new one
+					bool isNew = false;
+					Build build = repository.Builds.GetOrAdd(buildId, _ =>
+					{
+						isNew = true;
+						return repository.CreateBuild(buildName, buildId);
+					});
+
+					// Update name if it changed (e.g., workflow file renamed)
+					bool hasChanges = false;
+					if (build.Name != buildName)
+					{
+						build.Name = buildName;
+						hasChanges = true;
+					}
+
+					if (isNew || hasChanges)
 					{
 						BuildMonitor.QueueSaveAppData();
 					}
