@@ -1,6 +1,8 @@
-## v1.3.1 (patch)
+## v1.3.2-pre.1 (prerelease)
 
-Changes since v1.3.0:
+Changes since v1.3.1:
 
-- Enhance entity update strategy: implement GetOrAdd pattern for repositories, builds, and runs to ensure data consistency and prevent duplicates ([@matt-edmondson](https://github.com/matt-edmondson))
+- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
+- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
+- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
 
