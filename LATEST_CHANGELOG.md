@@ -1,6 +1,4 @@
-## v1.3.3 (patch)
+## v1.3.3
 
-Changes since v1.3.2:
-
-- Add SonarLint configuration for connected mode ([@matt-edmondson](https://github.com/matt-edmondson))
+No significant changes detected since v1.3.3.
 
