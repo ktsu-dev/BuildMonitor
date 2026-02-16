@@ -84,6 +84,39 @@ New providers should:
 - Register in `BuildMonitor.OnStart()` by adding to `AppData.BuildProviders`
 - Implement provider-specific menu actions via `ShowMenu()` override
 
+### Entity Update Strategy
+
+The application uses a **GetOrAdd pattern** to ensure existing entities are updated when new data arrives, preventing data loss and keeping properties in sync with the remote APIs.
+
+**Repository Updates:**
+- Uses `ConcurrentDictionary.GetOrAdd()` instead of `TryAdd()` to get existing or create new
+- Always updates mutable properties after getting the entity:
+  - `IsPrivate`: Updated when repository visibility changes
+  - `IsArchived`: Updated when repository is archived/unarchived
+  - `IsFork`: Updated when repository fork status changes
+- Only triggers `QueueSaveAppData()` when actual changes occur
+- Logs separately: new repositories, updated repositories, archived repositories removed
+
+**Build Updates:**
+- Uses `GetOrAdd()` pattern for build/workflow definitions
+- Updates `BuildName` if the workflow file or build definition is renamed
+- Detects changes by comparing current value with API value
+- Only saves when new builds are discovered or names change
+
+**Run Updates:**
+- Run entities are always updated in place (no GetOrAdd needed)
+- `UpdateRunFromWorkflowAsync()` (GitHub) and `UpdateRunFromBuild()` (Azure DevOps) always update properties
+- Updates: Status, Started, LastUpdated, Duration, Branch, Errors
+- Errors are cleared when run status changes from failure to non-failure
+- Triggers `Build.UpdateFromRun()` to keep parent build state in sync
+
+**Benefits of Update Strategy:**
+- Repository visibility changes are reflected without manual intervention
+- Renamed workflows/build definitions don't create duplicate entries
+- No data accumulation from stale entities
+- Efficient AppData saves (only when changes occur)
+- Better logging distinguishes between discovery and updates
+
 ### Provider Status Tracking
 
 Each BuildProvider tracks its operational status with visual indicators in the status bar:
@@ -452,10 +485,15 @@ BuildId buildId = workflowId.ToString().As<BuildId>();
   - Filters to only repos owned by the user (not all accessible repos)
 - For other users: `GitHubRepository.GetAllForUser(owner)` (public repos only)
 - For organizations: `GitHubRepository.GetAllForOrg(owner)` (respects org visibility)
+- Uses `GetOrAdd()` to get existing or create new repository
+- Updates properties: `IsPrivate`, `IsArchived`, `IsFork` on each refresh
 - Archived repositories are removed from tracking
+- Logs: `"{newRepos} new, {updatedRepos} updated, {archivedRepos} archived removed"`
 
 **Workflow/Build Discovery:**
 - `GitHubWorkflows.List(owner, repo)`: Gets all workflows in repository
+- Uses `GetOrAdd()` to get existing or create new build
+- Updates `BuildName` if workflow file is renamed
 - Maps `Workflow.Id` to `BuildId` and `Workflow.Name` to `BuildName`
 
 **Run Fetching:**
@@ -496,12 +534,16 @@ BuildId buildId = workflowId.ToString().As<BuildId>();
 - `ProjectClient.GetProjects()`: Gets all projects in the organization
 - Each project becomes an owner (project name → `OwnerName`)
 - Each project also creates a repository entry (project acts as both)
+- Uses `GetOrAdd()` to ensure repository entry exists for each project
 - Repository ID uses project GUID
 
 **Build Definition Discovery:**
 - `BuildClient.GetDefinitionsAsync(projectName)`: Gets all build definitions in project
+- Uses `GetOrAdd()` to get existing or create new build
+- Updates `BuildName` if build definition is renamed
 - Maps `BuildDefinitionReference.Id` to `BuildId`
 - Maps `BuildDefinitionReference.Name` to `BuildName`
+- Logs when new build definitions are discovered
 
 **Build/Run Fetching:**
 - `BuildClient.GetBuildsAsync(project, definitions, top)`: Gets last 10 builds for a definition
@@ -564,6 +606,48 @@ BuildId buildId = workflowId.ToString().As<BuildId>();
    ```csharp
    needsSave |= AppData.BuildProviders.TryAdd(NewProvider.BuildProviderName, new NewProvider());
    ```
+
+**IMPORTANT: Use GetOrAdd Pattern for Entity Updates**
+
+When implementing provider methods, always use `GetOrAdd()` instead of `TryAdd()` to ensure existing entities are updated:
+
+```csharp
+// ❌ WRONG - Only adds new, doesn't update existing
+Repository repository = owner.CreateRepository(name, id);
+repository.IsPrivate = apiRepo.Private;
+if (owner.Repositories.TryAdd(id, repository))
+{
+    BuildMonitor.QueueSaveAppData();
+}
+
+// ✅ CORRECT - Updates existing or creates new
+bool isNew = false;
+Repository repository = owner.Repositories.GetOrAdd(id, _ =>
+{
+    isNew = true;
+    return owner.CreateRepository(name, id);
+});
+
+// Always update mutable properties
+bool hasChanges = false;
+if (repository.IsPrivate != apiRepo.Private)
+{
+    repository.IsPrivate = apiRepo.Private;
+    hasChanges = true;
+}
+
+// Only save when changes occur
+if (isNew || hasChanges)
+{
+    BuildMonitor.QueueSaveAppData();
+}
+```
+
+This pattern ensures:
+- Existing entities receive property updates (e.g., repository visibility changes)
+- No duplicate entities are created
+- Efficient saves (only when actual changes occur)
+- Proper logging of new vs. updated entities
 
 ### Debugging Rate Limit Issues
 
