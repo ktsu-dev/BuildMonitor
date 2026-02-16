@@ -1,3 +1,9 @@
+## v1.3.3 (patch)
+
+Changes since v1.3.2:
+
+- Add SonarLint configuration for connected mode ([@matt-edmondson](https://github.com/matt-edmondson))
+
 ## v1.3.2 (patch)
 
 Changes since v1.3.1:
@@ -10,11 +16,7 @@ Changes since v1.3.1:
 
 ## v1.3.2-pre.1 (prerelease)
 
-Changes since v1.3.1:
-
-- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
-- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
-- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
+No significant changes detected since v1.3.2.
 
 ## v1.3.1 (patch)
 
