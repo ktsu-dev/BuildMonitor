@@ -10,7 +10,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageVersion Include="Humanizer.Core" Version="3.0.1" />
-    <PackageVersion Include="ktsu.AppDataStorage" Version="1.16.3" />
+    <PackageVersion Include="ktsu.AppDataStorage" Version="1.16.4" />
     <PackageVersion Include="ktsu.Extensions" Version="1.5.14" />
     <PackageVersion Include="ktsu.ImGui.App" Version="2.4.0" />
     <PackageVersion Include="ktsu.ImGui.Popups" Version="2.4.0" />
