@@ -16,7 +16,7 @@
     <PackageVersion Include="ktsu.ImGui.Popups" Version="2.4.0" />
     <PackageVersion Include="ktsu.ImGui.Styler" Version="2.4.0" />
     <PackageVersion Include="ktsu.ImGui.Widgets" Version="2.4.0" />
-    <PackageVersion Include="ktsu.Semantics.Strings" Version="1.0.33" />
+    <PackageVersion Include="ktsu.Semantics.Strings" Version="1.0.34" />
     <PackageVersion Include="ktsu.TextFilter" Version="1.5.9" />
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="10.0.103" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="10.0.103" />
