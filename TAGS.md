@@ -1,0 +1,1 @@
+build monitor;ci cd;continuous integration;github actions;cicd dashboard;build status;real time monitoring;workflow management;desktop application;dear imgui;hexa net;dotnet;csharp;developer tools;workflow runs;build progress;eta calculation;cross platform
