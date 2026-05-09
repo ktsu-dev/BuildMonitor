@@ -1,13 +1,105 @@
-## v1.3.4-pre.1 (prerelease)
+## v1.3.18
 
-Changes since v1.3.4-pre.1:
+Changes since v1.3.18:
 
 
-## v1.3.4-pre.1 (prerelease)
+## v1.3.18 (patch)
+
+Changes since v1.3.17:
+
+- Bump MSTest.Sdk from 4.2.1 to 4.2.2 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.17 (patch)
+
+Changes since v1.3.16:
+
+- Bump MSTest.Sdk from 4.1.0 to 4.2.1 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.16 (patch)
+
+Changes since v1.3.15:
+
+- Bump Humanizer.Core from 3.0.1 to 3.0.8 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.15 (patch)
+
+Changes since v1.3.14:
+
+- Bump Polyfill from 9.14.0 to 9.17.0 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.14 (patch)
+
+Changes since v1.3.13:
+
+- Bump the ktsu group with 2 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.13 (patch)
+
+Changes since v1.3.12:
+
+- Bump the ktsu group with 2 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.12 (patch)
+
+Changes since v1.3.11:
+
+- Bump Polyfill from 9.12.0 to 9.13.0 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump the ktsu group with 1 update ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.11 (patch)
+
+Changes since v1.3.10:
+
+- Bump the ktsu group with 1 update ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.10 (patch)
+
+Changes since v1.3.9:
+
+- Bump Polyfill from 9.11.0 to 9.12.0 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump the ktsu group with 2 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.9 (patch)
+
+Changes since v1.3.8:
+
+- Bump Polyfill from 9.10.0 to 9.11.0 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump the ktsu group with 1 update ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.8 (patch)
+
+Changes since v1.3.7:
+
+- Bump the ktsu group with 2 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.7 (patch)
+
+Changes since v1.3.6:
+
+- Bump Polyfill from 9.9.0 to 9.10.0 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.6 (patch)
+
+Changes since v1.3.5:
+
+- Bump the ktsu group with 1 update ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.5 (patch)
+
+Changes since v1.3.4:
+
+- Bump the ktsu group with 1 update ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
+## v1.3.4 (patch)
 
 Changes since v1.3.3:
 
+- Bump the ktsu group with 2 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
 - Sync .github\workflows\dotnet.yml ([@KtsuTools](https://github.com/KtsuTools))
+
+## v1.3.4-pre.1 (prerelease)
+
+No significant changes detected since v1.3.4.
 
 ## v1.3.3 (patch)
 
