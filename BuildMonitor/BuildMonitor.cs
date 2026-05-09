@@ -12,9 +12,9 @@ using System.Runtime.InteropServices;
 using Hexa.NET.ImGui;
 using ktsu.Extensions;
 using ktsu.ImGui.App;
+using ktsu.ImGui.Popups;
 using ktsu.ImGui.Styler;
 using ktsu.ImGui.Widgets;
-using ktsu.ImGui.Popups;
 using ktsu.TextFilter;
 
 [System.Diagnostics.CodeAnalysis.SuppressMessage("Maintainability", "CA1506:Avoid excessive class coupling", Justification = "Main application class orchestrates many components")]
@@ -78,7 +78,7 @@ internal static class BuildMonitor
 
 	private static readonly Dictionary<string, float> DefaultColumnWidths = new()
 	{
-		["##buildStatus"] = 30f,
+		["##buildStatus"] = 60f,
 		[Strings.Owner] = 150f,
 		[Strings.Repository] = 150f,
 		[Strings.BuildName] = 200f,
@@ -91,7 +91,7 @@ internal static class BuildMonitor
 		[Strings.Progress] = 100f,
 		[Strings.ETA] = 80f,
 		[Strings.Errors] = 200f,
-		[Strings.NextUpdate] = 80f,
+		[Strings.NextUpdate] = 100f,
 	};
 
 	private static ImGuiPopups.Prompt ErrorDetailsPopup { get; } = new();
@@ -389,7 +389,7 @@ internal static class BuildMonitor
 
 				using (new ScopedTextColor(color))
 				{
-					string timestamp = entry.Timestamp.ToString("HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture);
+					string timestamp = entry.Timestamp.ToString("HH:mm:ss.fff", CultureInfo.InvariantCulture);
 					string levelStr = entry.Level.ToString().ToUpperInvariant();
 					ImGui.TextUnformatted($"[{timestamp}] [{levelStr}] {entry.Message}");
 				}
@@ -617,7 +617,7 @@ internal static class BuildMonitor
 		_ = RenderTextColumn(repository.Owner.Name);
 
 		// Repository column
-		_ = RenderTextColumn(MakeRepositoryDisplayName(repository));
+		_ = RenderRepositoryColumn(repository);
 
 		// Build Name column - show "No workflows" in gray
 		if (ImGui.TableNextColumn())
@@ -699,9 +699,9 @@ internal static class BuildMonitor
 		bool shouldOpenContextMenu = false;
 
 		ImGui.TableNextRow();
-		shouldOpenContextMenu |= RenderStatusColumn(build, latestRun);
+		shouldOpenContextMenu |= RenderStatusColumn(build, latestRun, isOngoing, progress);
 		shouldOpenContextMenu |= RenderTextColumn(build.Owner.Name);
-		shouldOpenContextMenu |= RenderTextColumn(MakeRepositoryDisplayName(build));
+		shouldOpenContextMenu |= RenderRepositoryColumn(build);
 		shouldOpenContextMenu |= RenderTextColumn(MakeBuildDisplayName(build));
 		shouldOpenContextMenu |= RenderTextColumn(branch);
 		shouldOpenContextMenu |= RenderTextColumn($"{latestRun.Status}");
@@ -717,15 +717,26 @@ internal static class BuildMonitor
 		return shouldOpenContextMenu;
 	}
 
-	private static bool RenderStatusColumn(Build build, Run latestRun)
+	private static bool RenderStatusColumn(Build build, Run latestRun, bool isOngoing, double progress)
 	{
 		bool shouldOpenContextMenu = false;
 		if (ImGui.TableNextColumn())
 		{
-			ImColor statusColor = IsBuildUpdating(build)
-				? Color.Palette.Basic.Cyan
-				: GetStatusColor(latestRun.Status);
-			ImGuiWidgets.ColorIndicator(statusColor, true);
+			if (isOngoing)
+			{
+				// Show radial progress for ongoing builds with NoText option (sized to frame height)
+				// The progress ring will use the theme's button hovered color
+				float radius = ImGui.GetFrameHeight() / 2.0f;
+				ImGuiWidgets.RadialProgressBar((float)progress, radius: radius, thickness: 0, segments: 24, ImGuiRadialProgressBarOptions.NoText);
+			}
+			else
+			{
+				// Show status color indicator for completed builds
+				ImColor statusColor = IsBuildUpdating(build)
+					? Color.Palette.Basic.Cyan
+					: GetStatusColor(latestRun.Status);
+				ImGuiWidgets.ColorIndicator(statusColor, true);
+			}
 			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 		}
 
@@ -738,6 +749,64 @@ internal static class BuildMonitor
 		if (ImGui.TableNextColumn())
 		{
 			ImGui.TextUnformatted(text);
+			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
+		}
+
+		return shouldOpenContextMenu;
+	}
+
+	private static bool RenderRepositoryColumn(Build build)
+	{
+		bool shouldOpenContextMenu = false;
+		if (ImGui.TableNextColumn())
+		{
+			string displayName = MakeRepositoryDisplayName(build);
+
+			// Add icons for repository properties (using nerd font icons)
+			string icons = string.Empty;
+			if (build.Repository.IsPrivate)
+			{
+				icons += "\uf023 "; // nf-fa-lock (private)
+			}
+			if (build.Repository.IsFork)
+			{
+				icons += "\uf126 "; // nf-fa-code_fork (fork)
+			}
+			if (build.Repository.IsArchived)
+			{
+				icons += "\uf187 "; // nf-fa-archive (archived)
+			}
+
+			ImGui.TextUnformatted(icons + displayName);
+			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
+		}
+
+		return shouldOpenContextMenu;
+	}
+
+	private static bool RenderRepositoryColumn(Repository repository)
+	{
+		bool shouldOpenContextMenu = false;
+		if (ImGui.TableNextColumn())
+		{
+			string displayName = MakeRepositoryDisplayName(repository);
+
+			// Add icons for repository properties (using nerd font icons)
+			string icons = string.Empty;
+			if (repository.IsPrivate)
+			{
+				icons += "\uf023 "; // nf-fa-lock (private)
+			}
+			if (repository.IsFork)
+			{
+				icons += "\uf126 "; // nf-fa-code_fork (fork)
+			}
+			if (repository.IsArchived)
+			{
+				icons += "\uf187 "; // nf-fa-archive (archived)
+			}
+
+			ImGui.TextUnformatted(icons + displayName);
 			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 		}
 
@@ -797,7 +866,13 @@ internal static class BuildMonitor
 		{
 			if (isOngoing)
 			{
-				ImGui.ProgressBar((float)progress, new(-1, ImGui.GetFrameHeight()), $"{progress:P0}");
+				// Use radial progress bar sized to frame height with no text
+				float radius = ImGui.GetFrameHeight() / 2.0f;
+				ImGuiWidgets.RadialProgressBar((float)progress, radius: radius, thickness: 0, segments: 24, ImGuiRadialProgressBarOptions.NoText);
+
+				// Display percentage text to the right of the radial widget
+				ImGui.SameLine();
+				ImGui.TextUnformatted($"{progress:P0}");
 			}
 			else
 			{
@@ -851,8 +926,15 @@ internal static class BuildMonitor
 			{
 				float progress = (float)buildSync.UpdateProgress;
 				TimeSpan remaining = buildSync.TimeRemaining;
+
+				// Use radial progress bar to show countdown to next update (sized to frame height)
+				float radius = ImGui.GetFrameHeight() / 2.0f;
+				ImGuiWidgets.RadialProgressBar(progress, radius: radius, thickness: 0, segments: 24, ImGuiRadialProgressBarOptions.NoText);
+
+				// Display time remaining text to the right of the radial widget
+				ImGui.SameLine();
 				string label = remaining.ToString(@"m\:ss", CultureInfo.InvariantCulture);
-				ImGui.ProgressBar(progress, new(-1, ImGui.GetFrameHeight()), label);
+				ImGui.TextUnformatted(label);
 			}
 			else
 			{

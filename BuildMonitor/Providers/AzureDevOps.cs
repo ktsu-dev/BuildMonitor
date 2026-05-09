@@ -69,6 +69,10 @@ internal sealed class AzureDevOps : BuildProvider
 			BuildClient = null;
 			SetStatus(ProviderStatus.Error, $"Invalid organization name: {ex.Message}");
 		}
+		else
+		{
+			Log.Debug($"{Name}: UpdateAzureDevOpsClientCredentials skipped - AccountId empty: {string.IsNullOrEmpty(AccountId)}, Token empty: {string.IsNullOrEmpty(Token)}");
+		}
 	}
 
 	internal override void ShowMenu()
@@ -116,33 +120,40 @@ internal sealed class AzureDevOps : BuildProvider
 	{
 		if (AccountId.IsEmpty() || Token.IsEmpty())
 		{
+			Log.Warning($"{Name}: DiscoverProjectsAsync skipped - AccountId or Token is empty");
 			return;
 		}
 
 		EnsureAzureDevOpsClients();
 		if (ProjectClient == null)
 		{
+			Log.Warning($"{Name}: DiscoverProjectsAsync skipped - ProjectClient is null after credential update");
 			return;
 		}
 
+		Log.Info($"{Name}: Discovering projects for organization '{AccountId}'");
 		await MakeAzureDevOpsRequestAsync($"{Name}/discover", async () =>
 		{
 			IEnumerable<TeamProjectReference> projects = await ProjectClient.GetProjects().ConfigureAwait(false);
 
+			int projectCount = 0;
 			foreach (TeamProjectReference? project in projects)
 			{
+				projectCount++;
 				OwnerName ownerName = project.Name.As<OwnerName>();
 				if (Owners.TryAdd(ownerName, CreateOwner(ownerName)))
 				{
-					// Create the repository entry for this project
-					Owner owner = Owners[ownerName];
-					RepositoryId repositoryId = project.Id.ToString().As<RepositoryId>();
-					RepositoryName repositoryName = project.Name.As<RepositoryName>();
-					Repository repository = owner.CreateRepository(repositoryName, repositoryId);
-					owner.Repositories.TryAdd(repositoryId, repository);
+					Log.Info($"{Name}: Discovered new project '{project.Name}' (ID: {project.Id})");
 					BuildMonitor.QueueSaveAppData();
 				}
+
+				// Always ensure repository entry exists for this project
+				Owner owner = Owners[ownerName];
+				RepositoryId repositoryId = project.Id.ToString().As<RepositoryId>();
+				RepositoryName repositoryName = project.Name.As<RepositoryName>();
+				_ = owner.Repositories.GetOrAdd(repositoryId, _ => owner.CreateRepository(repositoryName, repositoryId));
 			}
+			Log.Info($"{Name}: DiscoverProjects found {projectCount} project(s)");
 		}).ConfigureAwait(false);
 	}
 
@@ -150,16 +161,18 @@ internal sealed class AzureDevOps : BuildProvider
 	{
 		if (AccountId.IsEmpty() || Token.IsEmpty())
 		{
+			Log.Warning($"{Name}: UpdateRepositoriesAsync skipped for owner '{owner.Name}' - AccountId or Token is empty");
 			return;
 		}
 
 		EnsureAzureDevOpsClients();
 		if (ProjectClient == null)
 		{
-			// Status already set by UpdateAzureDevOpsClientCredentials if there was an error
+			Log.Warning($"{Name}: UpdateRepositoriesAsync skipped for owner '{owner.Name}' - ProjectClient is null");
 			return;
 		}
 
+		Log.Debug($"{Name}: UpdateRepositoriesAsync for owner '{owner.Name}'");
 		await MakeAzureDevOpsRequestAsync($"{Name}/{owner.Name}", async () =>
 		{
 			// In Azure DevOps, projects are the top-level containers
@@ -167,25 +180,35 @@ internal sealed class AzureDevOps : BuildProvider
 			IEnumerable<TeamProjectReference> projects = await ProjectClient.GetProjects().ConfigureAwait(false);
 
 			bool foundProject = false;
+			int projectCount = 0;
 			foreach (TeamProjectReference? project in projects)
 			{
+				projectCount++;
 				// Use case-insensitive comparison for project names
 				if (string.Equals(project.Name, owner.Name, StringComparison.OrdinalIgnoreCase))
 				{
 					foundProject = true;
 					RepositoryId repositoryId = project.Id.ToString().As<RepositoryId>();
 					RepositoryName repositoryName = project.Name.As<RepositoryName>();
-					Repository repository = owner.CreateRepository(repositoryName, repositoryId);
-					if (owner.Repositories.TryAdd(repositoryId, repository))
+
+					// Get existing repository or create new one
+					bool isNew = !owner.Repositories.ContainsKey(repositoryId);
+					_ = owner.Repositories.GetOrAdd(repositoryId, _ => owner.CreateRepository(repositoryName, repositoryId));
+
+					if (isNew)
 					{
+						Log.Info($"{Name}: Added repository '{repositoryName}' (ID: {repositoryId}) for owner '{owner.Name}'");
 						BuildMonitor.QueueSaveAppData();
 					}
 					break;
 				}
 			}
 
+			Log.Debug($"{Name}: UpdateRepositories listed {projectCount} project(s), match for '{owner.Name}': {foundProject}");
+
 			if (!foundProject)
 			{
+				Log.Warning($"{Name}: Project '{owner.Name}' not found among {projectCount} projects in organization '{AccountId}'");
 				SetStatus(ProviderStatus.Error, $"Project '{owner.Name}' not found in organization '{AccountId}'");
 			}
 		}).ConfigureAwait(false);
@@ -195,24 +218,49 @@ internal sealed class AzureDevOps : BuildProvider
 	{
 		if (AccountId.IsEmpty() || Token.IsEmpty())
 		{
+			Log.Warning($"{Name}: UpdateBuildsAsync skipped for '{repository.Owner.Name}/{repository.Name}' - AccountId or Token is empty");
 			return;
 		}
 
 		EnsureAzureDevOpsClients();
 		if (BuildClient == null)
 		{
+			Log.Warning($"{Name}: UpdateBuildsAsync skipped for '{repository.Owner.Name}/{repository.Name}' - BuildClient is null");
 			return;
 		}
 
+		Log.Debug($"{Name}: UpdateBuildsAsync for '{repository.Owner.Name}/{repository.Name}'");
 		await MakeAzureDevOpsRequestAsync($"{Name}/{repository.Owner.Name}/{repository.Name}", async () =>
 		{
 			List<BuildDefinitionReference> definitions = await BuildClient.GetDefinitionsAsync(repository.Owner.Name).ConfigureAwait(false);
+			Log.Info($"{Name}: Found {definitions.Count} build definition(s) for '{repository.Owner.Name}/{repository.Name}'");
 			foreach (BuildDefinitionReference? definition in definitions)
 			{
 				BuildName buildName = definition.Name.As<BuildName>();
 				BuildId buildId = definition.Id.ToString(CultureInfo.InvariantCulture).As<BuildId>();
-				Build build = repository.CreateBuild(buildName, buildId);
-				if (repository.Builds.TryAdd(buildId, build))
+
+				// Get existing build or create new one
+				bool isNew = false;
+				Build build = repository.Builds.GetOrAdd(buildId, _ =>
+				{
+					isNew = true;
+					return repository.CreateBuild(buildName, buildId);
+				});
+
+				// Update name if it changed (e.g., build definition renamed)
+				bool hasChanges = false;
+				if (build.Name != buildName)
+				{
+					build.Name = buildName;
+					hasChanges = true;
+				}
+
+				if (isNew)
+				{
+					Log.Info($"{Name}: Added new build definition '{buildName}' (ID: {buildId}) for '{repository.Owner.Name}/{repository.Name}'");
+				}
+
+				if (isNew || hasChanges)
 				{
 					BuildMonitor.QueueSaveAppData();
 				}
@@ -224,15 +272,18 @@ internal sealed class AzureDevOps : BuildProvider
 	{
 		if (AccountId.IsEmpty() || Token.IsEmpty())
 		{
+			Log.Warning($"{Name}: UpdateBuildAsync skipped for '{build.Owner.Name}/{build.Repository.Name}/{build.Name}' - AccountId or Token is empty");
 			return;
 		}
 
 		EnsureAzureDevOpsClients();
 		if (BuildClient == null)
 		{
+			Log.Warning($"{Name}: UpdateBuildAsync skipped for '{build.Owner.Name}/{build.Repository.Name}/{build.Name}' - BuildClient is null");
 			return;
 		}
 
+		Log.Debug($"{Name}: UpdateBuildAsync for '{build.Owner.Name}/{build.Repository.Name}/{build.Name}' (definition ID: {build.Id})");
 		await MakeAzureDevOpsRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/{build.Name}", async () =>
 		{
 			List<Microsoft.TeamFoundation.Build.WebApi.Build> builds = await BuildClient.GetBuildsAsync(
@@ -241,10 +292,12 @@ internal sealed class AzureDevOps : BuildProvider
 				top: 10
 			).ConfigureAwait(false);
 
+			Log.Info($"{Name}: GetBuildsAsync returned {builds.Count} run(s) for '{build.Owner.Name}/{build.Repository.Name}/{build.Name}'");
 			foreach (Microsoft.TeamFoundation.Build.WebApi.Build? azureBuild in builds)
 			{
 				RunId runId = azureBuild.Id.ToString(CultureInfo.InvariantCulture).As<RunId>();
 				RunName runName = $"{azureBuild.BuildNumber}".As<RunName>();
+				Log.Debug($"{Name}: Processing run '{runName}' (ID: {runId}, Status: {azureBuild.Status}, Result: {azureBuild.Result}, Branch: {azureBuild.SourceBranch})");
 				Run run = build.Runs.GetOrCreate(runId, build.CreateRun(runName, runId));
 				UpdateRunFromBuild(run, azureBuild);
 			}
@@ -255,21 +308,25 @@ internal sealed class AzureDevOps : BuildProvider
 	{
 		if (AccountId.IsEmpty() || Token.IsEmpty())
 		{
+			Log.Warning($"{Name}: UpdateRunAsync skipped for run '{run.Name}' - AccountId or Token is empty");
 			return;
 		}
 
 		EnsureAzureDevOpsClients();
 		if (BuildClient == null)
 		{
+			Log.Warning($"{Name}: UpdateRunAsync skipped for run '{run.Name}' - BuildClient is null");
 			return;
 		}
 
+		Log.Debug($"{Name}: UpdateRunAsync for run '{run.Name}' (ID: {run.Id}) in '{run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}'");
 		await MakeAzureDevOpsRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}/{run.Name}", async () =>
 		{
 			Microsoft.TeamFoundation.Build.WebApi.Build azureBuild = await BuildClient.GetBuildAsync(
 				run.Owner.Name,
 				int.Parse(run.Id, CultureInfo.InvariantCulture)
 			).ConfigureAwait(false);
+			Log.Debug($"{Name}: Run '{run.Name}' updated - Status: {azureBuild.Status}, Result: {azureBuild.Result}, Branch: {azureBuild.SourceBranch}");
 			UpdateRunFromBuild(run, azureBuild);
 		}).ConfigureAwait(false);
 	}
@@ -318,6 +375,10 @@ internal sealed class AzureDevOps : BuildProvider
 		try
 		{
 			TimeSpan waitTime = GetRateLimitWaitTime();
+			if (waitTime > BaseRequestDelay)
+			{
+				Log.Debug($"{Name}: Rate limit pacing - waiting {waitTime.TotalMilliseconds:F0}ms before request '{name}'");
+			}
 			await Task.Delay(waitTime).ConfigureAwait(false);
 
 			try
@@ -327,18 +388,22 @@ internal sealed class AzureDevOps : BuildProvider
 			}
 			catch (VssServiceResponseException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.Unauthorized)
 			{
+				Log.Error($"{Name}: 401 Unauthorized for request '{name}' - {ex.Message}");
 				OnAuthenticationFailure();
 			}
 			catch (VssServiceResponseException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.TooManyRequests)
 			{
+				Log.Warning($"{Name}: 429 Too Many Requests for '{name}' - {ex.Message}");
 				OnRateLimitExceeded();
 			}
 			catch (VssServiceException ex)
 			{
+				Log.Error($"{Name}: VssServiceException for request '{name}' - {ex.Message}");
 				SetStatus(ProviderStatus.Error, $"{Strings.ConnectionErrorMessage} {ex.Message}");
 			}
-			catch (System.Net.Http.HttpRequestException ex)
+			catch (HttpRequestException ex)
 			{
+				Log.Error($"{Name}: HttpRequestException for request '{name}' - {ex.Message}");
 				SetStatus(ProviderStatus.Error, $"{Strings.ConnectionErrorMessage} {ex.Message}");
 			}
 		}

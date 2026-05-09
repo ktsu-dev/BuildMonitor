@@ -147,7 +147,7 @@ internal sealed partial class GitHub : BuildProvider
 		}
 	}
 
-	private ktsu.ImGui.Popups.ImGuiPopups.InputString OwnerTokenPopup { get; } = new();
+	private ImGui.Popups.ImGuiPopups.InputString OwnerTokenPopup { get; } = new();
 
 	internal override void Tick()
 	{
@@ -242,9 +242,17 @@ internal sealed partial class GitHub : BuildProvider
 			if (currentUser != null && currentUser.Login.Equals(owner.Name.ToString(), StringComparison.OrdinalIgnoreCase))
 			{
 				// This is the authenticated user - get all repos including private ones
+				// Filter to only repos owned by this user (GetAllForCurrent returns repos from all orgs the user has access to)
 				IReadOnlyList<Octokit.Repository> currentUserRepos = await GitHubRepository.GetAllForCurrent().ConfigureAwait(false);
-				allRepositories.AddRange(currentUserRepos);
-				Log.Info($"GitHub: Found {currentUserRepos.Count} repositories for authenticated user {owner.Name} (including private)");
+				int totalCount = currentUserRepos.Count;
+				foreach (Octokit.Repository repo in currentUserRepos)
+				{
+					if (repo.Owner.Login.Equals(owner.Name.ToString(), StringComparison.OrdinalIgnoreCase))
+					{
+						allRepositories.Add(repo);
+					}
+				}
+				Log.Info($"GitHub: Found {allRepositories.Count} repositories owned by authenticated user {owner.Name} (filtered from {totalCount} accessible repos)");
 			}
 			else
 			{
@@ -276,6 +284,7 @@ internal sealed partial class GitHub : BuildProvider
 			}
 
 			int newRepos = 0;
+			int updatedRepos = 0;
 			int archivedRepos = 0;
 			foreach (Octokit.Repository? gitHubRepository in allRepositories)
 			{
@@ -292,18 +301,53 @@ internal sealed partial class GitHub : BuildProvider
 				}
 
 				RepositoryName repositoryName = gitHubRepository.Name.As<RepositoryName>();
-				Repository repository = owner.CreateRepository(repositoryName, repositoryId);
-				if (owner.Repositories.TryAdd(repositoryId, repository))
+
+				// Get existing repository or create new one
+				bool isNew = false;
+				Repository repository = owner.Repositories.GetOrAdd(repositoryId, _ =>
+				{
+					isNew = true;
+					return owner.CreateRepository(repositoryName, repositoryId);
+				});
+
+				if (isNew)
 				{
 					newRepos++;
 					Log.Info($"GitHub: Discovered repository: {owner.Name}/{repositoryName}");
+				}
+
+				// Always update properties in case they changed
+				bool hasChanges = false;
+				if (repository.IsPrivate != gitHubRepository.Private)
+				{
+					repository.IsPrivate = gitHubRepository.Private;
+					hasChanges = true;
+				}
+				if (repository.IsArchived != gitHubRepository.Archived)
+				{
+					repository.IsArchived = gitHubRepository.Archived;
+					hasChanges = true;
+				}
+				if (repository.IsFork != gitHubRepository.Fork)
+				{
+					repository.IsFork = gitHubRepository.Fork;
+					hasChanges = true;
+				}
+
+				if (hasChanges)
+				{
+					updatedRepos++;
+				}
+
+				if (isNew || hasChanges)
+				{
 					BuildMonitor.QueueSaveAppData();
 				}
 			}
 
-			if (newRepos > 0 || archivedRepos > 0)
+			if (newRepos > 0 || updatedRepos > 0 || archivedRepos > 0)
 			{
-				Log.Info($"GitHub: Repository update for {owner.Name}: {newRepos} new, {archivedRepos} archived removed, {owner.Repositories.Count} total");
+				Log.Info($"GitHub: Repository update for {owner.Name}: {newRepos} new, {updatedRepos} updated, {archivedRepos} archived removed, {owner.Repositories.Count} total");
 			}
 		}, owner).ConfigureAwait(false);
 	}
@@ -324,8 +368,24 @@ internal sealed partial class GitHub : BuildProvider
 				{
 					BuildName buildName = workflow.Name.As<BuildName>();
 					BuildId buildId = workflow.Id.ToString(CultureInfo.InvariantCulture).As<BuildId>();
-					Build build = repository.CreateBuild(buildName, buildId);
-					if (repository.Builds.TryAdd(buildId, build))
+
+					// Get existing build or create new one
+					bool isNew = false;
+					Build build = repository.Builds.GetOrAdd(buildId, _ =>
+					{
+						isNew = true;
+						return repository.CreateBuild(buildName, buildId);
+					});
+
+					// Update name if it changed (e.g., workflow file renamed)
+					bool hasChanges = false;
+					if (build.Name != buildName)
+					{
+						build.Name = buildName;
+						hasChanges = true;
+					}
+
+					if (isNew || hasChanges)
 					{
 						BuildMonitor.QueueSaveAppData();
 					}
@@ -601,6 +661,10 @@ internal sealed partial class GitHub : BuildProvider
 
 			// Use smart waiting: if rate limited with a known reset time, wait until reset
 			TimeSpan waitTime = GetRateLimitWaitTime();
+			if (waitTime > BaseRequestDelay)
+			{
+				Log.Debug($"{Name}: Rate limit pacing - waiting {waitTime.TotalMilliseconds:F0}ms before request '{name}'");
+			}
 			await Task.Delay(waitTime).ConfigureAwait(false);
 
 			try
@@ -614,6 +678,7 @@ internal sealed partial class GitHub : BuildProvider
 			}
 			catch (AuthorizationException)
 			{
+				Log.Error($"{Name}: AuthorizationException for request '{name}'");
 				OnAuthenticationFailure();
 			}
 			catch (ApiException e)
@@ -625,17 +690,21 @@ internal sealed partial class GitHub : BuildProvider
 						// Check if this is a rate limit response before clearing credentials
 						if (IsRateLimitResponse(e))
 						{
+							Log.Warning($"{Name}: 403 Rate limited for request '{name}'");
 							OnRateLimitExceeded(ParseRateLimitResetTime(e));
 						}
 						else
 						{
+							Log.Error($"{Name}: 403 Forbidden for request '{name}' - {e.Message}");
 							OnAuthenticationFailure();
 						}
 						break;
 					case System.Net.HttpStatusCode.TooManyRequests:
+						Log.Warning($"{Name}: 429 Too Many Requests for '{name}'");
 						OnRateLimitExceeded(ParseRateLimitResetTime(e));
 						break;
 					default:
+						Log.Error($"{Name}: ApiException ({e.HttpResponse?.StatusCode}) for request '{name}' - {e.Message}");
 						throw;
 				}
 			}
