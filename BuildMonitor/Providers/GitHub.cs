@@ -406,6 +406,7 @@ internal sealed partial class GitHub : BuildProvider
 	{
 		if (!HasValidCredentials(build.Owner))
 		{
+			Log.Warning($"GitHub: Skipping UpdateBuild {build.Owner.Name}/{build.Repository.Name}/{build.Name} - AccountId empty: {AccountId.IsEmpty()}, Owner HasToken: {build.Owner?.HasToken}, Provider Token empty: {Token.IsEmpty()}");
 			return;
 		}
 
@@ -419,6 +420,7 @@ internal sealed partial class GitHub : BuildProvider
 				StartPage = 1,
 				PageSize = 10,
 			}).ConfigureAwait(false);
+			Log.Debug($"GitHub: UpdateBuild {build.Owner.Name}/{build.Repository.Name}/{build.Name} - API returned {gitHubRuns.TotalCount} total, {gitHubRuns.WorkflowRuns.Count} in page");
 			foreach (WorkflowRun? gitHubRun in gitHubRuns.WorkflowRuns)
 			{
 				RunId runId = gitHubRun.Id.ToString(CultureInfo.InvariantCulture).As<RunId>();

@@ -83,7 +83,18 @@ internal sealed class BuildSync
 
 	internal async Task UpdateAsync()
 	{
+		int runsBefore = Build.Runs.Count;
 		await Build.Owner.BuildProvider.UpdateBuildAsync(Build).ConfigureAwait(false);
+		int runsAfter = Build.Runs.Count;
+
+		if (runsAfter != runsBefore)
+		{
+			Log.Info($"BuildSync: {Build.Owner.Name}/{Build.Repository.Name}/{Build.Name} runs changed: {runsBefore} -> {runsAfter}");
+		}
+		else
+		{
+			Log.Debug($"BuildSync: {Build.Owner.Name}/{Build.Repository.Name}/{Build.Name} polled, {runsAfter} runs (no change)");
+		}
 
 		foreach ((RunId? runId, Run? run) in Build.Runs)
 		{

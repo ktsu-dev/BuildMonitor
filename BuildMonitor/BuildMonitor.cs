@@ -1462,11 +1462,25 @@ internal static class BuildMonitor
 	private static async Task UpdateBuildsAsync()
 	{
 		// Get builds that should update, skipping filtered builds, and filter by provider budget priority
-		List<KeyValuePair<BuildId, BuildSync>> buildSyncs = [.. BuildSyncCollection
-			.Where(b => b.Value.ShouldUpdate)
-			.Where(b => IsBuildVisible(b.Value.Build))
+		List<KeyValuePair<BuildId, BuildSync>> readyBuilds = [.. BuildSyncCollection.Where(b => b.Value.ShouldUpdate)];
+		List<KeyValuePair<BuildId, BuildSync>> visibleBuilds = [.. readyBuilds.Where(b => IsBuildVisible(b.Value.Build))];
+		List<KeyValuePair<BuildId, BuildSync>> buildSyncs = [.. visibleBuilds
 			.Where(b => b.Value.Priority <= b.Value.Build.Owner.BuildProvider.MaxAllowedPriority)
 			.OrderBy(b => b.Value.Priority)];
+
+		if (readyBuilds.Count > 0)
+		{
+			int filteredOut = readyBuilds.Count - visibleBuilds.Count;
+			if (filteredOut > 0)
+			{
+				IEnumerable<string> skippedNames = readyBuilds
+					.Where(b => !IsBuildVisible(b.Value.Build))
+					.Select(b => $"{b.Value.Build.Owner.Name}/{b.Value.Build.Repository.Name}/{b.Value.Build.Name}");
+				Log.Debug($"UpdateBuilds: {readyBuilds.Count} ready, {filteredOut} filtered out by IsBuildVisible: {string.Join(", ", skippedNames)}");
+			}
+
+			Log.Debug($"UpdateBuilds: polling {buildSyncs.Count} builds");
+		}
 
 		// Update all builds concurrently (semaphore limits per-provider concurrency)
 		await Task.WhenAll(buildSyncs.Select(kvp => kvp.Value.UpdateAsync())).ConfigureAwait(false);
