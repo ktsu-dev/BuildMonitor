@@ -69,10 +69,6 @@ internal sealed class AzureDevOps : BuildProvider
 			BuildClient = null;
 			SetStatus(ProviderStatus.Error, $"Invalid organization name: {ex.Message}");
 		}
-		else
-		{
-			Log.Debug($"{Name}: UpdateAzureDevOpsClientCredentials skipped - AccountId empty: {string.IsNullOrEmpty(AccountId)}, Token empty: {string.IsNullOrEmpty(Token)}");
-		}
 	}
 
 	internal override void ShowMenu()
