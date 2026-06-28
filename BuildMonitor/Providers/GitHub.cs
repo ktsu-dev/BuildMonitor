@@ -66,7 +66,8 @@ internal sealed partial class GitHub : BuildProvider
 		{
 			GitHubClient client = new(new ProductHeaderValue(Strings.FullyQualifiedApplicationName))
 			{
-				Credentials = new Credentials(AccountId, token)
+				// Token authentication (PAT) - does not require a username/AccountId.
+				Credentials = new Credentials(token)
 			};
 			return client;
 		});
@@ -85,8 +86,11 @@ internal sealed partial class GitHub : BuildProvider
 	/// <returns>True if valid credentials are available.</returns>
 	private bool HasValidCredentials(Owner? owner = null)
 	{
+		// A token alone is sufficient for GitHub API authentication (token auth does not
+		// require a username/AccountId). Owners can be authenticated purely via their own
+		// per-owner token, without the provider-level AccountId being set.
 		string tokenToUse = owner?.HasToken == true ? owner.Token : Token;
-		return !AccountId.IsEmpty() && !string.IsNullOrEmpty(tokenToUse);
+		return !string.IsNullOrEmpty(tokenToUse);
 	}
 
 	private Owner? OwnerPendingTokenPopup { get; set; }
