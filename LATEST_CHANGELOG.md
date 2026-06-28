@@ -2,5 +2,6 @@
 
 Changes since v1.4.0:
 
+- fix: replace audit suppression with explicit SqlClient version ([@matt-edmondson](https://github.com/matt-edmondson))
 - Remove serena/cursor files ([@matt-edmondson](https://github.com/matt-edmondson))
 
