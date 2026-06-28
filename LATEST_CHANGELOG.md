@@ -1,8 +1,6 @@
-## v1.4.1 (patch)
+## v1.4.2-pre.1 (prerelease)
 
-Changes since v1.4.0:
+Changes since v1.4.1:
 
-- fix: remove obsolete SourceLink package versions ([@matt-edmondson](https://github.com/matt-edmondson))
-- fix: replace audit suppression with explicit SqlClient version ([@matt-edmondson](https://github.com/matt-edmondson))
-- Remove serena/cursor files ([@matt-edmondson](https://github.com/matt-edmondson))
+- fix: allow GitHub auth with token only ([@matt-edmondson](https://github.com/matt-edmondson))
 
