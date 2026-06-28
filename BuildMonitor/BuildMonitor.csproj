@@ -15,21 +15,17 @@
     <PackageReference Include="ktsu.Extensions" />
     <PackageReference Include="ktsu.Semantics.Strings" />
     <PackageReference Include="ktsu.TextFilter" />
-    <PackageReference Include="Microsoft.SourceLink.AzureRepos.Git">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
-    <PackageReference Include="Microsoft.SourceLink.GitHub">
-      <PrivateAssets>all</PrivateAssets>
-      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-    </PackageReference>
     <PackageReference Include="Microsoft.TeamFoundationServer.Client" />
     <PackageReference Include="Octokit" />
     <PackageReference Include="Polyfill">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-  </ItemGroup>
+  
+    <PackageReference Include="Hexa.NET.ImGui" />
+    <PackageReference Include="Microsoft.VisualStudio.Services.Client" />
+    <!-- Override vulnerable transitive System.Data.SqlClient 4.8.5 (GHSA-98g6-xh36-x2p7) -->
+    <PackageReference Include="System.Data.SqlClient" /></ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="ktsu.ImGui.App" />
