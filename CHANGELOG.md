@@ -1,3 +1,7 @@
+## v1.4.2
+
+No significant changes detected since v1.4.2.
+
 ## v1.4.2 (patch)
 
 Changes since v1.4.1:
@@ -9,9 +13,7 @@ Changes since v1.4.1:
 
 ## v1.4.2-pre.1 (prerelease)
 
-Changes since v1.4.1:
-
-- fix: allow GitHub auth with token only ([@matt-edmondson](https://github.com/matt-edmondson))
+No significant changes detected since v1.4.2.
 
 ## v1.4.1 (patch)
 
