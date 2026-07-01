@@ -1,6 +1,6 @@
-## v1.4.4 (patch)
+## v1.4.5 (patch)
 
-Changes since v1.4.3:
+Changes since v1.4.4:
 
-- Bump the ktsu group with 17 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump the ktsu group with 9 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
 
