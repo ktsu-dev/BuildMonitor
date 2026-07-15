@@ -14,7 +14,7 @@
     <PackageVersion Include="ktsu.TextFilter" Version="1.5.20" />
     <PackageVersion Include="Microsoft.TeamFoundationServer.Client" Version="19.225.2" />
     <PackageVersion Include="Octokit" Version="14.0.0" />
-    <PackageVersion Include="Polyfill" Version="10.11.2" />
+    <PackageVersion Include="Polyfill" Version="11.0.1" />
     <PackageVersion Include="Hexa.NET.ImGui" Version="2.2.9" />
     <PackageVersion Include="Microsoft.VisualStudio.Services.Client" Version="19.225.2" />
     <PackageVersion Include="System.Data.SqlClient" Version="4.9.1" />
