@@ -6,12 +6,12 @@
     <PackageVersion Include="Humanizer.Core" Version="3.0.10" />
     <PackageVersion Include="ktsu.AppDataStorage" Version="1.16.33" />
     <PackageVersion Include="ktsu.Extensions" Version="1.5.30" />
-    <PackageVersion Include="ktsu.ImGui.App" Version="3.1.8" />
-    <PackageVersion Include="ktsu.ImGui.Popups" Version="3.1.8" />
-    <PackageVersion Include="ktsu.ImGui.Styler" Version="3.1.8" />
-    <PackageVersion Include="ktsu.ImGui.Widgets" Version="3.1.8" />
-    <PackageVersion Include="ktsu.Semantics.Strings" Version="2.7.5" />
-    <PackageVersion Include="ktsu.TextFilter" Version="1.5.24" />
+    <PackageVersion Include="ktsu.ImGui.App" Version="3.1.9" />
+    <PackageVersion Include="ktsu.ImGui.Popups" Version="3.1.9" />
+    <PackageVersion Include="ktsu.ImGui.Styler" Version="3.1.9" />
+    <PackageVersion Include="ktsu.ImGui.Widgets" Version="3.1.9" />
+    <PackageVersion Include="ktsu.Semantics.Strings" Version="2.7.6" />
+    <PackageVersion Include="ktsu.TextFilter" Version="1.5.25" />
     <PackageVersion Include="Microsoft.TeamFoundationServer.Client" Version="19.225.2" />
     <PackageVersion Include="Octokit" Version="14.0.0" />
     <PackageVersion Include="Polyfill" Version="11.0.1" />
