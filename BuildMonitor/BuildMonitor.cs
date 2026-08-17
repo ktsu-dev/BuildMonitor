@@ -1,6 +1,4 @@
-// Copyright (c) ktsu.dev
-// All rights reserved.
-// Licensed under the MIT license.
+// Copyright (c) 2023-2026 ktsu-dev contributors
 
 namespace ktsu.BuildMonitor;
 
@@ -190,14 +188,13 @@ internal static class BuildMonitor
 		{
 			ImGui.SetNextItemWidth(-1);
 			string text = filterText;
-			TextFilterType type = filterType;
-			TextFilterMatchOptions matchOptions = filterMatchOptions;
-			ImGuiWidgets.SearchBox(id, ref text, ref type, ref matchOptions);
-			if (text != filterText || type != filterType || matchOptions != filterMatchOptions)
+			SearchBoxOptions options = new(Label: id, FilterType: filterType, MatchOptions: filterMatchOptions);
+			ImGuiWidgets.SearchBox(ref options, ref text);
+			if (text != filterText || options.FilterType != filterType || options.MatchOptions != filterMatchOptions)
 			{
 				filterText = text;
-				filterType = type;
-				filterMatchOptions = matchOptions;
+				filterType = options.FilterType;
+				filterMatchOptions = options.MatchOptions;
 				QueueSaveAppData();
 			}
 		}
@@ -380,11 +377,11 @@ internal static class BuildMonitor
 			{
 				ImColor color = entry.Level switch
 				{
-					LogLevel.Debug => Color.Palette.Neutral.Gray,
-					LogLevel.Info => Color.Palette.Neutral.White,
-					LogLevel.Warning => Color.Palette.Basic.Yellow,
-					LogLevel.Error => Color.Palette.Basic.Red,
-					_ => Color.Palette.Neutral.White,
+					LogLevel.Debug => Palette.Neutral.Gray,
+					LogLevel.Info => Palette.Neutral.White,
+					LogLevel.Warning => Palette.Basic.Yellow,
+					LogLevel.Error => Palette.Basic.Red,
+					_ => Palette.Neutral.White,
 				};
 
 				using (new ScopedTextColor(color))
@@ -610,7 +607,7 @@ internal static class BuildMonitor
 		// Status column - gray indicator for no builds
 		if (ImGui.TableNextColumn())
 		{
-			ImGuiWidgets.ColorIndicator(Color.Palette.Neutral.Gray, true);
+			ImGuiWidgets.ColorIndicator(Palette.Neutral.Gray, true);
 		}
 
 		// Owner column
@@ -622,7 +619,7 @@ internal static class BuildMonitor
 		// Build Name column - show "No workflows" in gray
 		if (ImGui.TableNextColumn())
 		{
-			using (new ScopedTextColor(Color.Palette.Neutral.Gray))
+			using (new ScopedTextColor(Palette.Neutral.Gray))
 			{
 				ImGui.TextUnformatted(Strings.NoWorkflows);
 			}
@@ -733,7 +730,7 @@ internal static class BuildMonitor
 			{
 				// Show status color indicator for completed builds
 				ImColor statusColor = IsBuildUpdating(build)
-					? Color.Palette.Basic.Cyan
+					? Palette.Basic.Cyan
 					: GetStatusColor(latestRun.Status);
 				ImGuiWidgets.ColorIndicator(statusColor, true);
 			}
@@ -1241,7 +1238,7 @@ internal static class BuildMonitor
 		bool shouldOpenContextMenu = false;
 
 		// Make the text clickable (use run ID for unique widget ID)
-		using (new ScopedTextColor(Color.Palette.Basic.Red))
+		using (new ScopedTextColor(Palette.Basic.Red))
 		{
 			if (ImGui.Selectable($"{displayText}##{run.Id}"))
 			{
@@ -1280,12 +1277,12 @@ internal static class BuildMonitor
 	{
 		return status switch
 		{
-			RunStatus.Pending => Color.Palette.Neutral.Gray,
-			RunStatus.Running => Color.Palette.Basic.Yellow,
-			RunStatus.Canceled => Color.Palette.Basic.Red,
-			RunStatus.Success => Color.Palette.Basic.Green,
-			RunStatus.Failure => Color.Palette.Basic.Red,
-			_ => Color.Palette.Neutral.Gray,
+			RunStatus.Pending => Palette.Neutral.Gray,
+			RunStatus.Running => Palette.Basic.Yellow,
+			RunStatus.Canceled => Palette.Basic.Red,
+			RunStatus.Success => Palette.Basic.Green,
+			RunStatus.Failure => Palette.Basic.Red,
+			_ => Palette.Neutral.Gray,
 		};
 	}
 
@@ -1293,11 +1290,11 @@ internal static class BuildMonitor
 	{
 		return status switch
 		{
-			ProviderStatus.OK => Color.Palette.Basic.Green,
-			ProviderStatus.RateLimited => Color.Palette.Basic.Yellow,
-			ProviderStatus.AuthFailed => Color.Palette.Basic.Red,
-			ProviderStatus.Error => Color.Palette.Basic.Magenta,
-			_ => Color.Palette.Neutral.Gray,
+			ProviderStatus.OK => Palette.Basic.Green,
+			ProviderStatus.RateLimited => Palette.Basic.Yellow,
+			ProviderStatus.AuthFailed => Palette.Basic.Red,
+			ProviderStatus.Error => Palette.Basic.Magenta,
+			_ => Palette.Neutral.Gray,
 		};
 	}
 
