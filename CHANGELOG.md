@@ -1,6 +1,8 @@
-## v1.4.13
+## v1.4.14 (patch)
 
-No significant changes detected since v1.4.13.
+Changes since v1.4.13:
+
+- Stop Update SDKs failing when there is nothing to update ([@matt-edmondson](https://github.com/matt-edmondson))
 
 ## v1.4.13 (patch)
 
