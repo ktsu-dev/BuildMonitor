@@ -2,9 +2,10 @@
 
 > A desktop application for monitoring CI/CD build statuses across multiple providers.
 
-[![License](https://img.shields.io/github/license/ktsu-dev/BuildMonitor)](https://github.com/ktsu-dev/BuildMonitor/blob/main/LICENSE.md)
-[![Build Status](https://github.com/ktsu-dev/BuildMonitor/workflows/build/badge.svg)](https://github.com/ktsu-dev/BuildMonitor/actions)
-[![GitHub Stars](https://img.shields.io/github/stars/ktsu-dev/BuildMonitor?style=social)](https://github.com/ktsu-dev/BuildMonitor/stargazers)
+[![License](https://img.shields.io/github/license/ktsu-dev/BuildMonitor.svg?label=License&logo=nuget)](LICENSE.md)
+[![GitHub commit activity](https://img.shields.io/github/commit-activity/m/ktsu-dev/BuildMonitor?label=Commits&logo=github)](https://github.com/ktsu-dev/BuildMonitor/commits/main)
+[![GitHub contributors](https://img.shields.io/github/contributors/ktsu-dev/BuildMonitor?label=Contributors&logo=github)](https://github.com/ktsu-dev/BuildMonitor/graphs/contributors)
+[![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/ktsu-dev/BuildMonitor/dotnet.yml?label=Build&logo=github)](https://github.com/ktsu-dev/BuildMonitor/actions)
 
 ## Introduction
 
