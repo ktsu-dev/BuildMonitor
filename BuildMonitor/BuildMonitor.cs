@@ -182,18 +182,12 @@ internal static class BuildMonitor
 	private static unsafe int? ProbeNativeImGuiTableColumnSize()
 	{
 		int csharpSize = sizeof(ImGuiTableColumn);
+		int widthGivenOffset;
 		int narrowFieldBytes = 0;
 
 		try
 		{
-			if (Marshal.OffsetOf<ImGuiTableColumn>(nameof(ImGuiTableColumn.WidthGiven)).ToInt32() != WidthGivenOffset)
-			{
-				Log.Warning(
-					$"ImGuiTableColumn.WidthGiven is not at the expected offset {WidthGivenOffset}, so the " +
-					"struct layout is not one this workaround understands. Column width persistence is " +
-					"disabled. See BuildMonitor#258.");
-				return null;
-			}
+			widthGivenOffset = Marshal.OffsetOf<ImGuiTableColumn>(nameof(ImGuiTableColumn.WidthGiven)).ToInt32();
 
 			foreach (string fieldName in NarrowlyBoundColumnFields)
 			{
@@ -221,6 +215,58 @@ internal static class BuildMonitor
 			return null;
 		}
 
+		int? stride = ResolveNativeColumnStride(csharpSize, widthGivenOffset, narrowFieldBytes);
+
+		if (stride is null)
+		{
+			Log.Warning(
+				$"The ImGuiTableColumn layout was not recognised (size {csharpSize}, WidthGiven at " +
+				$"{widthGivenOffset}, index fields occupying {narrowFieldBytes} bytes). Column width " +
+				"persistence is disabled rather than guessing at the stride. See BuildMonitor#258.");
+		}
+		else if (stride == csharpSize)
+		{
+			Log.Info(
+				"Hexa.NET.ImGui now binds the ImGuiTableColumn index fields at their native width. " +
+				"The struct size workaround is no longer needed and can be removed. See BuildMonitor#258.");
+		}
+
+		return stride;
+	}
+
+	/// <summary>
+	/// Decides the native stride of ImGuiTableColumn from a measured layout.
+	/// </summary>
+	/// <param name="csharpSize">The value of <c>sizeof(ImGuiTableColumn)</c>.</param>
+	/// <param name="widthGivenOffset">The measured byte offset of the WidthGiven field.</param>
+	/// <param name="narrowFieldBytes">
+	/// The total bytes the fields in <see cref="NarrowlyBoundColumnFields"/> occupy.
+	/// </param>
+	/// <returns>
+	/// The native stride, or <see langword="null"/> when the layout is not one this workaround
+	/// understands and reading it would be unsafe.
+	/// </returns>
+	/// <remarks>
+	/// This is deliberately separate from <see cref="ProbeNativeImGuiTableColumnSize"/> and takes
+	/// its measurements as plain integers. The probe needs <c>unsafe</c>, reflection and a real
+	/// Hexa.NET.ImGui type, none of which a test can vary; the decision it makes is the part worth
+	/// testing, and expressed this way every branch -- including the ones that cannot be reached
+	/// with the binding currently referenced -- is reachable from a unit test.
+	///
+	/// Measuring the affected fields is also deliberate rather than comparing
+	/// <paramref name="csharpSize"/> against a constant. A size threshold only ever infers the bug:
+	/// it cannot tell a fixed binding from one whose struct grew for an unrelated reason, and the
+	/// "native is about 112 bytes" figure this code used to carry does not even agree with the
+	/// measured 108 + 8. Counting the bytes those eight fields actually occupy tests the bug
+	/// itself, so a fixed binding is recognised as fixed and anything else is refused.
+	/// </remarks>
+	internal static int? ResolveNativeColumnStride(int csharpSize, int widthGivenOffset, int narrowFieldBytes)
+	{
+		if (widthGivenOffset != WidthGivenOffset)
+		{
+			return null;
+		}
+
 		// One byte each: the binding is still narrow, so native is this many bytes wider.
 		if (narrowFieldBytes == NarrowlyBoundColumnFields.Length)
 		{
@@ -229,20 +275,7 @@ internal static class BuildMonitor
 
 		// Two bytes each: the binding has been fixed and now matches native, so sizeof is correct
 		// and the workaround should be removed along with this whole probe.
-		if (narrowFieldBytes == NarrowlyBoundColumnFields.Length * 2)
-		{
-			Log.Info(
-				"Hexa.NET.ImGui now binds the ImGuiTableColumn index fields at their native width. " +
-				"The struct size workaround is no longer needed and can be removed. See BuildMonitor#258.");
-			return csharpSize;
-		}
-
-		Log.Warning(
-			$"The ImGuiTableColumn index fields occupy {narrowFieldBytes} bytes, which matches neither the " +
-			$"known-narrow binding ({NarrowlyBoundColumnFields.Length}) nor a corrected one " +
-			$"({NarrowlyBoundColumnFields.Length * 2}). Column width persistence is disabled rather than " +
-			"guessing at the stride. See BuildMonitor#258.");
-		return null;
+		return narrowFieldBytes == NarrowlyBoundColumnFields.Length * 2 ? csharpSize : null;
 	}
 
 	private static unsafe void SaveColumnWidth(string columnName, int columnIndex)

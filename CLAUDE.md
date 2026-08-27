@@ -8,6 +8,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 # Build the solution
 dotnet build
 
+# Run all tests
+dotnet test
+
+# Run a single test by name filter
+dotnet test --filter "FullyQualifiedName~EstimationIsDeterministic"
+
 # Run the application
 dotnet run --project BuildMonitor/BuildMonitor.csproj
 
@@ -268,10 +274,16 @@ is 116.
 
 `ProbeNativeImGuiTableColumnSize` runs once from a static initializer and measures **the bug
 itself** — how many bytes those eight fields actually occupy — rather than inferring it from a size
-threshold. Eight bytes means the binding is still narrow and the stride is `sizeof + 8`; sixteen
-means it has been fixed, so `sizeof` is correct and the whole workaround can go; anything else, a
-missing field, a moved `WidthGiven`, or a `Marshal` failure disables column-width persistence and
-logs a warning.
+threshold. The measuring and the deciding are deliberately separate: the probe needs `unsafe`,
+reflection and a real Hexa.NET.ImGui type, none of which a test can vary, so it hands three plain
+integers to `ResolveNativeColumnStride`, which is `internal` and covered by `ColumnStrideTests`.
+That is what makes the corrected-binding and unrecognised-layout branches reachable from a test at
+all — neither can be produced with the binding currently referenced.
+
+The rule it applies: eight bytes means the binding is still narrow and the stride is `sizeof + 8`;
+sixteen means it has been fixed, so `sizeof` is correct and the whole workaround can go; anything
+else, a missing field, a moved `WidthGiven`, or a `Marshal` failure disables column-width
+persistence and logs a warning.
 
 This deliberately replaced two `Debug.Assert` calls. Those are compiled out of a Release build, so
 a fixed binding or a reordered struct would have left Release silently applying an offset that no
@@ -489,6 +501,29 @@ BuildId buildId = workflowId.ToString().As<BuildId>();
 
 ### Estimation
 - **DurationEstimator.cs**: Statistical duration estimation with IQR outlier removal and exponential weighting
+
+## Testing
+
+`BuildMonitor.Test` uses **MSTest.Sdk** with the Microsoft Testing Platform, targeting `net10.0`.
+The application project exposes its internals to it via `InternalsVisibleTo` in
+`BuildMonitor/AssemblyInfo.cs`.
+
+Most of this application cannot be unit tested — the UI needs a live ImGui context and the
+providers need credentials and network. What *is* covered is the provider-independent logic that
+decides what the user sees and how hard the APIs get hit:
+
+- **`DurationEstimatorTests`** — the sample floor, the IQR outlier filter, exponential weighting
+  toward recent runs, that only completed successful runs are sampled, branch-specific estimation
+  and its fallback, determinism, and that the estimate stays inside its own sample range.
+- **`ColumnStrideTests`** — the ImGuiTableColumn layout decision described above.
+
+When adding a test that needs a `Build`, note that `DurationEstimator` orders samples by `Started`
+descending, so a fixture must set distinct `Started` values for "most recent" to mean anything;
+`DurationEstimatorTests.BuildWithDurations` does this and is the pattern to copy.
+
+Anything genuinely worth testing that is currently tangled up with ImGui or a provider is usually
+worth extracting into a plain method first, the way `ResolveNativeColumnStride` was — the
+extraction is what makes it testable, and the pure function is easier to reason about besides.
 
 ## Provider Implementation Details
 
