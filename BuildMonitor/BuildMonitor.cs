@@ -6,6 +6,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Globalization;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using Hexa.NET.ImGui;
 using ktsu.Extensions;
@@ -117,37 +118,140 @@ internal static class BuildMonitor
 		return DefaultColumnWidths.GetValueOrDefault(columnName, 80f);
 	}
 
-	// TODO: Remove this workaround once Hexa.NET.ImGui fixes the ImGuiTableColumn struct layout.
-	// The binding incorrectly uses sbyte/byte for ImGuiTableColumnIdx/ImGuiTableDrawChannelIdx fields
-	// which should be short/ushort (2 bytes each). This makes the C# struct 8 bytes smaller than native.
-	// See: https://github.com/HexaEngine/Hexa.NET.ImGui/issues/XXX (report this issue)
+	// Workaround for a binding bug in Hexa.NET.ImGui's ImGuiTableColumn struct layout.
 	//
-	// 8 fields are wrong: DisplayOrder, IndexWithinEnabledSet, PrevEnabledColumn, NextEnabledColumn,
-	// SortOrder (all ImGuiTableColumnIdx = ImS16), and DrawChannelCurrent, DrawChannelFrozen,
-	// DrawChannelUnfrozen (all ImGuiTableDrawChannelIdx = ImU16). Each should be 2 bytes but is 1 byte.
+	// The binding declares ImGuiTableColumnIdx and ImGuiTableDrawChannelIdx fields as sbyte/byte
+	// where native Dear ImGui uses ImS16/ImU16. Eight fields are affected; each should occupy
+	// 2 bytes and occupies 1, leaving the C# struct 8 bytes smaller than the native one.
+	//
+	// Measured against Hexa.NET.ImGui 2.2.9: sizeof(ImGuiTableColumn) is 108, and all eight
+	// affected fields sit contiguously at offsets 86-93 at one byte apiece. The native stride is
+	// therefore 116, so reading a column needs manual pointer arithmetic rather than
+	// sizeof(ImGuiTableColumn).
+	//
+	// Tracked in ktsu-dev/BuildMonitor#258, which also covers reporting the bug upstream; no
+	// upstream issue has been filed yet.
 	private const int ImGuiTableColumnSizeDifference = 8;
 
-	private static unsafe int GetNativeImGuiTableColumnSize()
+	// WidthGiven sits immediately after Flags, which is 4 bytes.
+	private const int WidthGivenOffset = 4;
+
+	/// <summary>
+	/// The fields Hexa.NET.ImGui binds one byte too narrow. Native Dear ImGui gives each of these
+	/// two bytes: the first five are ImGuiTableColumnIdx (ImS16), the last three are
+	/// ImGuiTableDrawChannelIdx (ImU16).
+	/// </summary>
+	private static readonly string[] NarrowlyBoundColumnFields =
+	[
+		nameof(ImGuiTableColumn.DisplayOrder),
+		nameof(ImGuiTableColumn.IndexWithinEnabledSet),
+		nameof(ImGuiTableColumn.PrevEnabledColumn),
+		nameof(ImGuiTableColumn.NextEnabledColumn),
+		nameof(ImGuiTableColumn.SortOrder),
+		nameof(ImGuiTableColumn.DrawChannelCurrent),
+		nameof(ImGuiTableColumn.DrawChannelFrozen),
+		nameof(ImGuiTableColumn.DrawChannelUnfrozen),
+	];
+
+	/// <summary>
+	/// The native stride of ImGuiTableColumn, or <see langword="null"/> when the binding's layout
+	/// is not one this workaround understands and reading it would be unsafe.
+	/// </summary>
+	/// <remarks>
+	/// This was previously two <see cref="Debug.Assert(bool, string)"/> calls, which are compiled
+	/// out of a Release build. If the binding were fixed, or Dear ImGui reordered the struct, a
+	/// Release build would have gone on applying an offset that no longer matched and read from
+	/// the wrong address -- silently, with nothing to notice it. Probing once at first use and
+	/// degrading to null instead means the widths simply stop being tracked, which
+	/// <see cref="GetColumnWidth"/> already handles by falling back to the saved or default value.
+	/// </remarks>
+	private static readonly int? NativeImGuiTableColumnSize = ProbeNativeImGuiTableColumnSize();
+
+	/// <summary>
+	/// Determines the native stride of ImGuiTableColumn by measuring the binding directly.
+	/// </summary>
+	/// <returns>The stride, or <see langword="null"/> if the layout is not recognised.</returns>
+	/// <remarks>
+	/// Measuring the affected fields is deliberate rather than comparing sizeof against a constant.
+	/// A size threshold only ever infers the bug: it cannot tell a fixed binding from one whose
+	/// struct grew for an unrelated reason, and the "native is about 112 bytes" figure this code
+	/// used to carry does not even agree with the measured 108 + 8. Counting the bytes those eight
+	/// fields actually occupy tests the bug itself, so a fixed binding is recognised as fixed and
+	/// anything else is refused rather than guessed at.
+	/// </remarks>
+	private static unsafe int? ProbeNativeImGuiTableColumnSize()
 	{
 		int csharpSize = sizeof(ImGuiTableColumn);
-		int nativeSize = csharpSize + ImGuiTableColumnSizeDifference;
+		int narrowFieldBytes = 0;
 
-		// Native struct should be ~112 bytes according to imgui comments
-		// If C# size >= 112, the fix has likely been applied
-		Debug.Assert(
-			csharpSize < 112,
-			$"ImGuiTableColumn C# struct size is {csharpSize} bytes (expected < 112). " +
-			"Check if Hexa.NET.ImGui fixed the struct layout and remove this workaround if so.");
+		try
+		{
+			if (Marshal.OffsetOf<ImGuiTableColumn>(nameof(ImGuiTableColumn.WidthGiven)).ToInt32() != WidthGivenOffset)
+			{
+				Log.Warning(
+					$"ImGuiTableColumn.WidthGiven is not at the expected offset {WidthGivenOffset}, so the " +
+					"struct layout is not one this workaround understands. Column width persistence is " +
+					"disabled. See BuildMonitor#258.");
+				return null;
+			}
 
-		return nativeSize;
+			foreach (string fieldName in NarrowlyBoundColumnFields)
+			{
+				FieldInfo? field = typeof(ImGuiTableColumn).GetField(fieldName);
+				if (field is null)
+				{
+					Log.Warning(
+						$"ImGuiTableColumn has no field named {fieldName}, so the struct layout is not one " +
+						"this workaround understands. Column width persistence is disabled. See BuildMonitor#258.");
+					return null;
+				}
+
+				narrowFieldBytes += Marshal.SizeOf(field.FieldType);
+			}
+		}
+		catch (ArgumentException ex)
+		{
+			// Marshal rejects a type it cannot marshal. These calls previously sat inside a
+			// Debug.Assert and so never ran in a Release build; running them unconditionally must
+			// not be able to take the application down, and this runs from a static initializer
+			// where an escaping exception becomes a TypeInitializationException.
+			Log.Warning(
+				$"Could not read the ImGuiTableColumn layout ({ex.Message}), so column width " +
+				"persistence is disabled. See BuildMonitor#258.");
+			return null;
+		}
+
+		// One byte each: the binding is still narrow, so native is this many bytes wider.
+		if (narrowFieldBytes == NarrowlyBoundColumnFields.Length)
+		{
+			return csharpSize + ImGuiTableColumnSizeDifference;
+		}
+
+		// Two bytes each: the binding has been fixed and now matches native, so sizeof is correct
+		// and the workaround should be removed along with this whole probe.
+		if (narrowFieldBytes == NarrowlyBoundColumnFields.Length * 2)
+		{
+			Log.Info(
+				"Hexa.NET.ImGui now binds the ImGuiTableColumn index fields at their native width. " +
+				"The struct size workaround is no longer needed and can be removed. See BuildMonitor#258.");
+			return csharpSize;
+		}
+
+		Log.Warning(
+			$"The ImGuiTableColumn index fields occupy {narrowFieldBytes} bytes, which matches neither the " +
+			$"known-narrow binding ({NarrowlyBoundColumnFields.Length}) nor a corrected one " +
+			$"({NarrowlyBoundColumnFields.Length * 2}). Column width persistence is disabled rather than " +
+			"guessing at the stride. See BuildMonitor#258.");
+		return null;
 	}
 
 	private static unsafe void SaveColumnWidth(string columnName, int columnIndex)
 	{
-		// Assert that WidthGiven is still at the expected offset (after Flags which is 4 bytes)
-		Debug.Assert(
-			Marshal.OffsetOf<ImGuiTableColumn>(nameof(ImGuiTableColumn.WidthGiven)).ToInt32() == 4,
-			"ImGuiTableColumn.WidthGiven offset changed. Update the workaround.");
+		// Null means the layout probe rejected the binding, so there is no address we can trust.
+		if (NativeImGuiTableColumnSize is not int nativeStructSize)
+		{
+			return;
+		}
 
 		ImGuiTablePtr table = ImGuiP.GetCurrentTable();
 		if (table.Handle == null || columnIndex < 0 || columnIndex >= table.Handle->ColumnsCount)
@@ -155,15 +259,12 @@ internal static class BuildMonitor
 			return;
 		}
 
-		// Use manual pointer arithmetic with the correct native struct size
-		// instead of relying on C# sizeof(ImGuiTableColumn) which is incorrect
-		int nativeStructSize = GetNativeImGuiTableColumnSize();
+		// Manual pointer arithmetic against the probed native stride, which is wider than
+		// sizeof(ImGuiTableColumn) -- see ProbeNativeImGuiTableColumnSize above.
 		byte* basePtr = (byte*)table.Handle->Columns.Data;
 		byte* columnAddress = basePtr + (columnIndex * nativeStructSize);
 
-		// Read WidthGiven directly from offset 4 (after Flags which is 4 bytes)
-		const int widthGivenOffset = 4;
-		float currentWidth = *(float*)(columnAddress + widthGivenOffset);
+		float currentWidth = *(float*)(columnAddress + WidthGivenOffset);
 
 		if (currentWidth < 1f || currentWidth > 10000f || !float.IsFinite(currentWidth))
 		{

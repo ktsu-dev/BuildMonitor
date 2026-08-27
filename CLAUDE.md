@@ -260,6 +260,26 @@ The UI uses radial progress bars (from `ImGuiWidgets.RadialProgressBar`) for:
 - Workaround for Hexa.NET.ImGui struct layout bug (8-byte size difference)
 - `SaveColumnWidth()` saves when width changes by more than 1px
 
+**The struct-layout workaround validates itself before reading.** Hexa.NET.ImGui binds eight
+`ImGuiTableColumn` index fields one byte narrower than native Dear ImGui does, so the C# struct is
+8 bytes smaller and `sizeof(ImGuiTableColumn)` is the wrong stride. Measured against 2.2.9: `sizeof`
+is 108, the eight fields sit contiguously at offsets 86-93 at one byte apiece, and the native stride
+is 116.
+
+`ProbeNativeImGuiTableColumnSize` runs once from a static initializer and measures **the bug
+itself** — how many bytes those eight fields actually occupy — rather than inferring it from a size
+threshold. Eight bytes means the binding is still narrow and the stride is `sizeof + 8`; sixteen
+means it has been fixed, so `sizeof` is correct and the whole workaround can go; anything else, a
+missing field, a moved `WidthGiven`, or a `Marshal` failure disables column-width persistence and
+logs a warning.
+
+This deliberately replaced two `Debug.Assert` calls. Those are compiled out of a Release build, so
+a fixed binding or a reordered struct would have left Release silently applying an offset that no
+longer matched and reading from the wrong address. The probe fails closed instead: `GetColumnWidth`
+already falls back to the saved or default width, so the app keeps working and only stops tracking
+new widths. Do not reintroduce an assert here — it must hold in Release, which is the only
+configuration users run.
+
 ### Context Menu Actions
 
 Right-clicking on any build row opens a context menu with the following actions:
