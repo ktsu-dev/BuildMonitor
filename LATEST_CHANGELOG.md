@@ -1,6 +1,6 @@
-## v1.5.15 (patch)
+## v1.5.16 (patch)
 
-Changes since v1.5.14:
+Changes since v1.5.15:
 
-- Gate Dependabot auto-merge on CI actually being green ([@Claude](https://github.com/Claude))
+- Bump the ktsu group with 13 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
 
