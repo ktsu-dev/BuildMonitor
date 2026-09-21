@@ -652,8 +652,25 @@ internal sealed partial class GitHub : BuildProvider
 		return [.. errors.Take(10)];
 	}
 
+	/// <summary>
+	/// Runs one GitHub API request, handling the failures this provider knows how to absorb.
+	/// </summary>
+	/// <param name="name">The request name, used for logging and in-flight tracking.</param>
+	/// <param name="action">The API call to make.</param>
+	/// <param name="owner">The owner whose token the call should use, if any.</param>
+	/// <returns>
+	/// <see langword="true"/> if the request completed, <see langword="false"/> if it failed in one
+	/// of the ways handled here. An unhandled <see cref="ApiException"/> status still propagates.
+	/// </returns>
+	/// <remarks>
+	/// The answer matters because the failures handled here are handled silently: the status is set
+	/// and the failure is logged, but nothing is rethrown. A caller that assumed reaching the next
+	/// line meant success therefore reported success for a request that never happened -- which is
+	/// what the workflow actions did, telling the user a re-run or cancel had worked while the
+	/// provider was rate limited or its token had just been revoked.
+	/// </remarks>
 	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0010:Add missing cases", Justification = "<Pending>")]
-	internal async Task MakeGitHubRequestAsync(string name, Func<Task> action, Owner? owner = null)
+	internal async Task<bool> MakeGitHubRequestAsync(string name, Func<Task> action, Owner? owner = null)
 	{
 		await RequestSemaphore.WaitAsync().ConfigureAwait(false);
 		try
@@ -679,11 +696,13 @@ internal sealed partial class GitHub : BuildProvider
 				UpdateRateLimitFromApiInfo();
 
 				ClearStatus();
+				return true;
 			}
 			catch (AuthorizationException)
 			{
 				Log.Error($"{Name}: AuthorizationException for request '{name}'");
 				OnAuthenticationFailure();
+				return false;
 			}
 			catch (ApiException e)
 			{
@@ -711,11 +730,14 @@ internal sealed partial class GitHub : BuildProvider
 						Log.Error($"{Name}: ApiException ({e.HttpResponse?.StatusCode}) for request '{name}' - {e.Message}");
 						throw;
 				}
+
+				return false;
 			}
 			catch (HttpRequestException ex)
 			{
 				Log.Error($"{Name}: Connection error - {ex.Message}");
 				SetStatus(ProviderStatus.Error, $"{Strings.ConnectionErrorMessage} {ex.Message}");
+				return false;
 			}
 		}
 		finally
@@ -789,8 +811,7 @@ internal sealed partial class GitHub : BuildProvider
 
 		try
 		{
-			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/rerun/{run.Id}", async () => await GitHubRuns.Rerun(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false), run.Owner).ConfigureAwait(false);
-			return true;
+			return await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/rerun/{run.Id}", async () => await GitHubRuns.Rerun(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false), run.Owner).ConfigureAwait(false);
 		}
 		catch (NotFoundException)
 		{
@@ -816,8 +837,7 @@ internal sealed partial class GitHub : BuildProvider
 
 		try
 		{
-			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/cancel/{run.Id}", async () => await GitHubRuns.Cancel(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false), run.Owner).ConfigureAwait(false);
-			return true;
+			return await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/cancel/{run.Id}", async () => await GitHubRuns.Cancel(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false), run.Owner).ConfigureAwait(false);
 		}
 		catch (NotFoundException)
 		{
@@ -844,7 +864,7 @@ internal sealed partial class GitHub : BuildProvider
 
 		try
 		{
-			await MakeGitHubRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/dispatch/{build.Name}", async () =>
+			return await MakeGitHubRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/dispatch/{build.Name}", async () =>
 			{
 				CreateWorkflowDispatch createWorkflowDispatch = new(branch)
 				{
@@ -852,7 +872,6 @@ internal sealed partial class GitHub : BuildProvider
 				};
 				await GitHubActions.Workflows.CreateDispatch(build.Owner.Name, build.Repository.Name, long.Parse(build.Id, CultureInfo.InvariantCulture), createWorkflowDispatch).ConfigureAwait(false);
 			}, build.Owner).ConfigureAwait(false);
-			return true;
 		}
 		catch (NotFoundException)
 		{
