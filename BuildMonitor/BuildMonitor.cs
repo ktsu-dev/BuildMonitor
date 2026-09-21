@@ -66,6 +66,13 @@ internal static class BuildMonitor
 
 		// add more providers here as needed
 
+		int migratedTokens = TokenStorage.MigrateLegacyTokens(AppData.BuildProviders.Values);
+		if (migratedTokens > 0)
+		{
+			Log.Info($"Moved {migratedTokens} access token(s) out of the app data file into the OS secret store");
+			needsSave = true;
+		}
+
 		if (needsSave)
 		{
 			QueueSaveAppData();

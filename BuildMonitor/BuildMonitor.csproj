@@ -12,6 +12,7 @@
   <ItemGroup>
     <PackageReference Include="Humanizer.Core" ExcludeAssets="analyzers" />
     <PackageReference Include="ktsu.AppDataStorage" />
+    <PackageReference Include="ktsu.CredentialCache" />
     <PackageReference Include="ktsu.Extensions" />
     <PackageReference Include="ktsu.Semantics.Strings" />
     <PackageReference Include="ktsu.TextFilter" />

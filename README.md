@@ -131,6 +131,10 @@ Full support for GitHub Actions including:
 1. Go to **Providers > GitHub > Set Credentials**
 2. Enter your GitHub username
 3. Enter a Personal Access Token (PAT) with `repo` and `workflow` scopes
+
+Tokens are kept in the operating system's secret store — Windows Credential Manager, macOS Keychain,
+or libsecret (Secret Service) on Linux — not in the app data file. A token saved by an earlier
+version is moved there on the next start and blanked where it was, so nothing needs re-entering.
 4. Add owners via **Providers > GitHub > Add Owner**
 
 Additional providers are planned for future releases.
