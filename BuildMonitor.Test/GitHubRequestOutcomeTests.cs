@@ -127,6 +127,81 @@ public sealed class GitHubRequestOutcomeTests
 		Assert.AreEqual(ProviderStatus.Error, provider.Status);
 	}
 
+	private static Owner OwnerWithToken() => new()
+	{
+		Name = OwnerName.Create<OwnerName>("alpha"),
+		Token = BuildProviderToken.Create<BuildProviderToken>("alpha-pat"),
+	};
+
+	/// <summary>
+	/// The workflow actions themselves: a refused request must come back as a failure, not as the
+	/// unconditional success they used to report.
+	/// </summary>
+	/// <remarks>
+	/// The API call is a delegate, so the refusal is injected and nothing reaches the network. The
+	/// owner carries its own token, which is what gets past the credential guard without the
+	/// provider needing one.
+	/// </remarks>
+	[TestMethod]
+	public async Task AWorkflowActionRefusedByTheApiReportsFailure()
+	{
+		GitHub provider = new();
+		ApiException rateLimited = ApiFailure(
+			HttpStatusCode.Forbidden,
+			new Dictionary<string, string> { ["X-RateLimit-Remaining"] = "0" });
+
+		bool succeeded = await provider.RunWorkflowActionAsync(
+			OwnerWithToken(), RequestName, () => Task.FromException(rateLimited)).ConfigureAwait(false);
+
+		Assert.IsFalse(succeeded, "A cancel or re-run the API refused must not be reported as having worked.");
+		Assert.AreEqual(ProviderStatus.RateLimited, provider.Status);
+	}
+
+	[TestMethod]
+	public async Task AWorkflowActionThatSucceedsReportsSuccess()
+	{
+		GitHub provider = new();
+
+		bool succeeded = await provider.RunWorkflowActionAsync(
+			OwnerWithToken(), RequestName, () => Task.CompletedTask).ConfigureAwait(false);
+
+		Assert.IsTrue(succeeded);
+	}
+
+	/// <summary>
+	/// A missing NotFound is still a failure, and is caught by the action rather than escaping.
+	/// </summary>
+	[TestMethod]
+	public async Task AWorkflowActionOnAMissingRunReportsFailure()
+	{
+		GitHub provider = new();
+		NotFoundException missing = new(new FakeResponse(HttpStatusCode.NotFound, new Dictionary<string, string>()));
+
+		bool succeeded = await provider.RunWorkflowActionAsync(
+			OwnerWithToken(), RequestName, () => Task.FromException(missing)).ConfigureAwait(false);
+
+		Assert.IsFalse(succeeded);
+	}
+
+	[TestMethod]
+	public async Task AWorkflowActionWithoutCredentialsReportsFailureWithoutCalling()
+	{
+		GitHub provider = new();
+		bool called = false;
+
+		bool succeeded = await provider.RunWorkflowActionAsync(
+			new Owner { Name = OwnerName.Create<OwnerName>("beta") },
+			RequestName,
+			() =>
+			{
+				called = true;
+				return Task.CompletedTask;
+			}).ConfigureAwait(false);
+
+		Assert.IsFalse(succeeded);
+		Assert.IsFalse(called, "With no credentials there is nothing to ask GitHub.");
+	}
+
 	/// <summary>
 	/// A status this provider has no handling for still propagates, so a caller that genuinely
 	/// cannot continue is not quietly handed a <see langword="false"/> instead.
