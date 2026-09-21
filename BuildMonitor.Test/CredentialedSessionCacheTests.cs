@@ -100,8 +100,8 @@ public sealed class CredentialedSessionCacheTests
 			List<FakeSession> handedOut = RunConcurrently(_ => cache.Get(AccountId, Token));
 
 			Assert.AreEqual(1, cache.SessionsCreated, $"round {round}: more than one session was built");
-			Assert.AreEqual(1, created.Count, $"round {round}: more than one session was built");
-			Assert.AreEqual(ConcurrentCallers, handedOut.Count);
+			Assert.HasCount(1, created, $"round {round}: more than one session was built");
+			Assert.HasCount(ConcurrentCallers, handedOut);
 			Assert.IsTrue(
 				handedOut.TrueForAll(session => ReferenceEquals(session, handedOut[0])),
 				$"round {round}: callers were handed different sessions");
@@ -132,7 +132,7 @@ public sealed class CredentialedSessionCacheTests
 				Assert.AreEqual(1, session.Disposals, $"round {round}: a session was disposed {session.Disposals} times");
 			}
 
-			Assert.AreEqual(ConcurrentCallers, handedOut.Count);
+			Assert.HasCount(ConcurrentCallers, handedOut);
 		}
 	}
 
@@ -160,7 +160,7 @@ public sealed class CredentialedSessionCacheTests
 				return session.Credentials;
 			});
 
-			Assert.AreEqual(ConcurrentCallers, observed.Count);
+			Assert.HasCount(ConcurrentCallers, observed);
 			Assert.IsFalse(
 				observed.Exists(string.IsNullOrEmpty),
 				$"round {round}: a caller dereferenced a session it no longer held");
