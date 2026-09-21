@@ -75,7 +75,7 @@ internal sealed class AzureDevOps : BuildProvider
 	/// let a rebuild on another thread null a client between a caller's null check and its use.
 	/// </remarks>
 	/// <returns>The session, or <see langword="null"/>.</returns>
-	private AzureDevOpsSession? EnsureAzureDevOpsClients()
+	internal AzureDevOpsSession? EnsureAzureDevOpsClients()
 	{
 		string accountId = AccountId.ToString();
 		string token = Token.ToString();
