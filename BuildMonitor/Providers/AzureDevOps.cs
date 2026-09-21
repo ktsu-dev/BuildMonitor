@@ -17,55 +17,86 @@ internal sealed class AzureDevOps : BuildProvider
 	internal static BuildProviderName BuildProviderName => nameof(AzureDevOps).As<BuildProviderName>();
 	internal override BuildProviderName Name => BuildProviderName;
 
-	private VssConnection? Connection { get; set; }
-	private ProjectHttpClient? ProjectClient { get; set; }
-	private BuildHttpClient? BuildClient { get; set; }
-	private string? LastAccountId { get; set; }
-	private string? LastToken { get; set; }
+	private CredentialedSessionCache<AzureDevOpsSession> Sessions { get; } = new(CreateSession);
 	private bool ShouldDiscoverProjects { get; set; }
 
-	private void EnsureAzureDevOpsClients()
+	/// <summary>
+	/// A connection to an Azure DevOps organization together with the clients built from it.
+	/// </summary>
+	/// <remarks>
+	/// The clients are bound to the connection that made them, so they are kept and replaced as one
+	/// value. A caller holds the session it was handed for the whole of its request, which is what
+	/// keeps a rebuild behind it from nulling a client it is about to use.
+	/// </remarks>
+	internal sealed class AzureDevOpsSession : IDisposable
 	{
-		if (string.IsNullOrEmpty(AccountId) || string.IsNullOrEmpty(Token))
+		private VssConnection Connection { get; }
+
+		/// <summary>
+		/// Gets the client used to enumerate the organization's projects.
+		/// </summary>
+		internal ProjectHttpClient ProjectClient { get; }
+
+		/// <summary>
+		/// Gets the client used to read build definitions, builds and runs.
+		/// </summary>
+		internal BuildHttpClient BuildClient { get; }
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="AzureDevOpsSession"/> class.
+		/// </summary>
+		/// <param name="connection">The connection the session owns and disposes.</param>
+		internal AzureDevOpsSession(VssConnection connection)
 		{
-			return;
+			Connection = connection;
+			ProjectClient = connection.GetClient<ProjectHttpClient>();
+			BuildClient = connection.GetClient<BuildHttpClient>();
 		}
 
-		// Only recreate when credentials have changed
-		if (Connection != null && LastAccountId == AccountId.ToString() && LastToken == Token.ToString())
-		{
-			return;
-		}
+		/// <summary>
+		/// Disposes the underlying connection.
+		/// </summary>
+		public void Dispose() => Connection.Dispose();
+	}
 
-		// Dispose old connection before creating a new one
-		Connection?.Dispose();
-		Connection = null;
-		ProjectClient = null;
-		BuildClient = null;
+	private static AzureDevOpsSession CreateSession(string accountId, string token)
+	{
+		Uri collectionUri = new($"https://dev.azure.com/{accountId}");
+		VssBasicCredential credentials = new(string.Empty, token);
+		return new(new VssConnection(collectionUri, credentials));
+	}
+
+	/// <summary>
+	/// Gets the session for the current credentials, or <see langword="null"/> when there are none or
+	/// the connection could not be built.
+	/// </summary>
+	/// <remarks>
+	/// Callers keep the returned session in a local rather than reading it again. Re-reading is what
+	/// let a rebuild on another thread null a client between a caller's null check and its use.
+	/// </remarks>
+	/// <returns>The session, or <see langword="null"/>.</returns>
+	private AzureDevOpsSession? EnsureAzureDevOpsClients()
+	{
+		string accountId = AccountId.ToString();
+		string token = Token.ToString();
+		if (string.IsNullOrEmpty(accountId) || string.IsNullOrEmpty(token))
+		{
+			return null;
+		}
 
 		try
 		{
-			Uri collectionUri = new($"https://dev.azure.com/{AccountId}");
-			VssBasicCredential credentials = new(string.Empty, Token);
-			Connection = new(collectionUri, credentials);
-			ProjectClient = Connection.GetClient<ProjectHttpClient>();
-			BuildClient = Connection.GetClient<BuildHttpClient>();
-			LastAccountId = AccountId.ToString();
-			LastToken = Token.ToString();
+			return Sessions.Get(accountId, token);
 		}
 		catch (VssServiceException ex)
 		{
-			Connection = null;
-			ProjectClient = null;
-			BuildClient = null;
 			SetStatus(ProviderStatus.Error, $"{Strings.ConnectionErrorMessage} {ex.Message}");
+			return null;
 		}
 		catch (UriFormatException ex)
 		{
-			Connection = null;
-			ProjectClient = null;
-			BuildClient = null;
 			SetStatus(ProviderStatus.Error, $"Invalid organization name: {ex.Message}");
+			return null;
 		}
 	}
 
@@ -118,17 +149,17 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		EnsureAzureDevOpsClients();
-		if (ProjectClient == null)
+		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
+		if (session == null)
 		{
-			Log.Warning($"{Name}: DiscoverProjectsAsync skipped - ProjectClient is null after credential update");
+			Log.Warning($"{Name}: DiscoverProjectsAsync skipped - no Azure DevOps session after credential update");
 			return;
 		}
 
 		Log.Info($"{Name}: Discovering projects for organization '{AccountId}'");
 		await MakeAzureDevOpsRequestAsync($"{Name}/discover", async () =>
 		{
-			IEnumerable<TeamProjectReference> projects = await ProjectClient.GetProjects().ConfigureAwait(false);
+			IEnumerable<TeamProjectReference> projects = await session.ProjectClient.GetProjects().ConfigureAwait(false);
 
 			int projectCount = 0;
 			foreach (TeamProjectReference? project in projects)
@@ -159,10 +190,10 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		EnsureAzureDevOpsClients();
-		if (ProjectClient == null)
+		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
+		if (session == null)
 		{
-			Log.Warning($"{Name}: UpdateRepositoriesAsync skipped for owner '{owner.Name}' - ProjectClient is null");
+			Log.Warning($"{Name}: UpdateRepositoriesAsync skipped for owner '{owner.Name}' - no Azure DevOps session");
 			return;
 		}
 
@@ -171,7 +202,7 @@ internal sealed class AzureDevOps : BuildProvider
 		{
 			// In Azure DevOps, projects are the top-level containers
 			// The owner name represents a project in Azure DevOps
-			IEnumerable<TeamProjectReference> projects = await ProjectClient.GetProjects().ConfigureAwait(false);
+			IEnumerable<TeamProjectReference> projects = await session.ProjectClient.GetProjects().ConfigureAwait(false);
 
 			bool foundProject = false;
 			int projectCount = 0;
@@ -216,17 +247,17 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		EnsureAzureDevOpsClients();
-		if (BuildClient == null)
+		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
+		if (session == null)
 		{
-			Log.Warning($"{Name}: UpdateBuildsAsync skipped for '{repository.Owner.Name}/{repository.Name}' - BuildClient is null");
+			Log.Warning($"{Name}: UpdateBuildsAsync skipped for '{repository.Owner.Name}/{repository.Name}' - no Azure DevOps session");
 			return;
 		}
 
 		Log.Debug($"{Name}: UpdateBuildsAsync for '{repository.Owner.Name}/{repository.Name}'");
 		await MakeAzureDevOpsRequestAsync($"{Name}/{repository.Owner.Name}/{repository.Name}", async () =>
 		{
-			List<BuildDefinitionReference> definitions = await BuildClient.GetDefinitionsAsync(repository.Owner.Name).ConfigureAwait(false);
+			List<BuildDefinitionReference> definitions = await session.BuildClient.GetDefinitionsAsync(repository.Owner.Name).ConfigureAwait(false);
 			Log.Info($"{Name}: Found {definitions.Count} build definition(s) for '{repository.Owner.Name}/{repository.Name}'");
 			foreach (BuildDefinitionReference? definition in definitions)
 			{
@@ -270,17 +301,17 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		EnsureAzureDevOpsClients();
-		if (BuildClient == null)
+		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
+		if (session == null)
 		{
-			Log.Warning($"{Name}: UpdateBuildAsync skipped for '{build.Owner.Name}/{build.Repository.Name}/{build.Name}' - BuildClient is null");
+			Log.Warning($"{Name}: UpdateBuildAsync skipped for '{build.Owner.Name}/{build.Repository.Name}/{build.Name}' - no Azure DevOps session");
 			return;
 		}
 
 		Log.Debug($"{Name}: UpdateBuildAsync for '{build.Owner.Name}/{build.Repository.Name}/{build.Name}' (definition ID: {build.Id})");
 		await MakeAzureDevOpsRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/{build.Name}", async () =>
 		{
-			List<Microsoft.TeamFoundation.Build.WebApi.Build> builds = await BuildClient.GetBuildsAsync(
+			List<Microsoft.TeamFoundation.Build.WebApi.Build> builds = await session.BuildClient.GetBuildsAsync(
 				build.Owner.Name,
 				definitions: [int.Parse(build.Id, CultureInfo.InvariantCulture)],
 				top: 10
@@ -306,17 +337,17 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		EnsureAzureDevOpsClients();
-		if (BuildClient == null)
+		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
+		if (session == null)
 		{
-			Log.Warning($"{Name}: UpdateRunAsync skipped for run '{run.Name}' - BuildClient is null");
+			Log.Warning($"{Name}: UpdateRunAsync skipped for run '{run.Name}' - no Azure DevOps session");
 			return;
 		}
 
 		Log.Debug($"{Name}: UpdateRunAsync for run '{run.Name}' (ID: {run.Id}) in '{run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}'");
 		await MakeAzureDevOpsRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}/{run.Name}", async () =>
 		{
-			Microsoft.TeamFoundation.Build.WebApi.Build azureBuild = await BuildClient.GetBuildAsync(
+			Microsoft.TeamFoundation.Build.WebApi.Build azureBuild = await session.BuildClient.GetBuildAsync(
 				run.Owner.Name,
 				int.Parse(run.Id, CultureInfo.InvariantCulture)
 			).ConfigureAwait(false);
