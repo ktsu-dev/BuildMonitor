@@ -652,8 +652,25 @@ internal sealed partial class GitHub : BuildProvider
 		return [.. errors.Take(10)];
 	}
 
+	/// <summary>
+	/// Runs one GitHub API request, handling the failures this provider knows how to absorb.
+	/// </summary>
+	/// <param name="name">The request name, used for logging and in-flight tracking.</param>
+	/// <param name="action">The API call to make.</param>
+	/// <param name="owner">The owner whose token the call should use, if any.</param>
+	/// <returns>
+	/// <see langword="true"/> if the request completed, <see langword="false"/> if it failed in one
+	/// of the ways handled here. An unhandled <see cref="ApiException"/> status still propagates.
+	/// </returns>
+	/// <remarks>
+	/// The answer matters because the failures handled here are handled silently: the status is set
+	/// and the failure is logged, but nothing is rethrown. A caller that assumed reaching the next
+	/// line meant success therefore reported success for a request that never happened -- which is
+	/// what the workflow actions did, telling the user a re-run or cancel had worked while the
+	/// provider was rate limited or its token had just been revoked.
+	/// </remarks>
 	[System.Diagnostics.CodeAnalysis.SuppressMessage("Style", "IDE0010:Add missing cases", Justification = "<Pending>")]
-	internal async Task MakeGitHubRequestAsync(string name, Func<Task> action, Owner? owner = null)
+	internal async Task<bool> MakeGitHubRequestAsync(string name, Func<Task> action, Owner? owner = null)
 	{
 		await RequestSemaphore.WaitAsync().ConfigureAwait(false);
 		try
@@ -679,11 +696,13 @@ internal sealed partial class GitHub : BuildProvider
 				UpdateRateLimitFromApiInfo();
 
 				ClearStatus();
+				return true;
 			}
 			catch (AuthorizationException)
 			{
 				Log.Error($"{Name}: AuthorizationException for request '{name}'");
 				OnAuthenticationFailure();
+				return false;
 			}
 			catch (ApiException e)
 			{
@@ -711,11 +730,14 @@ internal sealed partial class GitHub : BuildProvider
 						Log.Error($"{Name}: ApiException ({e.HttpResponse?.StatusCode}) for request '{name}' - {e.Message}");
 						throw;
 				}
+
+				return false;
 			}
 			catch (HttpRequestException ex)
 			{
 				Log.Error($"{Name}: Connection error - {ex.Message}");
 				SetStatus(ProviderStatus.Error, $"{Strings.ConnectionErrorMessage} {ex.Message}");
+				return false;
 			}
 		}
 		finally
@@ -776,21 +798,30 @@ internal sealed partial class GitHub : BuildProvider
 	}
 
 	/// <summary>
-	/// Re-runs a workflow run.
+	/// Runs one workflow action and answers whether it actually happened.
 	/// </summary>
-	/// <param name="run">The workflow run to re-run.</param>
-	/// <returns>True if the operation was successful, false otherwise.</returns>
-	internal async Task<bool> RerunWorkflowAsync(Run run)
+	/// <param name="owner">The owner whose credentials the action runs under.</param>
+	/// <param name="name">The request name, used for logging and in-flight tracking.</param>
+	/// <param name="action">The API call to make.</param>
+	/// <returns><see langword="true"/> only if the request reached GitHub and succeeded.</returns>
+	/// <remarks>
+	/// The three workflow actions had this guard and these catch blocks copied between them, and all
+	/// three read reaching the line after the request as success. They did not: the failures this
+	/// provider handles are swallowed by <see cref="MakeGitHubRequestAsync"/> without rethrowing, so
+	/// the catch blocks never fired for them and the action reported a success that never happened.
+	/// One copy, returning what the request returned, is what keeps that answer honest -- and taking
+	/// the call as a delegate is what lets a test drive the refusal without reaching the network.
+	/// </remarks>
+	internal async Task<bool> RunWorkflowActionAsync(Owner owner, string name, Func<Task> action)
 	{
-		if (!HasValidCredentials(run.Owner))
+		if (!HasValidCredentials(owner))
 		{
 			return false;
 		}
 
 		try
 		{
-			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/rerun/{run.Id}", async () => await GitHubRuns.Rerun(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false), run.Owner).ConfigureAwait(false);
-			return true;
+			return await MakeGitHubRequestAsync(name, action, owner).ConfigureAwait(false);
 		}
 		catch (NotFoundException)
 		{
@@ -803,31 +834,18 @@ internal sealed partial class GitHub : BuildProvider
 	}
 
 	/// <summary>
+	/// Re-runs a workflow run.
+	/// </summary>
+	/// <param name="run">The workflow run to re-run.</param>
+	/// <returns>True if the operation was successful, false otherwise.</returns>
+	internal async Task<bool> RerunWorkflowAsync(Run run) => await RunWorkflowActionAsync(run.Owner, $"{Name}/{run.Owner.Name}/{run.Repository.Name}/rerun/{run.Id}", async () => await GitHubRuns.Rerun(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false)).ConfigureAwait(false);
+
+	/// <summary>
 	/// Cancels a running workflow.
 	/// </summary>
 	/// <param name="run">The workflow run to cancel.</param>
 	/// <returns>True if the operation was successful, false otherwise.</returns>
-	internal async Task<bool> CancelWorkflowAsync(Run run)
-	{
-		if (!HasValidCredentials(run.Owner))
-		{
-			return false;
-		}
-
-		try
-		{
-			await MakeGitHubRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/cancel/{run.Id}", async () => await GitHubRuns.Cancel(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false), run.Owner).ConfigureAwait(false);
-			return true;
-		}
-		catch (NotFoundException)
-		{
-			return false;
-		}
-		catch (ApiException)
-		{
-			return false;
-		}
-	}
+	internal async Task<bool> CancelWorkflowAsync(Run run) => await RunWorkflowActionAsync(run.Owner, $"{Name}/{run.Owner.Name}/{run.Repository.Name}/cancel/{run.Id}", async () => await GitHubRuns.Cancel(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false)).ConfigureAwait(false);
 
 	/// <summary>
 	/// Triggers a workflow dispatch event.
@@ -835,32 +853,5 @@ internal sealed partial class GitHub : BuildProvider
 	/// <param name="build">The workflow build to trigger.</param>
 	/// <param name="branch">The branch to run the workflow on.</param>
 	/// <returns>True if the operation was successful, false otherwise.</returns>
-	internal async Task<bool> TriggerWorkflowAsync(Build build, BranchName branch)
-	{
-		if (!HasValidCredentials(build.Owner))
-		{
-			return false;
-		}
-
-		try
-		{
-			await MakeGitHubRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/dispatch/{build.Name}", async () =>
-			{
-				CreateWorkflowDispatch createWorkflowDispatch = new(branch)
-				{
-					Inputs = new Dictionary<string, object>()
-				};
-				await GitHubActions.Workflows.CreateDispatch(build.Owner.Name, build.Repository.Name, long.Parse(build.Id, CultureInfo.InvariantCulture), createWorkflowDispatch).ConfigureAwait(false);
-			}, build.Owner).ConfigureAwait(false);
-			return true;
-		}
-		catch (NotFoundException)
-		{
-			return false;
-		}
-		catch (ApiException)
-		{
-			return false;
-		}
-	}
+	internal async Task<bool> TriggerWorkflowAsync(Build build, BranchName branch) => await RunWorkflowActionAsync(build.Owner, $"{Name}/{build.Owner.Name}/{build.Repository.Name}/dispatch/{build.Name}", async () => await GitHubActions.Workflows.CreateDispatch(build.Owner.Name, build.Repository.Name, long.Parse(build.Id, CultureInfo.InvariantCulture), new CreateWorkflowDispatch(branch) { Inputs = new Dictionary<string, object>() }).ConfigureAwait(false)).ConfigureAwait(false);
 }
