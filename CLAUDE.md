@@ -170,13 +170,27 @@ The application implements sophisticated rate limit management to avoid hitting 
 
 ### Authentication and Credentials
 
+**Where tokens live:**
+- Access tokens are held in the OS secret store (Windows Credential Manager, macOS Keychain,
+  libsecret on Linux) through `TokenStorage`, not in the app data file
+- `TokenStorage` derives a persona per token from a versioned namespace plus
+  `BuildProviderName` (and `OwnerName` for an override), so `AppData` holds no credential-shaped
+  state at all. Changing the derivation orphans every token already stored, which is why the
+  namespace carries a version
+- `BuildProvider.LegacyToken` and `Owner.LegacyToken` map to the old `Token` JSON field and exist
+  only for the one-time migration `OnStart` runs: the token is written to the secret store first,
+  then blanked in the app data file
+- With no usable secret store, tokens read as empty and the reason is logged once. BuildMonitor is
+  a desktop app, so a throw out of a token read would take down the render loop. It never falls
+  back to writing tokens to a plain file
+
 **Provider-Level Authentication:**
-- Each provider has an `AccountId` and `Token` (stored in AppData, persisted)
+- Each provider has an `AccountId` (stored in AppData) and a `Token` (stored in the OS secret store)
 - Set via "Set Credentials" menu item (two-step popup: AccountId, then Token)
 - Cleared automatically on `AuthorizationException` or 403 Forbidden responses
 
 **Owner-Level Authentication (GitHub only):**
-- Each owner can have an optional `Token` property (overrides provider token)
+- Each owner can have an optional `Token` property (overrides provider token), also held in the OS secret store
 - Enables access to private repositories in different organizations
 - Set via "Providers → GitHub → Set Owner Token" submenu
 - Clear via "Providers → GitHub → Set Owner Token → Clear Owner Token" submenu

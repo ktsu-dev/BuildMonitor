@@ -7,6 +7,7 @@ using System.Text.Json.Serialization;
 
 using Hexa.NET.ImGui;
 
+using ktsu.CredentialCache;
 using ktsu.ImGui.Popups;
 using ktsu.Semantics.Strings;
 
@@ -46,8 +47,35 @@ internal abstract class BuildProvider
 	internal abstract BuildProviderName Name { get; }
 	[JsonInclude]
 	internal BuildProviderAccountId AccountId { get; private set; } = new();
+
+	/// <summary>
+	/// The provider token as earlier versions persisted it: plaintext, in the app data file.
+	/// </summary>
+	/// <remarks>
+	/// Retained under its original JSON name only so <see cref="TokenStorage.MigrateLegacyTokens"/>
+	/// can move an existing token into the OS secret store and blank it here. Nothing writes a token
+	/// here any more.
+	/// </remarks>
 	[JsonInclude]
-	protected BuildProviderToken Token { get; private set; } = new();
+	[JsonPropertyName("Token")]
+	internal BuildProviderToken LegacyToken { get; set; } = new();
+
+	/// <summary>
+	/// The persona this provider's token is stored under.
+	/// </summary>
+	[JsonIgnore]
+	internal PersonaGUID TokenPersona => TokenStorage.ProviderPersona(Name);
+
+	/// <summary>
+	/// The provider-level access token, held in the OS secret store rather than the app data file.
+	/// </summary>
+	[JsonIgnore]
+	protected BuildProviderToken Token
+	{
+		get => TokenStorage.Read(TokenPersona);
+		private set => _ = TokenStorage.Write(TokenPersona, value);
+	}
+
 	[JsonInclude]
 	internal ConcurrentDictionary<OwnerName, Owner> Owners { get; init; } = [];
 	private bool ShouldShowAccountIdPopup { get; set; }
