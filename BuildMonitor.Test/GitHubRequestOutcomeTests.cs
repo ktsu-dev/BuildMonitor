@@ -8,9 +8,13 @@ using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 
+using ktsu.CredentialCache.Storage;
+
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 using Octokit;
+
+using CredentialCache = ktsu.CredentialCache.CredentialCache;
 
 /// <summary>
 /// Tests whether one GitHub API request reports having succeeded.
@@ -31,6 +35,26 @@ using Octokit;
 public sealed class GitHubRequestOutcomeTests
 {
 	private const string RequestName = "test/request";
+
+	private CredentialCache Cache { get; set; } = null!;
+
+	/// <summary>
+	/// Tokens live in the OS secret store, and an authorization failure clears the provider's token,
+	/// so every test runs against an in-memory store rather than the developer's real credentials.
+	/// </summary>
+	[TestInitialize]
+	public void SetUp()
+	{
+		Cache = new CredentialCache(new InMemoryCredentialStore());
+		TokenStorage.UseCache(Cache);
+	}
+
+	[TestCleanup]
+	public void TearDown()
+	{
+		TokenStorage.UseCache(null);
+		Cache.Dispose();
+	}
 
 	/// <summary>
 	/// A response built to order. Octokit's own <c>Response</c> is internal, and the provider reads
@@ -127,11 +151,16 @@ public sealed class GitHubRequestOutcomeTests
 		Assert.AreEqual(ProviderStatus.Error, provider.Status);
 	}
 
-	private static Owner OwnerWithToken() => new()
+	/// <summary>
+	/// Builds an owner carrying its own token. The owner is made by the provider, because its token
+	/// is stored under a persona derived from the provider's name.
+	/// </summary>
+	private static Owner OwnerWithToken(GitHub provider)
 	{
-		Name = OwnerName.Create<OwnerName>("alpha"),
-		Token = BuildProviderToken.Create<BuildProviderToken>("alpha-pat"),
-	};
+		Owner owner = provider.CreateOwner(OwnerName.Create<OwnerName>("alpha"));
+		owner.Token = BuildProviderToken.Create<BuildProviderToken>("alpha-pat");
+		return owner;
+	}
 
 	/// <summary>
 	/// The workflow actions themselves: a refused request must come back as a failure, not as the
@@ -151,7 +180,7 @@ public sealed class GitHubRequestOutcomeTests
 			new Dictionary<string, string> { ["X-RateLimit-Remaining"] = "0" });
 
 		bool succeeded = await provider.RunWorkflowActionAsync(
-			OwnerWithToken(), RequestName, () => Task.FromException(rateLimited)).ConfigureAwait(false);
+			OwnerWithToken(provider), RequestName, () => Task.FromException(rateLimited)).ConfigureAwait(false);
 
 		Assert.IsFalse(succeeded, "A cancel or re-run the API refused must not be reported as having worked.");
 		Assert.AreEqual(ProviderStatus.RateLimited, provider.Status);
@@ -163,7 +192,7 @@ public sealed class GitHubRequestOutcomeTests
 		GitHub provider = new();
 
 		bool succeeded = await provider.RunWorkflowActionAsync(
-			OwnerWithToken(), RequestName, () => Task.CompletedTask).ConfigureAwait(false);
+			OwnerWithToken(provider), RequestName, () => Task.CompletedTask).ConfigureAwait(false);
 
 		Assert.IsTrue(succeeded);
 	}
@@ -178,7 +207,7 @@ public sealed class GitHubRequestOutcomeTests
 		NotFoundException missing = new(new FakeResponse(HttpStatusCode.NotFound, new Dictionary<string, string>()));
 
 		bool succeeded = await provider.RunWorkflowActionAsync(
-			OwnerWithToken(), RequestName, () => Task.FromException(missing)).ConfigureAwait(false);
+			OwnerWithToken(provider), RequestName, () => Task.FromException(missing)).ConfigureAwait(false);
 
 		Assert.IsFalse(succeeded);
 	}
@@ -190,7 +219,7 @@ public sealed class GitHubRequestOutcomeTests
 		bool called = false;
 
 		bool succeeded = await provider.RunWorkflowActionAsync(
-			new Owner { Name = OwnerName.Create<OwnerName>("beta") },
+			provider.CreateOwner(OwnerName.Create<OwnerName>("beta")),
 			RequestName,
 			() =>
 			{
