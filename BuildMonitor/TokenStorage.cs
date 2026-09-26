@@ -192,11 +192,18 @@ internal static class TokenStorage
 	/// Recognises a machine with no usable secret store: the factory refusing the platform, the
 	/// native library failing to resolve, or the store itself reporting a failure.
 	/// </summary>
+	/// <remarks>
+	/// A native library first reached from a static constructor surfaces as a
+	/// <see cref="TypeInitializationException"/> wrapping the real failure, and the runtime rethrows
+	/// that same exception on every later access. The Linux store reaches libsecret that way, so a
+	/// host without it would otherwise throw out of every token read instead of reading as empty.
+	/// </remarks>
 	private static bool IsUnavailable(Exception exception) =>
 		exception is PlatformNotSupportedException
 			or DllNotFoundException
 			or EntryPointNotFoundException
-			or CredentialStoreException;
+			or CredentialStoreException
+		|| (exception is TypeInitializationException { InnerException: { } inner } && IsUnavailable(inner));
 
 	/// <summary>
 	/// Logs the unavailable store once per process. Tokens are read on request paths that run every

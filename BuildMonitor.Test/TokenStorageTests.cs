@@ -79,6 +79,25 @@ public sealed class TokenStorageTests
 	}
 
 	/// <summary>
+	/// The same missing library as <see cref="UnavailableCredentialStore"/>, but in the form it
+	/// actually takes on Linux: the store first reaches libsecret from a static constructor, so the
+	/// failure arrives wrapped in a <see cref="TypeInitializationException"/>.
+	/// </summary>
+	private sealed class TypeInitializerFailureCredentialStore : ICredentialStore
+	{
+		public string Name => "TypeInitializerFailure";
+
+		public bool TryLoad(PersonaGUID persona, out Credential? credential) => throw Failure();
+
+		public void Save(PersonaGUID persona, Credential credential) => throw Failure();
+
+		public bool Remove(PersonaGUID persona) => throw Failure();
+
+		private static TypeInitializationException Failure() =>
+			new("ktsu.CredentialCache.Storage.LinuxSecretServiceCredentialStore+Schema", new DllNotFoundException("libsecret-1.so.0"));
+	}
+
+	/// <summary>
 	/// Mirrors how <see cref="ktsu.AppDataStorage"/> writes the app data file: references preserved,
 	/// and semantic strings round-tripped as plain strings rather than as char arrays.
 	/// </summary>
@@ -336,6 +355,24 @@ public sealed class TokenStorageTests
 		TestProvider provider = NewProvider();
 
 		Assert.IsTrue(provider.ReadToken().IsEmpty());
+		Assert.IsFalse(TokenStorage.Write(provider.TokenPersona, "ghp_x".As<BuildProviderToken>()));
+	}
+
+	/// <summary>
+	/// The Linux form of a missing secret library, wrapped in a type initializer failure, reads as
+	/// "no token" too, rather than escaping every token read.
+	/// </summary>
+	[TestMethod]
+	public void ReadingWhenTheSecretStoreTypeFailedToInitializeIsEmptyRatherThanFatal()
+	{
+		using CredentialCache unavailable = new(new TypeInitializerFailureCredentialStore());
+		TokenStorage.UseCache(unavailable);
+
+		TestProvider provider = NewProvider();
+		Owner owner = AddOwner(provider, "ktsu-dev");
+
+		Assert.IsTrue(provider.ReadToken().IsEmpty());
+		Assert.IsFalse(owner.HasToken);
 		Assert.IsFalse(TokenStorage.Write(provider.TokenPersona, "ghp_x".As<BuildProviderToken>()));
 	}
 
