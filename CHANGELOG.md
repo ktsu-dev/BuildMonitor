@@ -1,3 +1,10 @@
+## v1.6.1-pre.1 (prerelease)
+
+Changes since v1.6.0:
+
+- Bump Polyfill from 11.4.0 to 11.4.1 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump ktsu.AppDataStorage and 17 others ([@dependabot[bot]](https://github.com/dependabot[bot]))
+
 ## v1.6.0 (minor)
 
 Changes since v1.5.0:
@@ -11,6 +18,7 @@ Changes since v1.5.0:
 - test: cover the credential check that keeps an unconfigured provider offline ([@Claude](https://github.com/Claude))
 - fix: serialize Azure DevOps client creation and hand callers a session [patch] ([@Claude](https://github.com/Claude))
 - refactor: fold the three workflow actions into one, and cover it [patch] ([@Claude](https://github.com/Claude))
+- fix: report a workflow action that the GitHub API refused as failed [patch] ([@Claude](https://github.com/Claude))
 - feat: keep provider and owner access tokens in the OS secret store [minor] ([@Claude](https://github.com/Claude))
 - Gate Dependabot auto-merge on CI actually being green ([@Claude](https://github.com/Claude))
 - ci: adopt the consolidated .NET workflow [patch] ([@Claude](https://github.com/Claude))
@@ -144,10 +152,13 @@ Changes since v1.4.0:
 - docs: correct README, DESCRIPTION and TAGS metadata ([@matt-edmondson](https://github.com/matt-edmondson))
 - Stop Update SDKs failing when there is nothing to update ([@matt-edmondson](https://github.com/matt-edmondson))
 - Fix build for ktsu.Sdk 2.26.1+: migrate file headers (IDE0073), normalize line endings to LF (IDE0055), and adopt ImGui suite 3.6.1 Palette and SearchBoxOptions APIs [patch] ([@matt-edmondson](https://github.com/matt-edmondson))
+- Sync .github\workflows\dotnet.yml ([@KtsuTools](https://github.com/KtsuTools))
 - Sync .runsettings ([@KtsuTools](https://github.com/KtsuTools))
 - Sync .editorconfig ([@KtsuTools](https://github.com/KtsuTools))
 - Sync .gitattributes ([@KtsuTools](https://github.com/KtsuTools))
 - Sync global.json ([@KtsuTools](https://github.com/KtsuTools))
+- Sync .github\workflows\dotnet.yml ([@KtsuTools](https://github.com/KtsuTools))
+- fix: allow GitHub auth with token only ([@matt-edmondson](https://github.com/matt-edmondson))
 - fix: remove obsolete SourceLink package versions ([@matt-edmondson](https://github.com/matt-edmondson))
 - fix: replace audit suppression with explicit SqlClient version ([@matt-edmondson](https://github.com/matt-edmondson))
 - Remove serena/cursor files ([@matt-edmondson](https://github.com/matt-edmondson))
@@ -200,10 +211,12 @@ Changes since v1.4.13:
 Changes since v1.4.12:
 
 - Fix build for ktsu.Sdk 2.26.1+: migrate file headers (IDE0073), normalize line endings to LF (IDE0055), and adopt ImGui suite 3.6.1 Palette and SearchBoxOptions APIs [patch] ([@matt-edmondson](https://github.com/matt-edmondson))
+- Sync .github\workflows\dotnet.yml ([@KtsuTools](https://github.com/KtsuTools))
 - Sync .runsettings ([@KtsuTools](https://github.com/KtsuTools))
 - Sync .editorconfig ([@KtsuTools](https://github.com/KtsuTools))
 - Sync .gitattributes ([@KtsuTools](https://github.com/KtsuTools))
 - Sync global.json ([@KtsuTools](https://github.com/KtsuTools))
+- Sync .github\workflows\dotnet.yml ([@KtsuTools](https://github.com/KtsuTools))
 
 ## v1.4.12 (patch)
 
@@ -270,14 +283,13 @@ Changes since v1.4.2:
 
 Changes since v1.4.1:
 
-- Merge remote-tracking branch 'refs/remotes/origin/main' ([@ktsu[bot]](https://github.com/ktsu[bot]))
-- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
-- Sync global.json ([@ktsu[bot]](https://github.com/ktsu[bot]))
 - fix: allow GitHub auth with token only ([@matt-edmondson](https://github.com/matt-edmondson))
 
 ## v1.4.2-pre.1 (prerelease)
 
-No significant changes detected since v1.4.2.
+Changes since v1.4.1:
+
+- fix: allow GitHub auth with token only ([@matt-edmondson](https://github.com/matt-edmondson))
 
 ## v1.4.1 (patch)
 
@@ -294,8 +306,11 @@ Changes since v1.3.0:
 - Update package references and versions in project files ([@matt-edmondson](https://github.com/matt-edmondson))
 - Enhance logging for build updates and visibility filtering in BuildMonitor ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add TAGS.md with NuGet package tags ([@matt-edmondson](https://github.com/matt-edmondson))
+- Sync .github\workflows\dotnet.yml ([@KtsuTools](https://github.com/KtsuTools))
 - Add SonarLint configuration for connected mode ([@matt-edmondson](https://github.com/matt-edmondson))
 - Enhance entity update strategy: implement GetOrAdd pattern for repositories, builds, and runs to ensure data consistency and prevent duplicates ([@matt-edmondson](https://github.com/matt-edmondson))
+- Refactor repository and build creation logic in AzureDevOps and GitHub providers to ensure existing entries are updated or created as needed ([@matt-edmondson](https://github.com/matt-edmondson))
+- Refactor Azure DevOps and GitHub providers for improved client management and error handling; update AppData and Build classes for better data structure usage ([@matt-edmondson](https://github.com/matt-edmondson))
 
 ## v1.3.18 (patch)
 
@@ -388,12 +403,13 @@ Changes since v1.3.4:
 
 Changes since v1.3.3:
 
-- Bump the ktsu group with 2 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
 - Sync .github\workflows\dotnet.yml ([@KtsuTools](https://github.com/KtsuTools))
 
 ## v1.3.4-pre.1 (prerelease)
 
-No significant changes detected since v1.3.4.
+Changes since v1.3.3:
+
+- Sync .github\workflows\dotnet.yml ([@KtsuTools](https://github.com/KtsuTools))
 
 ## v1.3.3 (patch)
 
@@ -413,13 +429,18 @@ Changes since v1.3.1:
 
 ## v1.3.2-pre.1 (prerelease)
 
-No significant changes detected since v1.3.2.
+Changes since v1.3.1:
+
+- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
+- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
+- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
 
 ## v1.3.1 (patch)
 
 Changes since v1.3.0:
 
 - Enhance entity update strategy: implement GetOrAdd pattern for repositories, builds, and runs to ensure data consistency and prevent duplicates ([@matt-edmondson](https://github.com/matt-edmondson))
+- Refactor repository and build creation logic in AzureDevOps and GitHub providers to ensure existing entries are updated or created as needed ([@matt-edmondson](https://github.com/matt-edmondson))
 
 ## v1.3.0 (minor)
 
@@ -429,6 +450,7 @@ Changes since v1.2.0:
 - Add .gitignore and project configuration; enhance repository handling in BuildMonitor ([@matt-edmondson](https://github.com/matt-edmondson))
 - Enhance build status display with radial progress indicators and adjust column widths ([@matt-edmondson](https://github.com/matt-edmondson))
 - Remove legacy build scripts ([@matt-edmondson](https://github.com/matt-edmondson))
+- Add logging and fix an issue where github repos would be fetched for the wrong owners ([@matt-edmondson](https://github.com/matt-edmondson))
 - Enhance winget manifest update script by restoring packages for SDK properties and improving packageId resolution logic ([@matt-edmondson](https://github.com/matt-edmondson))
 - Enhance build visibility checks and update filtering logic for runs and builds ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add Next Update column to build table and enhance BuildSync with progress tracking ([@matt-edmondson](https://github.com/matt-edmondson))
@@ -437,19 +459,27 @@ Changes since v1.2.0:
 - Enhance sync management by adding orphan detection for builds and runs, improving cleanup logic and update conditions ([@matt-edmondson](https://github.com/matt-edmondson))
 - Implement branch-specific duration estimation and add DurationEstimator class for improved accuracy ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add Estimate column and update related rendering logic in BuildMonitor ([@matt-edmondson](https://github.com/matt-edmondson))
+- Refactor GitHub client management to use owner-specific instances for improved concurrency handling ([@matt-edmondson](https://github.com/matt-edmondson))
+- Refactor GitHub client credential updates to use owner-specific tokens in request methods ([@matt-edmondson](https://github.com/matt-edmondson))
+- Add owner-specific token management and related UI updates for GitHub provider ([@matt-edmondson](https://github.com/matt-edmondson))
 - Refactor project references to package references for ImGui components ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add functionality to display empty repositories and implement related filtering logic ([@matt-edmondson](https://github.com/matt-edmondson))
+- Implement logging system and enhance GitHub provider with detailed logging for owner discovery and repository updates ([@matt-edmondson](https://github.com/matt-edmondson))
 - Enhance owner tab management by creating tabs based on provider type and updating tab visibility logic ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add owner tab filtering functionality and update related UI components ([@matt-edmondson](https://github.com/matt-edmondson))
+- Add filtering options for owner and repository in AppData, enhance Azure DevOps and GitHub provider menus, and implement project discovery functionality ([@matt-edmondson](https://github.com/matt-edmondson))
 - Refactor Azure DevOps provider to streamline status handling and remove unused variable ([@matt-edmondson](https://github.com/matt-edmondson))
 - Enhance error handling in Azure DevOps provider and update package vulnerability suppression ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update project to target .NET 10.0 and adjust package versions ([@matt-edmondson](https://github.com/matt-edmondson))
 - Enhance CLAUDE.md with context menu actions and provider status tracking details ([@matt-edmondson](https://github.com/matt-edmondson))
+- Refactor GitHub API methods for improved readability and error handling ([@matt-edmondson](https://github.com/matt-edmondson))
 - rate limit display ([@matt-edmondson](https://github.com/matt-edmondson))
 - update deps ([@matt-edmondson](https://github.com/matt-edmondson))
 - Fix an issue where token would get erased when you were rate limited ([@matt-edmondson](https://github.com/matt-edmondson))
 - Allow concurrent requests ([@matt-edmondson](https://github.com/matt-edmondson))
 - Enhance ClearData method to clear repositories for each owner ([@matt-edmondson](https://github.com/matt-edmondson))
+- Remove .github\workflows\project.yml ([@matt-edmondson](https://github.com/matt-edmondson))
+- Enhance error handling by fetching job logs for detailed error messages in GitHub builds ([@matt-edmondson](https://github.com/matt-edmondson))
 - Make error display text clickable with unique widget ID ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add error handling and display for build runs ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add LastRun column to BuildMonitor table and update Strings ([@matt-edmondson](https://github.com/matt-edmondson))
@@ -466,9 +496,11 @@ Changes since v1.2.0:
 - Add Clear Data functionality to the build monitor ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add imgui.ini to .gitignore to exclude ImGui configuration files ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add branch filtering to build monitor and update related structures ([@matt-edmondson](https://github.com/matt-edmondson))
+- Add handling for archived repositories in GitHub provider ([@matt-edmondson](https://github.com/matt-edmondson))
 - Refactor classes to use SemanticString for type safety and improve code clarity ([@matt-edmondson](https://github.com/matt-edmondson))
 - Refactor project files to manage package versions centrally and update SDK references ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update README.md to clarify NuGetApiKey parameter as optional for publishing ([@matt-edmondson](https://github.com/matt-edmondson))
+- Add GitHub Actions workflow to update ktsu SDKs weekly ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add CLAUDE.md for project guidance and architecture overview ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update .editorconfig, .gitignore, and .runsettings for improved settings and new files; modify PSBuild.psm1 for enhanced functionality and error handling. ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update ktsu.AppDataStorage package version to 1.15.5 ([@matt-edmondson](https://github.com/matt-edmondson))
@@ -508,18 +540,21 @@ Changes since v1.2.28-pre.1:
 
 ## v1.2.28-pre.1 (prerelease)
 
-No significant changes detected since v1.2.28.
+Changes since v1.2.27:
+
+- Bump the ktsu group with 4 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
 
 ## v1.2.27 (patch)
 
 Changes since v1.2.26:
 
 - Add logging and fix an issue where github repos would be fetched for the wrong owners ([@matt-edmondson](https://github.com/matt-edmondson))
-- Bump the ktsu group with 1 update ([@dependabot[bot]](https://github.com/dependabot[bot]))
 
 ## v1.2.27-pre.1 (prerelease)
 
-No significant changes detected since v1.2.27.
+Changes since v1.2.26:
+
+- Bump the ktsu group with 1 update ([@dependabot[bot]](https://github.com/dependabot[bot]))
 
 ## v1.2.26 (patch)
 
@@ -569,7 +604,10 @@ Changes since v1.2.24-pre.1:
 
 ## v1.2.24-pre.1 (prerelease)
 
-No significant changes detected since v1.2.24.
+Changes since v1.2.23:
+
+- Bump Polyfill from 9.7.7 to 9.8.0 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump the ktsu group with 5 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
 
 ## v1.2.23 (patch)
 
@@ -609,6 +647,7 @@ Changes since v1.2.17:
 
 - Refactor project references to package references for ImGui components ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add functionality to display empty repositories and implement related filtering logic ([@matt-edmondson](https://github.com/matt-edmondson))
+- Implement logging system and enhance GitHub provider with detailed logging for owner discovery and repository updates ([@matt-edmondson](https://github.com/matt-edmondson))
 - Enhance owner tab management by creating tabs based on provider type and updating tab visibility logic ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add owner tab filtering functionality and update related UI components ([@matt-edmondson](https://github.com/matt-edmondson))
 
@@ -631,6 +670,7 @@ Changes since v1.2.14:
 
 - Update project to target .NET 10.0 and adjust package versions ([@matt-edmondson](https://github.com/matt-edmondson))
 - Enhance CLAUDE.md with context menu actions and provider status tracking details ([@matt-edmondson](https://github.com/matt-edmondson))
+- Refactor GitHub API methods for improved readability and error handling ([@matt-edmondson](https://github.com/matt-edmondson))
 
 ## v1.2.14 (patch)
 
@@ -656,7 +696,11 @@ Changes since v1.2.14-pre.1:
 
 ## v1.2.14-pre.1 (prerelease)
 
-No significant changes detected since v1.2.14.
+Changes since v1.2.13:
+
+- Sync scripts\update-winget-manifests.ps1 ([@ktsu[bot]](https://github.com/ktsu[bot]))
+- Sync global.json ([@ktsu[bot]](https://github.com/ktsu[bot]))
+- Sync COPYRIGHT.md ([@ktsu[bot]](https://github.com/ktsu[bot]))
 
 ## v1.2.13 (patch)
 
@@ -675,11 +719,13 @@ Changes since v1.2.11:
 Changes since v1.2.10:
 
 - Enhance ClearData method to clear repositories for each owner ([@matt-edmondson](https://github.com/matt-edmondson))
+- Remove .github\workflows\project.yml ([@matt-edmondson](https://github.com/matt-edmondson))
 
 ## v1.2.10 (patch)
 
 Changes since v1.2.9:
 
+- Enhance error handling by fetching job logs for detailed error messages in GitHub builds ([@matt-edmondson](https://github.com/matt-edmondson))
 - Make error display text clickable with unique widget ID ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add error handling and display for build runs ([@matt-edmondson](https://github.com/matt-edmondson))
 
@@ -704,7 +750,9 @@ Changes since v1.2.9-pre.1:
 
 ## v1.2.9-pre.1 (prerelease)
 
-No significant changes detected since v1.2.9.
+Changes since v1.2.8:
+
+- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
 
 ## v1.2.8 (patch)
 
@@ -749,7 +797,19 @@ Changes since v1.2.6-pre.1:
 
 ## v1.2.6-pre.1 (prerelease)
 
-No significant changes detected since v1.2.6.
+Changes since v1.2.5:
+
+- Sync global.json ([@ktsu[bot]](https://github.com/ktsu[bot]))
+- Sync scripts\PSBuild.psm1 ([@ktsu[bot]](https://github.com/ktsu[bot]))
+- Sync .github\workflows\update-sdks.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
+- Sync .github\workflows\dotnet.yml ([@ktsu[bot]](https://github.com/ktsu[bot]))
+- Sync .gitignore ([@ktsu[bot]](https://github.com/ktsu[bot]))
+- Bump the ktsu group with 3 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump the microsoft group with 2 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump the ktsu group with 1 update ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump Polyfill from 8.8.0 to 9.7.0 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump MSTest.Sdk from 3.10.2 to 4.0.2 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump the ktsu group with 4 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
 
 ## v1.2.5 (patch)
 
@@ -764,6 +824,7 @@ Changes since v1.2.3:
 - Refactor classes to use SemanticString for type safety and improve code clarity ([@matt-edmondson](https://github.com/matt-edmondson))
 - Refactor project files to manage package versions centrally and update SDK references ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update README.md to clarify NuGetApiKey parameter as optional for publishing ([@matt-edmondson](https://github.com/matt-edmondson))
+- Add GitHub Actions workflow to update ktsu SDKs weekly ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add CLAUDE.md for project guidance and architecture overview ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update .editorconfig, .gitignore, and .runsettings for improved settings and new files; modify PSBuild.psm1 for enhanced functionality and error handling. ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update ktsu.AppDataStorage package version to 1.15.5 ([@matt-edmondson](https://github.com/matt-edmondson))
@@ -875,7 +936,9 @@ No significant changes detected since v1.2.4-pre.1.
 
 ## v1.2.4-pre.1 (prerelease)
 
-No significant changes detected since v1.2.4.
+Changes since v1.2.3:
+
+- Sync scripts\PSBuild.psm1 ([@ktsu[bot]](https://github.com/ktsu[bot]))
 
 ## v1.2.3 (patch)
 
@@ -906,7 +969,9 @@ Changes since v1.2.3-pre.1:
 
 ## v1.2.3-pre.1 (prerelease)
 
-No significant changes detected since v1.2.3.
+Changes since v1.2.2:
+
+- Bump ktsu.Extensions from 1.5.1 to 1.5.2 in the ktsu group ([@dependabot[bot]](https://github.com/dependabot[bot]))
 
 ## v1.2.2 (patch)
 
@@ -934,7 +999,9 @@ Changes since v1.2.2-pre.1:
 
 ## v1.2.2-pre.1 (prerelease)
 
-No significant changes detected since v1.2.2.
+Changes since v1.2.1:
+
+- Bump the ktsu group with 5 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
 
 ## v1.2.1 (patch)
 
@@ -1007,6 +1074,7 @@ Changes since v1.0.0:
 - Create global.json ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update azure-pipelines.yml ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update azure-pipelines.yml ([@matt-edmondson](https://github.com/matt-edmondson))
+- chore: Update githubReleaseAsset path in azure-pipelines.yml ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update azure-pipelines.yml ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update azure-pipelines.yml ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update azure-pipelines.yml ([@matt-edmondson](https://github.com/matt-edmondson))
@@ -1040,6 +1108,7 @@ Changes since v1.0.0:
 - Update azure-pipelines.yml for Azure Pipelines ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update azure-pipelines.yml for Azure Pipelines ([@matt-edmondson](https://github.com/matt-edmondson))
 - Sync main (#5) ([@matt-edmondson](https://github.com/matt-edmondson))
+- Delete .github/workflows/dotnet-application.yml ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add Azure DevOps build scripts (#4) ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update azure-pipelines.yml for Azure Pipelines ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update azure-pipelines.yml for Azure Pipelines ([@matt-edmondson](https://github.com/matt-edmondson))
@@ -1080,6 +1149,7 @@ Changes since v1.0.0:
 - Fix indenting on build script ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add mailmap file ([@matt-edmondson](https://github.com/matt-edmondson))
 - Add nsis installer script ([@matt-edmondson](https://github.com/matt-edmondson))
+- Merge branch 'dev' of https://github.com/ktsu-io/BuildMonitor into dev ([@matt-edmondson](https://github.com/matt-edmondson))
 - Improve status tracking of async requests (#3) ([@matt-edmondson](https://github.com/matt-edmondson))
 - Sync main (#2) ([@matt-edmondson](https://github.com/matt-edmondson))
 - Update azure-pipelines.yml for Azure Pipelines ([@matt-edmondson](https://github.com/matt-edmondson))

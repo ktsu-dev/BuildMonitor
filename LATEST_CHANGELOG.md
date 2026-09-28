@@ -1,17 +1,7 @@
-## v1.6.0 (minor)
+## v1.6.1-pre.1 (prerelease)
 
-Changes since v1.5.0:
+Changes since v1.6.0:
 
-- test: build request-outcome owners through their provider, against an in-memory store ([@Claude](https://github.com/Claude))
-- fix: read tokens as empty when the secret store's type initializer failed [patch] ([@Claude](https://github.com/Claude))
-- fix: read tokens as empty when the secret store's type initializer failed [patch] ([@Claude](https://github.com/Claude))
-- test: build request-outcome owners through their provider, against an in-memory store ([@Claude](https://github.com/Claude))
-- test: use Assert.HasCount for the collection-count assertions ([@Claude](https://github.com/Claude))
-- chore: drop the unrelated .gitignore edit from this branch ([@Claude](https://github.com/Claude))
-- test: cover the credential check that keeps an unconfigured provider offline ([@Claude](https://github.com/Claude))
-- fix: serialize Azure DevOps client creation and hand callers a session [patch] ([@Claude](https://github.com/Claude))
-- refactor: fold the three workflow actions into one, and cover it [patch] ([@Claude](https://github.com/Claude))
-- feat: keep provider and owner access tokens in the OS secret store [minor] ([@Claude](https://github.com/Claude))
-- Gate Dependabot auto-merge on CI actually being green ([@Claude](https://github.com/Claude))
-- ci: adopt the consolidated .NET workflow [patch] ([@Claude](https://github.com/Claude))
+- Bump Polyfill from 11.4.0 to 11.4.1 ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Bump ktsu.AppDataStorage and 17 others ([@dependabot[bot]](https://github.com/dependabot[bot]))
 
