@@ -680,6 +680,9 @@ internal sealed partial class GitHub : BuildProvider
 			// concurrent requests use different owner tokens
 			SetCurrentClient(owner);
 
+			// Which credential this request is sent with decides which one a rejection condemns.
+			Owner? tokenOwner = owner?.HasToken == true ? owner : null;
+
 			// Use smart waiting: if rate limited with a known reset time, wait until reset
 			TimeSpan waitTime = GetRateLimitWaitTime();
 			if (waitTime > BaseRequestDelay)
@@ -701,7 +704,15 @@ internal sealed partial class GitHub : BuildProvider
 			catch (AuthorizationException)
 			{
 				Log.Error($"{Name}: AuthorizationException for request '{name}'");
-				OnAuthenticationFailure();
+				if (tokenOwner is not null)
+				{
+					OnOwnerAuthenticationFailure(tokenOwner);
+				}
+				else
+				{
+					OnAuthenticationFailure();
+				}
+
 				return false;
 			}
 			catch (ApiException e)
@@ -718,8 +729,11 @@ internal sealed partial class GitHub : BuildProvider
 						}
 						else
 						{
+							// A token that is not allowed to make this one request -- a workflow
+							// dispatch without actions: write, say -- is still a working token.
+							// The refusal belongs to this request, not to the credentials.
 							Log.Error($"{Name}: 403 Forbidden for request '{name}' - {e.Message}");
-							OnAuthenticationFailure();
+							SetStatus(ProviderStatus.Error, $"{Strings.Forbidden}: {name}");
 						}
 						break;
 					case System.Net.HttpStatusCode.TooManyRequests:
@@ -744,6 +758,23 @@ internal sealed partial class GitHub : BuildProvider
 		{
 			RequestSemaphore.Release();
 		}
+	}
+
+	/// <summary>
+	/// Clears an owner's override token after GitHub rejected it.
+	/// </summary>
+	/// <param name="owner">The owner whose token the rejected request was sent with.</param>
+	/// <remarks>
+	/// The provider credentials were not used for the request, so they are left alone: clearing them
+	/// took every other owner offline while the token that actually failed stayed in place and kept
+	/// being sent, and rejected, every cycle. Clearing the owner token instead lets that owner fall
+	/// back to the provider token until a new one is set.
+	/// </remarks>
+	private void OnOwnerAuthenticationFailure(Owner owner)
+	{
+		Log.Error($"{Name}: Authentication failed for owner '{owner.Name}' - owner token cleared");
+		owner.Token = new();
+		SetStatus(ProviderStatus.AuthFailed, $"{Strings.AuthFailedMessage} ({owner.Name})");
 	}
 
 	/// <summary>

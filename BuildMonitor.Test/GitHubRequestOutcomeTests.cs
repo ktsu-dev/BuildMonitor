@@ -104,7 +104,7 @@ public sealed class GitHubRequestOutcomeTests
 	}
 
 	/// <summary>
-	/// The other headline case: a plain 403, which is what a just-revoked token looks like.
+	/// The other headline case: a plain 403, a request the token is not permitted to make.
 	/// </summary>
 	[TestMethod]
 	public async Task APlain403ReportsFailure()
@@ -114,8 +114,75 @@ public sealed class GitHubRequestOutcomeTests
 		bool succeeded = await RunFailing(provider, ApiFailure(HttpStatusCode.Forbidden)).ConfigureAwait(false);
 
 		Assert.IsFalse(succeeded, "A request refused for lack of authorization did not happen, and must not report success.");
+		Assert.AreEqual(ProviderStatus.Error, provider.Status);
+	}
+
+	/// <summary>
+	/// A 403 that is not a rate limit refuses one request -- a workflow dispatch on a repository the
+	/// token lacks <c>actions: write</c> for, say. The token still works for everything else, so the
+	/// refusal must not erase it along with every owner that depends on it.
+	/// </summary>
+	[TestMethod]
+	public async Task APlain403LeavesTheCredentialsInPlace()
+	{
+		GitHub provider = new();
+		SetProviderToken(provider, "provider-pat");
+		Owner owner = OwnerWithToken(provider);
+
+		bool succeeded = await provider.MakeGitHubRequestAsync(
+			RequestName, () => Task.FromException(ApiFailure(HttpStatusCode.Forbidden)), owner).ConfigureAwait(false);
+
+		Assert.IsFalse(succeeded);
+		Assert.AreEqual("provider-pat", ProviderToken(provider));
+		Assert.AreEqual("alpha-pat", owner.Token.ToString());
+	}
+
+	/// <summary>
+	/// A request sent with an owner's override token that GitHub rejects condemns that token, not
+	/// the provider's. Clearing the provider token took every other owner offline, while the owner
+	/// token that actually failed stayed in place and was rejected again every cycle.
+	/// </summary>
+	[TestMethod]
+	public async Task ARejectedOwnerTokenClearsOnlyThatOwnersToken()
+	{
+		GitHub provider = new();
+		SetProviderToken(provider, "provider-pat");
+		Owner owner = OwnerWithToken(provider);
+		AuthorizationException unauthorized = new(new FakeResponse(HttpStatusCode.Unauthorized, new Dictionary<string, string>()));
+
+		bool succeeded = await provider.MakeGitHubRequestAsync(
+			RequestName, () => Task.FromException(unauthorized), owner).ConfigureAwait(false);
+
+		Assert.IsFalse(succeeded);
+		Assert.IsFalse(owner.HasToken, "The owner token GitHub rejected must not be sent again.");
+		Assert.AreEqual("provider-pat", ProviderToken(provider), "The provider token was not the one rejected.");
 		Assert.AreEqual(ProviderStatus.AuthFailed, provider.Status);
 	}
+
+	/// <summary>
+	/// An owner without its own token uses the provider's, so a rejection there still clears the
+	/// provider credentials as before.
+	/// </summary>
+	[TestMethod]
+	public async Task ARejectedProviderTokenStillClearsTheProviderCredentials()
+	{
+		GitHub provider = new();
+		SetProviderToken(provider, "provider-pat");
+		Owner owner = provider.CreateOwner(OwnerName.Create<OwnerName>("beta"));
+		AuthorizationException unauthorized = new(new FakeResponse(HttpStatusCode.Unauthorized, new Dictionary<string, string>()));
+
+		bool succeeded = await provider.MakeGitHubRequestAsync(
+			RequestName, () => Task.FromException(unauthorized), owner).ConfigureAwait(false);
+
+		Assert.IsFalse(succeeded);
+		Assert.AreEqual(string.Empty, ProviderToken(provider));
+		Assert.AreEqual(ProviderStatus.AuthFailed, provider.Status);
+	}
+
+	private static void SetProviderToken(GitHub provider, string token) =>
+		Assert.IsTrue(TokenStorage.Write(provider.TokenPersona, BuildProviderToken.Create<BuildProviderToken>(token)));
+
+	private static string ProviderToken(GitHub provider) => TokenStorage.Read(provider.TokenPersona).ToString();
 
 	[TestMethod]
 	public async Task A429ReportsFailure()
