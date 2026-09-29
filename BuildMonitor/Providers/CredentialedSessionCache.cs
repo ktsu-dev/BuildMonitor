@@ -93,6 +93,22 @@ internal sealed class CredentialedSessionCache<TSession> : IDisposable
 	}
 
 	/// <summary>
+	/// Leases the session for these credentials and hands the session back alongside the lease, for a
+	/// caller that null-checks the session and then uses it while the lease is held.
+	/// </summary>
+	/// <param name="accountId">The account the session authenticates against.</param>
+	/// <param name="token">The token the session authenticates with.</param>
+	/// <param name="session">The leased session.</param>
+	/// <returns>The lease, to be disposed when the caller is done with the session.</returns>
+	/// <exception cref="ObjectDisposedException">The cache has been disposed.</exception>
+	internal Lease Get(string accountId, string token, out TSession session)
+	{
+		Lease lease = Get(accountId, token);
+		session = lease.Session;
+		return lease;
+	}
+
+	/// <summary>
 	/// Retires the cached session and forgets the credentials it was built for, so the next caller
 	/// builds a fresh one. The retired session is disposed now if nobody holds it, or when its last
 	/// lease is released.

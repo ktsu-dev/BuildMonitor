@@ -190,7 +190,7 @@ public sealed class CredentialedSessionCacheTests
 		using CredentialedSessionCache<FakeSession> cache = CreateCache(created);
 
 		using CredentialedSessionCache<FakeSession>.Lease firstLease = cache.Get(AccountId, Token);
-		using CredentialedSessionCache<FakeSession>.Lease secondLease = cache.Get(AccountId, Token);
+		using CredentialedSessionCache<FakeSession>.Lease secondLease = cache.Get(AccountId, Token, out _);
 		FakeSession first = firstLease.Session;
 		FakeSession second = secondLease.Session;
 
