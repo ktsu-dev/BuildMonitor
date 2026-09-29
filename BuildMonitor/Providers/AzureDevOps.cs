@@ -67,16 +67,20 @@ internal sealed class AzureDevOps : BuildProvider
 	}
 
 	/// <summary>
-	/// Gets the session for the current credentials, or <see langword="null"/> when there are none or
-	/// the connection could not be built.
+	/// Leases the session for the current credentials, or returns <see langword="null"/> when there are
+	/// none or the connection could not be built.
 	/// </summary>
 	/// <remarks>
-	/// Callers keep the returned session in a local rather than reading it again. Re-reading is what
-	/// let a rebuild on another thread null a client between a caller's null check and its use.
+	/// Callers keep the session in a local rather than reading it again, and hold the lease with
+	/// <see langword="using"/> for the whole of their request. Re-reading is what let a rebuild on
+	/// another thread null a client between a caller's null check and its use, and holding the lease
+	/// is what keeps that rebuild from disposing the connection underneath the request.
 	/// </remarks>
-	/// <returns>The session, or <see langword="null"/>.</returns>
-	internal AzureDevOpsSession? EnsureAzureDevOpsClients()
+	/// <param name="session">The leased session, or <see langword="null"/>.</param>
+	/// <returns>The lease, or <see langword="null"/>.</returns>
+	internal CredentialedSessionCache<AzureDevOpsSession>.Lease? EnsureAzureDevOpsClients(out AzureDevOpsSession? session)
 	{
+		session = null;
 		string accountId = AccountId.ToString();
 		string token = Token.ToString();
 		if (string.IsNullOrEmpty(accountId) || string.IsNullOrEmpty(token))
@@ -86,7 +90,7 @@ internal sealed class AzureDevOps : BuildProvider
 
 		try
 		{
-			return Sessions.Get(accountId, token);
+			return Sessions.Get(accountId, token, out session);
 		}
 		catch (VssServiceException ex)
 		{
@@ -149,7 +153,7 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
+		using CredentialedSessionCache<AzureDevOpsSession>.Lease? lease = EnsureAzureDevOpsClients(out AzureDevOpsSession? session);
 		if (session == null)
 		{
 			Log.Warning($"{Name}: DiscoverProjectsAsync skipped - no Azure DevOps session after credential update");
@@ -190,7 +194,7 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
+		using CredentialedSessionCache<AzureDevOpsSession>.Lease? lease = EnsureAzureDevOpsClients(out AzureDevOpsSession? session);
 		if (session == null)
 		{
 			Log.Warning($"{Name}: UpdateRepositoriesAsync skipped for owner '{owner.Name}' - no Azure DevOps session");
@@ -247,7 +251,7 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
+		using CredentialedSessionCache<AzureDevOpsSession>.Lease? lease = EnsureAzureDevOpsClients(out AzureDevOpsSession? session);
 		if (session == null)
 		{
 			Log.Warning($"{Name}: UpdateBuildsAsync skipped for '{repository.Owner.Name}/{repository.Name}' - no Azure DevOps session");
@@ -301,7 +305,7 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
+		using CredentialedSessionCache<AzureDevOpsSession>.Lease? lease = EnsureAzureDevOpsClients(out AzureDevOpsSession? session);
 		if (session == null)
 		{
 			Log.Warning($"{Name}: UpdateBuildAsync skipped for '{build.Owner.Name}/{build.Repository.Name}/{build.Name}' - no Azure DevOps session");
@@ -337,7 +341,7 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
+		using CredentialedSessionCache<AzureDevOpsSession>.Lease? lease = EnsureAzureDevOpsClients(out AzureDevOpsSession? session);
 		if (session == null)
 		{
 			Log.Warning($"{Name}: UpdateRunAsync skipped for run '{run.Name}' - no Azure DevOps session");

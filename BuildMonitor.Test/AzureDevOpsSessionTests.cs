@@ -26,9 +26,9 @@ public sealed class AzureDevOpsSessionTests
 	{
 		AzureDevOps provider = new();
 
-		AzureDevOps.AzureDevOpsSession? session = provider.EnsureAzureDevOpsClients();
+		using CredentialedSessionCache<AzureDevOps.AzureDevOpsSession>.Lease? lease = provider.EnsureAzureDevOpsClients(out _);
 
-		Assert.IsNull(session);
+		Assert.IsNull(lease);
 	}
 
 	/// <summary>
@@ -40,8 +40,8 @@ public sealed class AzureDevOpsSessionTests
 	{
 		AzureDevOps provider = new();
 
-		Assert.IsNull(provider.EnsureAzureDevOpsClients());
-		Assert.IsNull(provider.EnsureAzureDevOpsClients());
+		Assert.IsNull(provider.EnsureAzureDevOpsClients(out _));
+		Assert.IsNull(provider.EnsureAzureDevOpsClients(out _));
 	}
 
 	/// <summary>

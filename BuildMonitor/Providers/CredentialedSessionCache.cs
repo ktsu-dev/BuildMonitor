@@ -26,6 +26,12 @@ namespace ktsu.BuildMonitor;
 /// a connection is serialized against another caller building one — which is the point, since that
 /// is what the duplicate work and the leak came from.
 /// </para>
+/// <para>
+/// Holding a session is not enough on its own if a rebuild disposes it: the caller would keep a
+/// reference to a closed connection and fail with <see cref="ObjectDisposedException"/>. So a caller
+/// takes a <see cref="Lease"/> rather than the bare session, and a session that is replaced or
+/// invalidated while leased is only retired. It is disposed when its last lease is released.
+/// </para>
 /// </remarks>
 /// <typeparam name="TSession">The session type, which owns the connection and disposes it.</typeparam>
 internal sealed class CredentialedSessionCache<TSession> : IDisposable
@@ -33,7 +39,7 @@ internal sealed class CredentialedSessionCache<TSession> : IDisposable
 {
 	private readonly Lock gate = new();
 	private readonly Func<string, string, TSession> createSession;
-	private TSession? session;
+	private Entry? current;
 	private string? lastAccountId;
 	private string? lastToken;
 	private bool disposed;
@@ -52,54 +58,79 @@ internal sealed class CredentialedSessionCache<TSession> : IDisposable
 	internal int SessionsCreated { get; private set; }
 
 	/// <summary>
-	/// Gets the session for these credentials, building one if the cached session is missing or was
+	/// Leases the session for these credentials, building one if the cached session is missing or was
 	/// built for different credentials.
 	/// </summary>
 	/// <param name="accountId">The account the session authenticates against.</param>
 	/// <param name="token">The token the session authenticates with.</param>
-	/// <returns>The session, to be held by the caller for the whole of its request.</returns>
+	/// <returns>
+	/// A lease on the session, to be held by the caller for the whole of its request and disposed when
+	/// it is done. The session is not disposed while the lease is held, even if it is replaced.
+	/// </returns>
 	/// <exception cref="ObjectDisposedException">The cache has been disposed.</exception>
-	internal TSession Get(string accountId, string token)
+	internal Lease Get(string accountId, string token)
 	{
 		lock (gate)
 		{
 			ObjectDisposedException.ThrowIf(disposed, this);
 
-			if (session is not null && lastAccountId == accountId && lastToken == token)
+			if (current is not null && lastAccountId == accountId && lastToken == token)
 			{
-				return session;
+				return new Lease(this, current);
 			}
 
 			// Drop the stale session first, so a factory that throws cannot leave credentials
 			// recorded for a session that was never built.
 			Invalidate();
 
-			TSession created = createSession(accountId, token);
-			session = created;
+			Entry created = new(createSession(accountId, token));
+			current = created;
 			lastAccountId = accountId;
 			lastToken = token;
 			SessionsCreated++;
-			return created;
+			return new Lease(this, created);
 		}
 	}
 
 	/// <summary>
-	/// Disposes the cached session and forgets the credentials it was built for, so the next caller
-	/// builds a fresh one.
+	/// Leases the session for these credentials and hands the session back alongside the lease, for a
+	/// caller that null-checks the session and then uses it while the lease is held.
+	/// </summary>
+	/// <param name="accountId">The account the session authenticates against.</param>
+	/// <param name="token">The token the session authenticates with.</param>
+	/// <param name="session">The leased session.</param>
+	/// <returns>The lease, to be disposed when the caller is done with the session.</returns>
+	/// <exception cref="ObjectDisposedException">The cache has been disposed.</exception>
+	internal Lease Get(string accountId, string token, out TSession session)
+	{
+		Lease lease = Get(accountId, token);
+		session = lease.Session;
+		return lease;
+	}
+
+	/// <summary>
+	/// Retires the cached session and forgets the credentials it was built for, so the next caller
+	/// builds a fresh one. The retired session is disposed now if nobody holds it, or when its last
+	/// lease is released.
 	/// </summary>
 	internal void Invalidate()
 	{
 		lock (gate)
 		{
-			session?.Dispose();
-			session = null;
+			if (current is not null)
+			{
+				current.Retired = true;
+				DisposeIfUnheld(current);
+			}
+
+			current = null;
 			lastAccountId = null;
 			lastToken = null;
 		}
 	}
 
 	/// <summary>
-	/// Disposes the cached session.
+	/// Retires the cached session, disposing it once nobody holds it.
 	/// </summary>
 	public void Dispose()
 	{
@@ -112,6 +143,74 @@ internal sealed class CredentialedSessionCache<TSession> : IDisposable
 
 			Invalidate();
 			disposed = true;
+		}
+	}
+
+	private void Release(Entry entry)
+	{
+		lock (gate)
+		{
+			entry.Holders--;
+			DisposeIfUnheld(entry);
+		}
+	}
+
+	private static void DisposeIfUnheld(Entry entry)
+	{
+		if (entry.Retired && entry.Holders == 0)
+		{
+			entry.Session.Dispose();
+		}
+	}
+
+	/// <summary>
+	/// A session together with how many callers hold it, guarded by the cache's lock.
+	/// </summary>
+	internal sealed class Entry(TSession session)
+	{
+		internal TSession Session { get; } = session;
+
+		internal int Holders { get; set; }
+
+		internal bool Retired { get; set; }
+	}
+
+	/// <summary>
+	/// A caller's hold on a session. The session stays undisposed until every lease on it is released,
+	/// so a rebuild behind a caller cannot close the connection it is using.
+	/// </summary>
+	internal sealed class Lease : IDisposable
+	{
+		private readonly CredentialedSessionCache<TSession> owner;
+		private readonly Entry entry;
+		private int released;
+
+		/// <summary>
+		/// Initializes a new instance of the <see cref="Lease"/> class. Called under the cache's lock.
+		/// </summary>
+		/// <param name="owner">The cache the session came from.</param>
+		/// <param name="entry">The session being leased.</param>
+		internal Lease(CredentialedSessionCache<TSession> owner, Entry entry)
+		{
+			this.owner = owner;
+			this.entry = entry;
+			entry.Holders++;
+		}
+
+		/// <summary>
+		/// Gets the leased session.
+		/// </summary>
+		internal TSession Session => entry.Session;
+
+		/// <summary>
+		/// Releases the lease. Releasing it again does nothing.
+		/// </summary>
+		public void Dispose()
+		{
+			if (Interlocked.Exchange(ref released, 1) == 0)
+			{
+				owner.Release(entry);
+			}
 		}
 	}
 }
