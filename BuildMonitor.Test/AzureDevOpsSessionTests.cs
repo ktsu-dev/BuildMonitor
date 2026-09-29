@@ -26,9 +26,9 @@ public sealed class AzureDevOpsSessionTests
 	{
 		AzureDevOps provider = new();
 
-		AzureDevOps.AzureDevOpsSession? session = provider.EnsureAzureDevOpsClients();
+		using CredentialedSessionCache<AzureDevOps.AzureDevOpsSession>.Lease? lease = provider.EnsureAzureDevOpsClients();
 
-		Assert.IsNull(session);
+		Assert.IsNull(lease);
 	}
 
 	/// <summary>

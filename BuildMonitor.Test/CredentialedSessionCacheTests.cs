@@ -97,7 +97,11 @@ public sealed class CredentialedSessionCacheTests
 			ConcurrentBag<FakeSession> created = [];
 			using CredentialedSessionCache<FakeSession> cache = CreateCache(created);
 
-			List<FakeSession> handedOut = RunConcurrently(_ => cache.Get(AccountId, Token));
+			List<FakeSession> handedOut = RunConcurrently(_ =>
+			{
+				using CredentialedSessionCache<FakeSession>.Lease lease = cache.Get(AccountId, Token);
+				return lease.Session;
+			});
 
 			Assert.AreEqual(1, cache.SessionsCreated, $"round {round}: more than one session was built");
 			Assert.HasCount(1, created, $"round {round}: more than one session was built");
@@ -121,8 +125,12 @@ public sealed class CredentialedSessionCacheTests
 			ConcurrentBag<FakeSession> created = [];
 			CredentialedSessionCache<FakeSession> cache = CreateCache(created);
 
-			List<FakeSession> handedOut = RunConcurrently(
-				index => cache.Get(AccountId, index % 2 == 0 ? Token : RotatedToken));
+			List<FakeSession> handedOut = RunConcurrently(index =>
+			{
+				using CredentialedSessionCache<FakeSession>.Lease lease =
+					cache.Get(AccountId, index % 2 == 0 ? Token : RotatedToken);
+				return lease.Session;
+			});
 
 			cache.Dispose();
 
@@ -140,7 +148,8 @@ public sealed class CredentialedSessionCacheTests
 	/// The <see cref="NullReferenceException"/> half. A caller is handed its session before waiting
 	/// out the rate-limit delay and dereferences the clients afterwards. A rebuild behind it used to
 	/// null the shared fields in that window; holding the session as a value means the caller still
-	/// has what it checked.
+	/// has what it checked. It must also still be open: a rebuild that disposed it would fail the
+	/// request with <see cref="ObjectDisposedException"/> instead.
 	/// </summary>
 	[TestMethod]
 	public void ASessionHandedToACallerSurvivesARebuildBehindIt()
@@ -150,20 +159,23 @@ public sealed class CredentialedSessionCacheTests
 			ConcurrentBag<FakeSession> created = [];
 			using CredentialedSessionCache<FakeSession> cache = CreateCache(created);
 
-			List<string> observed = RunConcurrently(index =>
+			List<(string Credentials, bool WasDisposed)> observed = RunConcurrently(index =>
 			{
 				// Half the callers rotate the credentials, standing in for a PAT change or a second
 				// configured owner; the rest take a session and use it after a pause.
 				string token = index % 2 == 0 ? Token : RotatedToken;
-				FakeSession session = cache.Get(AccountId, token);
+				using CredentialedSessionCache<FakeSession>.Lease lease = cache.Get(AccountId, token);
 				Thread.Yield();
-				return session.Credentials;
+				return (lease.Session.Credentials, lease.Session.IsDisposed);
 			});
 
 			Assert.HasCount(ConcurrentCallers, observed);
 			Assert.IsFalse(
-				observed.Exists(string.IsNullOrEmpty),
+				observed.Exists(o => string.IsNullOrEmpty(o.Credentials)),
 				$"round {round}: a caller dereferenced a session it no longer held");
+			Assert.IsFalse(
+				observed.Exists(o => o.WasDisposed),
+				$"round {round}: a session was disposed while a caller still held it");
 		}
 	}
 
@@ -177,8 +189,10 @@ public sealed class CredentialedSessionCacheTests
 		ConcurrentBag<FakeSession> created = [];
 		using CredentialedSessionCache<FakeSession> cache = CreateCache(created);
 
-		FakeSession first = cache.Get(AccountId, Token);
-		FakeSession second = cache.Get(AccountId, Token);
+		using CredentialedSessionCache<FakeSession>.Lease firstLease = cache.Get(AccountId, Token);
+		using CredentialedSessionCache<FakeSession>.Lease secondLease = cache.Get(AccountId, Token);
+		FakeSession first = firstLease.Session;
+		FakeSession second = secondLease.Session;
 
 		Assert.AreSame(first, second);
 		Assert.AreEqual(1, cache.SessionsCreated);
@@ -194,13 +208,67 @@ public sealed class CredentialedSessionCacheTests
 		ConcurrentBag<FakeSession> created = [];
 		using CredentialedSessionCache<FakeSession> cache = CreateCache(created);
 
-		FakeSession first = cache.Get(AccountId, Token);
-		FakeSession second = cache.Get(AccountId, RotatedToken);
+		FakeSession first;
+		using (CredentialedSessionCache<FakeSession>.Lease firstLease = cache.Get(AccountId, Token))
+		{
+			first = firstLease.Session;
+		}
+
+		using CredentialedSessionCache<FakeSession>.Lease secondLease = cache.Get(AccountId, RotatedToken);
+		FakeSession second = secondLease.Session;
 
 		Assert.AreNotSame(first, second);
 		Assert.AreEqual(2, cache.SessionsCreated);
 		Assert.IsTrue(first.IsDisposed);
 		Assert.IsFalse(second.IsDisposed);
+	}
+
+	/// <summary>
+	/// The Set Credentials flow changes the account and then the token in two popups while polling
+	/// continues, so a request can be holding a session when its replacement is built. That session
+	/// must stay open until the request lets go of it, and then be disposed exactly once.
+	/// </summary>
+	[TestMethod]
+	public void ASessionReplacedWhileHeldIsDisposedOnlyWhenReleased()
+	{
+		ConcurrentBag<FakeSession> created = [];
+		using CredentialedSessionCache<FakeSession> cache = CreateCache(created);
+
+		CredentialedSessionCache<FakeSession>.Lease held = cache.Get(AccountId, Token);
+		using CredentialedSessionCache<FakeSession>.Lease replacement = cache.Get(AccountId, RotatedToken);
+
+		Assert.AreNotSame(held.Session, replacement.Session);
+		Assert.IsFalse(held.Session.IsDisposed, "the session was disposed while a caller still held it");
+
+		held.Dispose();
+		held.Dispose();
+
+		Assert.AreEqual(1, held.Session.Disposals);
+		Assert.IsFalse(replacement.Session.IsDisposed);
+	}
+
+	/// <summary>
+	/// Invalidating after an authentication failure retires the session the same way: callers still
+	/// holding it keep it open, and the last of them to release it disposes it.
+	/// </summary>
+	[TestMethod]
+	public void AnInvalidatedSessionStaysOpenUntilItsLastHolderReleasesIt()
+	{
+		ConcurrentBag<FakeSession> created = [];
+		using CredentialedSessionCache<FakeSession> cache = CreateCache(created);
+
+		CredentialedSessionCache<FakeSession>.Lease first = cache.Get(AccountId, Token);
+		CredentialedSessionCache<FakeSession>.Lease second = cache.Get(AccountId, Token);
+		FakeSession session = first.Session;
+
+		cache.Invalidate();
+		first.Dispose();
+
+		Assert.IsFalse(session.IsDisposed, "the session was disposed while a caller still held it");
+
+		second.Dispose();
+
+		Assert.AreEqual(1, session.Disposals);
 	}
 
 	/// <summary>
@@ -219,10 +287,10 @@ public sealed class CredentialedSessionCacheTests
 
 		_ = Assert.ThrowsExactly<InvalidOperationException>(() => cache.Get(AccountId, Token));
 
-		FakeSession recovered = cache.Get(AccountId, Token);
+		using CredentialedSessionCache<FakeSession>.Lease recovered = cache.Get(AccountId, Token);
 
 		Assert.AreEqual(2, attempts);
-		Assert.AreEqual($"{AccountId}:{Token}", recovered.Credentials);
+		Assert.AreEqual($"{AccountId}:{Token}", recovered.Session.Credentials);
 	}
 
 	/// <summary>
@@ -235,9 +303,15 @@ public sealed class CredentialedSessionCacheTests
 		ConcurrentBag<FakeSession> created = [];
 		using CredentialedSessionCache<FakeSession> cache = CreateCache(created);
 
-		FakeSession first = cache.Get(AccountId, Token);
+		FakeSession first;
+		using (CredentialedSessionCache<FakeSession>.Lease firstLease = cache.Get(AccountId, Token))
+		{
+			first = firstLease.Session;
+		}
+
 		cache.Invalidate();
-		FakeSession second = cache.Get(AccountId, Token);
+		using CredentialedSessionCache<FakeSession>.Lease secondLease = cache.Get(AccountId, Token);
+		FakeSession second = secondLease.Session;
 
 		Assert.IsTrue(first.IsDisposed);
 		Assert.AreNotSame(first, second);
@@ -252,10 +326,15 @@ public sealed class CredentialedSessionCacheTests
 	{
 		ConcurrentBag<FakeSession> created = [];
 		CredentialedSessionCache<FakeSession> cache = CreateCache(created);
-		FakeSession session = cache.Get(AccountId, Token);
+		CredentialedSessionCache<FakeSession>.Lease lease = cache.Get(AccountId, Token);
+		FakeSession session = lease.Session;
 
 		cache.Dispose();
 		cache.Dispose();
+
+		Assert.IsFalse(session.IsDisposed, "the session was disposed while a caller still held it");
+
+		lease.Dispose();
 
 		Assert.AreEqual(1, session.Disposals);
 	}

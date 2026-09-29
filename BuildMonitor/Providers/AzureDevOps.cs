@@ -67,15 +67,17 @@ internal sealed class AzureDevOps : BuildProvider
 	}
 
 	/// <summary>
-	/// Gets the session for the current credentials, or <see langword="null"/> when there are none or
-	/// the connection could not be built.
+	/// Leases the session for the current credentials, or returns <see langword="null"/> when there are
+	/// none or the connection could not be built.
 	/// </summary>
 	/// <remarks>
-	/// Callers keep the returned session in a local rather than reading it again. Re-reading is what
-	/// let a rebuild on another thread null a client between a caller's null check and its use.
+	/// Callers keep the returned lease in a local rather than reading the session again, and dispose it
+	/// when their request is done. Re-reading is what let a rebuild on another thread null a client
+	/// between a caller's null check and its use, and holding the lease is what keeps that rebuild
+	/// from disposing the connection underneath the request.
 	/// </remarks>
-	/// <returns>The session, or <see langword="null"/>.</returns>
-	internal AzureDevOpsSession? EnsureAzureDevOpsClients()
+	/// <returns>The lease, or <see langword="null"/>.</returns>
+	internal CredentialedSessionCache<AzureDevOpsSession>.Lease? EnsureAzureDevOpsClients()
 	{
 		string accountId = AccountId.ToString();
 		string token = Token.ToString();
@@ -149,12 +151,14 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
-		if (session == null)
+		using CredentialedSessionCache<AzureDevOpsSession>.Lease? lease = EnsureAzureDevOpsClients();
+		if (lease == null)
 		{
 			Log.Warning($"{Name}: DiscoverProjectsAsync skipped - no Azure DevOps session after credential update");
 			return;
 		}
+
+		AzureDevOpsSession session = lease.Session;
 
 		Log.Info($"{Name}: Discovering projects for organization '{AccountId}'");
 		await MakeAzureDevOpsRequestAsync($"{Name}/discover", async () =>
@@ -190,12 +194,14 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
-		if (session == null)
+		using CredentialedSessionCache<AzureDevOpsSession>.Lease? lease = EnsureAzureDevOpsClients();
+		if (lease == null)
 		{
 			Log.Warning($"{Name}: UpdateRepositoriesAsync skipped for owner '{owner.Name}' - no Azure DevOps session");
 			return;
 		}
+
+		AzureDevOpsSession session = lease.Session;
 
 		Log.Debug($"{Name}: UpdateRepositoriesAsync for owner '{owner.Name}'");
 		await MakeAzureDevOpsRequestAsync($"{Name}/{owner.Name}", async () =>
@@ -247,12 +253,14 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
-		if (session == null)
+		using CredentialedSessionCache<AzureDevOpsSession>.Lease? lease = EnsureAzureDevOpsClients();
+		if (lease == null)
 		{
 			Log.Warning($"{Name}: UpdateBuildsAsync skipped for '{repository.Owner.Name}/{repository.Name}' - no Azure DevOps session");
 			return;
 		}
+
+		AzureDevOpsSession session = lease.Session;
 
 		Log.Debug($"{Name}: UpdateBuildsAsync for '{repository.Owner.Name}/{repository.Name}'");
 		await MakeAzureDevOpsRequestAsync($"{Name}/{repository.Owner.Name}/{repository.Name}", async () =>
@@ -301,12 +309,14 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
-		if (session == null)
+		using CredentialedSessionCache<AzureDevOpsSession>.Lease? lease = EnsureAzureDevOpsClients();
+		if (lease == null)
 		{
 			Log.Warning($"{Name}: UpdateBuildAsync skipped for '{build.Owner.Name}/{build.Repository.Name}/{build.Name}' - no Azure DevOps session");
 			return;
 		}
+
+		AzureDevOpsSession session = lease.Session;
 
 		Log.Debug($"{Name}: UpdateBuildAsync for '{build.Owner.Name}/{build.Repository.Name}/{build.Name}' (definition ID: {build.Id})");
 		await MakeAzureDevOpsRequestAsync($"{Name}/{build.Owner.Name}/{build.Repository.Name}/{build.Name}", async () =>
@@ -337,12 +347,14 @@ internal sealed class AzureDevOps : BuildProvider
 			return;
 		}
 
-		AzureDevOpsSession? session = EnsureAzureDevOpsClients();
-		if (session == null)
+		using CredentialedSessionCache<AzureDevOpsSession>.Lease? lease = EnsureAzureDevOpsClients();
+		if (lease == null)
 		{
 			Log.Warning($"{Name}: UpdateRunAsync skipped for run '{run.Name}' - no Azure DevOps session");
 			return;
 		}
+
+		AzureDevOpsSession session = lease.Session;
 
 		Log.Debug($"{Name}: UpdateRunAsync for run '{run.Name}' (ID: {run.Id}) in '{run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}'");
 		await MakeAzureDevOpsRequestAsync($"{Name}/{run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}/{run.Name}", async () =>
