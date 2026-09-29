@@ -44,6 +44,7 @@ internal static class Strings
 	internal static string RateLimitedMessage { get; } = "Rate limited.";
 	internal static string AuthFailed { get; } = nameof(AuthFailed).Titleize();
 	internal static string AuthFailedMessage { get; } = "Authentication failed. Please update credentials.";
+	internal static string Forbidden { get; } = "Forbidden";
 	internal static string ConnectionError { get; } = nameof(ConnectionError).Titleize();
 	internal static string ConnectionErrorMessage { get; } = "Connection error.";
 	internal static string Delay { get; } = nameof(Delay).Titleize();
