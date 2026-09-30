@@ -30,13 +30,27 @@ internal sealed class RunSync
 
 	internal async Task UpdateAsync()
 	{
+		// Restart the timer whether or not the update succeeds, so a run whose update keeps failing
+		// is retried on its interval rather than back to back (ktsu-dev/BuildMonitor#299). A run that
+		// is no longer ongoing never updates again, so restarting its timer changes nothing.
+		try
+		{
+			_ = await SyncGuard.RunAsync(UpdateRunAsync, $"RunSync: {Run.Owner.Name}/{Run.Repository.Name}/{Run.Build.Name}/{Run.Name}").ConfigureAwait(false);
+		}
+		finally
+		{
+			UpdateTimer.Restart();
+		}
+	}
+
+	private async Task UpdateRunAsync()
+	{
 		await Run.Owner.BuildProvider.UpdateRunAsync(Run).ConfigureAwait(false);
 
 		if (Run.IsOngoing)
 		{
 			UpdateIntervalCurrent = (int)Run.CalculateETA().TotalSeconds;
 			UpdateIntervalCurrent = Math.Clamp(UpdateIntervalCurrent, UpdateIntervalMin, UpdateIntervalMax);
-			UpdateTimer.Restart();
 		}
 	}
 }

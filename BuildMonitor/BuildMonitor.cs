@@ -1523,7 +1523,9 @@ internal static class BuildMonitor
 			}
 
 			// Update repositories concurrently (semaphore limits per-provider concurrency)
-			await Task.WhenAll(allOwners.Select(x => x.Provider.UpdateRepositoriesAsync(x.Owner))).ConfigureAwait(false);
+			// Each owner is guarded so one that fails does not fault the batch, which would skip the
+			// ProviderRefreshTimer restart below and re-run discovery straight away (ktsu-dev/BuildMonitor#299).
+			await SyncGuard.RunAllAsync(allOwners, x => x.Provider.UpdateRepositoriesAsync(x.Owner), x => $"{x.Provider.Name}: repository discovery for {x.Owner.Name}").ConfigureAwait(false);
 
 			// Gather all repositories across all owners
 			List<(BuildProvider Provider, Repository Repository)> allRepositories = [];
@@ -1536,7 +1538,8 @@ internal static class BuildMonitor
 			}
 
 			// Update builds concurrently (semaphore limits per-provider concurrency)
-			await Task.WhenAll(allRepositories.Select(async x =>
+			// Each repository is guarded for the same reason as each owner above.
+			await SyncGuard.RunAllAsync(allRepositories, async x =>
 			{
 				await x.Provider.UpdateBuildsAsync(x.Repository).ConfigureAwait(false);
 
@@ -1548,7 +1551,7 @@ internal static class BuildMonitor
 						Build = build,
 					});
 				}
-			})).ConfigureAwait(false);
+			}, x => $"{x.Provider.Name}: build discovery for {x.Repository.Owner.Name}/{x.Repository.Name}").ConfigureAwait(false);
 
 			ProviderRefreshTimer.Restart();
 		}
