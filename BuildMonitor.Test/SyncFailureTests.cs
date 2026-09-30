@@ -104,6 +104,35 @@ public sealed class SyncFailureTests
 		Assert.AreEqual("healthy", provider.Updated[0], "The healthy build should still be polled");
 	}
 
+	[TestMethod]
+	public async Task AFailedRunUpdateDoesNotStopTheOthersInTheBatch()
+	{
+		// Arrange
+		FailingProvider provider = new();
+		provider.Failing.Add("broken");
+		Build build = AddBuild(CreateRepository(provider), "build");
+		RunSync broken = new() { Run = AddRun(build, "broken") };
+		RunSync healthy = new() { Run = AddRun(build, "healthy") };
+
+		// Act
+		Task batch = Task.WhenAll(broken.UpdateAsync(), healthy.UpdateAsync());
+		await batch.ConfigureAwait(false);
+
+		// Assert
+		Assert.IsFalse(batch.IsFaulted, "One failing run should not fault the batch, which skips the pruning after it");
+		Assert.HasCount(1, provider.Updated);
+		Assert.AreEqual("healthy", provider.Updated[0], "The healthy run should still be polled");
+		Assert.IsFalse(broken.ShouldUpdate, "The failed run should wait out its interval before the next poll");
+	}
+
+	private static Run AddRun(Build build, string name)
+	{
+		Run run = build.CreateRun(name.As<RunName>());
+		run.Status = RunStatus.Running;
+		Assert.IsTrue(build.Runs.TryAdd(run.Id, run));
+		return run;
+	}
+
 	/// <summary>
 	/// Gets or sets the test context MSTest injects, used for its cancellation token.
 	/// </summary>

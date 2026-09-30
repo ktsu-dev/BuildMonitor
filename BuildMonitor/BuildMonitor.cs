@@ -1504,16 +1504,58 @@ internal static class BuildMonitor
 	{
 		if (!ProviderRefreshTimer.IsRunning || ProviderRefreshTimer.Elapsed.TotalSeconds >= ProviderRefreshTimeout)
 		{
-			try
+			// Gather all owners across all providers, skipping providers with low budget
+			// Discovery operations are low priority and should be skipped when budget is constrained
+			List<(BuildProvider Provider, Owner Owner)> allOwners = [];
+			foreach ((BuildProviderName _, BuildProvider? provider) in AppData.BuildProviders)
 			{
-				await DiscoverAsync().ConfigureAwait(false);
+				// Skip discovery for providers in low budget mode
+				if (provider.IsLowBudget)
+				{
+					Log.Info($"{provider.Name}: Skipping discovery due to low budget ({provider.BudgetPercentage:P0} remaining)");
+					continue;
+				}
+
+				foreach ((OwnerName _, Owner? owner) in provider.Owners)
+				{
+					allOwners.Add((provider, owner));
+				}
 			}
-			finally
+
+			// Update repositories concurrently (semaphore limits per-provider concurrency)
+			// Each owner is guarded so one that fails does not fault the batch, which would skip the
+			// ProviderRefreshTimer restart below and re-run discovery straight away (ktsu-dev/BuildMonitor#299).
+			await Task.WhenAll(allOwners.Select(x => SyncGuard.RunAsync(
+				() => x.Provider.UpdateRepositoriesAsync(x.Owner),
+				$"{x.Provider.Name}: repository discovery for {x.Owner.Name}"))).ConfigureAwait(false);
+
+			// Gather all repositories across all owners
+			List<(BuildProvider Provider, Repository Repository)> allRepositories = [];
+			foreach ((BuildProvider provider, Owner owner) in allOwners)
 			{
-				// Restarted even when discovery fails, so a failure waits out the refresh interval
-				// instead of re-running discovery straight away (ktsu-dev/BuildMonitor#299).
-				ProviderRefreshTimer.Restart();
+				foreach ((RepositoryId _, Repository? repository) in owner.Repositories)
+				{
+					allRepositories.Add((provider, repository));
+				}
 			}
+
+			// Update builds concurrently (semaphore limits per-provider concurrency)
+			// Each repository is guarded for the same reason as each owner above.
+			await Task.WhenAll(allRepositories.Select(x => SyncGuard.RunAsync(async () =>
+			{
+				await x.Provider.UpdateBuildsAsync(x.Repository).ConfigureAwait(false);
+
+				// Add new builds to sync collection
+				foreach ((BuildId _, Build? build) in x.Repository.Builds)
+				{
+					_ = BuildSyncCollection.TryAdd(build.Id, new()
+					{
+						Build = build,
+					});
+				}
+			}, $"{x.Provider.Name}: build discovery for {x.Repository.Owner.Name}/{x.Repository.Name}"))).ConfigureAwait(false);
+
+			ProviderRefreshTimer.Restart();
 		}
 
 		// Update builds and runs concurrently
@@ -1523,59 +1565,6 @@ internal static class BuildMonitor
 		).ConfigureAwait(false);
 
 		PruneOrphanedAndCompletedSyncs();
-	}
-
-	private static async Task DiscoverAsync()
-	{
-		// Gather all owners across all providers, skipping providers with low budget
-		// Discovery operations are low priority and should be skipped when budget is constrained
-		List<(BuildProvider Provider, Owner Owner)> allOwners = [];
-		foreach ((BuildProviderName _, BuildProvider? provider) in AppData.BuildProviders)
-		{
-			// Skip discovery for providers in low budget mode
-			if (provider.IsLowBudget)
-			{
-				Log.Info($"{provider.Name}: Skipping discovery due to low budget ({provider.BudgetPercentage:P0} remaining)");
-				continue;
-			}
-
-			foreach ((OwnerName _, Owner? owner) in provider.Owners)
-			{
-				allOwners.Add((provider, owner));
-			}
-		}
-
-		// Update repositories concurrently (semaphore limits per-provider concurrency)
-		// Each owner is guarded so one that fails does not stop discovery for the rest.
-		await Task.WhenAll(allOwners.Select(x => SyncGuard.RunAsync(
-			() => x.Provider.UpdateRepositoriesAsync(x.Owner),
-			$"{x.Provider.Name}: repository discovery for {x.Owner.Name}"))).ConfigureAwait(false);
-
-		// Gather all repositories across all owners
-		List<(BuildProvider Provider, Repository Repository)> allRepositories = [];
-		foreach ((BuildProvider provider, Owner owner) in allOwners)
-		{
-			foreach ((RepositoryId _, Repository? repository) in owner.Repositories)
-			{
-				allRepositories.Add((provider, repository));
-			}
-		}
-
-		// Update builds concurrently (semaphore limits per-provider concurrency)
-		// Each repository is guarded so one that fails does not stop discovery for the rest.
-		await Task.WhenAll(allRepositories.Select(x => SyncGuard.RunAsync(async () =>
-		{
-			await x.Provider.UpdateBuildsAsync(x.Repository).ConfigureAwait(false);
-
-			// Add new builds to sync collection
-			foreach ((BuildId _, Build? build) in x.Repository.Builds)
-			{
-				_ = BuildSyncCollection.TryAdd(build.Id, new()
-				{
-					Build = build,
-				});
-			}
-		}, $"{x.Provider.Name}: build discovery for {x.Repository.Owner.Name}/{x.Repository.Name}"))).ConfigureAwait(false);
 	}
 
 	private static void PruneOrphanedAndCompletedSyncs()
