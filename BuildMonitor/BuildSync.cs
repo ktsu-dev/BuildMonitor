@@ -81,6 +81,20 @@ internal sealed class BuildSync
 
 	internal async Task UpdateAsync()
 	{
+		// Restart the timer whether or not the update succeeds. A failed update that left it running
+		// kept ShouldUpdate true, so the build was polled again back to back (ktsu-dev/BuildMonitor#299).
+		try
+		{
+			_ = await SyncGuard.RunAsync(UpdateBuildAsync, $"BuildSync: {Build.Owner.Name}/{Build.Repository.Name}/{Build.Name}").ConfigureAwait(false);
+		}
+		finally
+		{
+			UpdateTimer.Restart();
+		}
+	}
+
+	private async Task UpdateBuildAsync()
+	{
 		int runsBefore = Build.Runs.Count;
 		await Build.Owner.BuildProvider.UpdateBuildAsync(Build).ConfigureAwait(false);
 		int runsAfter = Build.Runs.Count;
@@ -101,7 +115,5 @@ internal sealed class BuildSync
 				Run = run,
 			});
 		}
-
-		UpdateTimer.Restart();
 	}
 }
