@@ -37,4 +37,22 @@ internal static class SyncGuard
 			return false;
 		}
 	}
+
+	/// <summary>
+	/// Runs <paramref name="update"/> for every item concurrently, each guarded by
+	/// <see cref="RunAsync"/>, so one item that throws is logged and the rest still run.
+	/// </summary>
+	/// <typeparam name="T">The type of item being updated.</typeparam>
+	/// <param name="items">The items to update.</param>
+	/// <param name="update">The update to run for each item.</param>
+	/// <param name="describe">Describes an item for the log line when its update fails.</param>
+	/// <returns>A task that completes, without faulting, once every update has finished.</returns>
+	internal static Task RunAllAsync<T>(IEnumerable<T> items, Func<T, Task> update, Func<T, string> describe)
+	{
+		Ensure.NotNull(items);
+		Ensure.NotNull(update);
+		Ensure.NotNull(describe);
+
+		return Task.WhenAll(items.Select(item => RunAsync(() => update(item), describe(item))));
+	}
 }

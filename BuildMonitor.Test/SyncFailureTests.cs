@@ -125,6 +125,40 @@ public sealed class SyncFailureTests
 		Assert.IsFalse(broken.ShouldUpdate, "The failed run should wait out its interval before the next poll");
 	}
 
+	[TestMethod]
+	public async Task AFailedDiscoveryItemDoesNotStopTheRest()
+	{
+		// Arrange
+		List<string> discovered = [];
+
+		// Act
+		Task batch = SyncGuard.RunAllAsync(
+			["first", "broken", "last"],
+			name =>
+			{
+				if (name == "broken")
+				{
+					throw new HttpRequestException("503 Service Unavailable");
+				}
+
+				lock (discovered)
+				{
+					discovered.Add(name);
+				}
+
+				return Task.CompletedTask;
+			},
+			name => $"discovery for {name}");
+		await batch.ConfigureAwait(false);
+
+		// Assert
+		Assert.IsFalse(batch.IsFaulted, "One failing item should not fault discovery, which would skip the refresh timer restart after it");
+		Assert.HasCount(2, discovered);
+		Assert.Contains("first", discovered);
+		Assert.Contains("last", discovered);
+		Assert.Contains(e => e.Message.Contains("discovery for broken", StringComparison.Ordinal), Log.GetEntries(), "The failure should be logged");
+	}
+
 	private static Run AddRun(Build build, string name)
 	{
 		Run run = build.CreateRun(name.As<RunName>());
