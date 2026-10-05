@@ -11,7 +11,7 @@
     <PackageVersion Include="ktsu.ImGui.Popups" Version="3.59.1" />
     <PackageVersion Include="ktsu.ImGui.Styler" Version="3.59.1" />
     <PackageVersion Include="ktsu.ImGui.Widgets" Version="3.59.1" />
-    <PackageVersion Include="ktsu.Semantics.Strings" Version="5.10.0" />
+    <PackageVersion Include="ktsu.Semantics.Strings" Version="5.11.0" />
     <PackageVersion Include="ktsu.TextFilter" Version="1.7.11" />
     <PackageVersion Include="Microsoft.TeamFoundationServer.Client" Version="19.225.2" />
     <PackageVersion Include="Octokit" Version="14.0.0" />
