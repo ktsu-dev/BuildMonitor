@@ -467,33 +467,49 @@ internal sealed partial class GitHub : BuildProvider
 		}
 	}
 
-	private static RunStatus MapWorkflowRunStatus(WorkflowRun gitHubRun)
+	private static RunStatus MapWorkflowRunStatus(WorkflowRun gitHubRun) =>
+		MapWorkflowRunStatus(gitHubRun.Status, gitHubRun.Conclusion);
+
+	/// <summary>
+	/// Unknown status and conclusion pairs that have already been logged. A run in an unknown state is
+	/// still ongoing and is polled every 10-60 s, so warning on every poll would push the genuine
+	/// warnings out of the 1000-entry log (ktsu-dev/BuildMonitor#306).
+	/// </summary>
+	private static System.Collections.Concurrent.ConcurrentDictionary<string, byte> LoggedUnhandledWorkflowStatuses { get; } = new();
+
+	internal static RunStatus MapWorkflowRunStatus(StringEnum<WorkflowRunStatus> runStatus, StringEnum<WorkflowRunConclusion>? conclusion)
 	{
-		RunStatus status = gitHubRun.Conclusion switch
+		RunStatus? status = conclusion switch
 		{
-			_ when gitHubRun.Status == WorkflowRunStatus.Requested => RunStatus.Pending,
-			_ when gitHubRun.Status == WorkflowRunStatus.Queued => RunStatus.Pending,
-			_ when gitHubRun.Status == WorkflowRunStatus.InProgress => RunStatus.Running,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Neutral => RunStatus.Success,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Success => RunStatus.Success,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Failure => RunStatus.Failure,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Cancelled => RunStatus.Canceled,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Skipped => RunStatus.Canceled,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.StartupFailure => RunStatus.Failure,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.TimedOut => RunStatus.Failure,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.ActionRequired => RunStatus.Failure,
-			_ when gitHubRun.Status == WorkflowRunStatus.Completed && gitHubRun.Conclusion == WorkflowRunConclusion.Stale => RunStatus.Failure,
-			_ => RunStatus.Pending,
+			_ when runStatus == WorkflowRunStatus.Requested => RunStatus.Pending,
+			_ when runStatus == WorkflowRunStatus.Queued => RunStatus.Pending,
+			// Waiting is a job held for deployment environment approval, which can take hours
+			_ when runStatus == WorkflowRunStatus.Waiting => RunStatus.Pending,
+			_ when runStatus == WorkflowRunStatus.Pending => RunStatus.Pending,
+			_ when runStatus == WorkflowRunStatus.InProgress => RunStatus.Running,
+			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.Neutral => RunStatus.Success,
+			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.Success => RunStatus.Success,
+			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.Failure => RunStatus.Failure,
+			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.Cancelled => RunStatus.Canceled,
+			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.Skipped => RunStatus.Canceled,
+			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.StartupFailure => RunStatus.Failure,
+			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.TimedOut => RunStatus.Failure,
+			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.ActionRequired => RunStatus.Failure,
+			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.Stale => RunStatus.Failure,
+			_ => null,
 		};
 
-		if (status == RunStatus.Pending &&
-			gitHubRun.Status != WorkflowRunStatus.Requested &&
-			gitHubRun.Status != WorkflowRunStatus.Queued)
+		if (status is RunStatus mapped)
 		{
-			Log.Warning($"GitHub: Unhandled workflow status: {gitHubRun.Status}, conclusion: {gitHubRun.Conclusion} - treating as Pending");
+			return mapped;
 		}
 
-		return status;
+		if (LoggedUnhandledWorkflowStatuses.TryAdd($"{runStatus}/{conclusion}", 0))
+		{
+			Log.Warning($"GitHub: Unhandled workflow status: {runStatus}, conclusion: {conclusion} - treating as Pending");
+		}
+
+		return RunStatus.Pending;
 	}
 
 	private async Task UpdateRunFromWorkflowAsync(Run run, WorkflowRun gitHubRun)
