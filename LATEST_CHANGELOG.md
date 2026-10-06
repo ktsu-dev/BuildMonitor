@@ -1,7 +1,6 @@
-## v1.6.4-pre.2 (prerelease)
+## v1.6.4 (patch)
 
-Changes since v1.6.4-pre.1:
+Changes since v1.6.3:
 
-- Bump Polyfill from 11.4.1 to 11.4.2 ([@dependabot[bot]](https://github.com/dependabot[bot]))
-- Bump the ktsu group with 1 update ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- fix: map Waiting/Pending workflow runs without an unhandled-status warning [patch] ([@Claude](https://github.com/Claude))
 
