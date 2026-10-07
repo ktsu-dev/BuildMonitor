@@ -28,6 +28,11 @@ internal sealed class BuildSync
 	private const int UpdateIntervalLow = 120;
 
 	/// <summary>
+	/// Set by <see cref="ForceUpdate"/> to poll the build on the next tick regardless of its interval.
+	/// </summary>
+	private volatile bool forceUpdate;
+
+	/// <summary>
 	/// Returns true if the build no longer exists in its parent repository's builds collection.
 	/// This happens when the build/workflow is deleted or the repository is removed.
 	/// </summary>
@@ -68,19 +73,28 @@ internal sealed class BuildSync
 		_ => UpdateIntervalLow,
 	};
 
-	internal TimeSpan TimeRemaining => TimeSpan.FromSeconds(
-		Math.Max(0, UpdateInterval - UpdateTimer.Elapsed.TotalSeconds));
+	internal TimeSpan TimeRemaining => forceUpdate
+		? TimeSpan.Zero
+		: TimeSpan.FromSeconds(Math.Max(0, UpdateInterval - UpdateTimer.Elapsed.TotalSeconds));
 
-	internal double UpdateProgress => Math.Clamp(UpdateTimer.Elapsed.TotalSeconds / UpdateInterval, 0, 1);
+	internal double UpdateProgress => forceUpdate ? 1 : Math.Clamp(UpdateTimer.Elapsed.TotalSeconds / UpdateInterval, 0, 1);
 
-	internal bool ShouldUpdate => !IsOrphaned && UpdateTimer.Elapsed.TotalSeconds >= UpdateInterval;
+	internal bool ShouldUpdate => !IsOrphaned && (forceUpdate || UpdateTimer.Elapsed.TotalSeconds >= UpdateInterval);
 
 	internal BuildSync() => UpdateTimer.Start();
 
-	internal void ResetTimer() => UpdateTimer.Restart();
+	/// <summary>
+	/// Queues the build to be polled on the next tick, however much of its interval is left. Restarting
+	/// the timer instead pushed the next poll a full interval away (ktsu-dev/BuildMonitor#303).
+	/// </summary>
+	internal void ForceUpdate() => forceUpdate = true;
 
 	internal async Task UpdateAsync()
 	{
+		// Clear the request before polling, so a refresh asked for while this update is in flight still
+		// gets its own poll afterwards.
+		forceUpdate = false;
+
 		// Restart the timer whether or not the update succeeds. A failed update that left it running
 		// kept ShouldUpdate true, so the build was polled again back to back (ktsu-dev/BuildMonitor#299).
 		try
