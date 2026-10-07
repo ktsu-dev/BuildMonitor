@@ -20,7 +20,9 @@ using Microsoft.VisualStudio.TestTools.UnitTesting;
 /// glyph is one quad, so two strings of the same length with no spaces draw the same number of
 /// vertices only when every character of both was drawn. A format pass collapses <c>%%</c> to one
 /// <c>%</c> and drops a glyph. A specifier such as <c>%s</c> would read a missing argument, which is
-/// the crash this guards against, so the tests use the deterministic case.
+/// the crash this guards against, so the tests use the deterministic case. The status bar reads its
+/// providers from the process-wide <see cref="BuildMonitor.AppData"/>, which is another reason these
+/// run outside the parallel phase.
 /// </remarks>
 [TestClass]
 [DoNotParallelize]
@@ -93,7 +95,16 @@ public sealed class TooltipTests
 	{
 		AzureDevOps provider = new();
 		provider.ReportProjectNotFound(projectName.As<OwnerName>());
-		return RenderVertexCount(() => BuildMonitor.RenderProviderStatus(provider), mousePosition);
+		BuildMonitor.AppData = new();
+		BuildMonitor.AppData.BuildProviders[provider.Name] = provider;
+		try
+		{
+			return RenderVertexCount(BuildMonitor.RenderProviderStatusBar, mousePosition);
+		}
+		finally
+		{
+			BuildMonitor.AppData = new();
+		}
 	}
 
 	[TestMethod]

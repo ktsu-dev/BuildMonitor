@@ -1451,40 +1451,36 @@ internal static class BuildMonitor
 		};
 	}
 
-	private static void RenderProviderStatusBar()
+	internal static void RenderProviderStatusBar()
 	{
 		foreach ((BuildProviderName _, BuildProvider? provider) in AppData.BuildProviders)
 		{
-			RenderProviderStatus(provider);
+			ImGuiWidgets.ColorIndicator(GetProviderStatusColor(provider.Status), true);
+			ImGui.SameLine();
+
+			// Build status text with rate limit info if available
+			string statusText = $"{provider.Name}: {GetProviderStatusLabel(provider.Status)}";
+			if (provider.RateLimitDisplay != null)
+			{
+				statusText += $" [{provider.RateLimitDisplay}]";
+			}
+			ImGui.TextUnformatted(statusText);
+
+			// Show detailed tooltip with status message and rate limit details
+			if (ImGui.IsItemHovered())
+			{
+				string? tooltip = BuildProviderTooltip(provider);
+				if (!string.IsNullOrEmpty(tooltip))
+				{
+					Tooltip.Show(tooltip);
+				}
+			}
+
 			ImGui.SameLine();
 			ImGui.Spacing();
 			ImGui.SameLine();
 		}
 		ImGui.NewLine();
-	}
-
-	internal static void RenderProviderStatus(BuildProvider provider)
-	{
-		ImGuiWidgets.ColorIndicator(GetProviderStatusColor(provider.Status), true);
-		ImGui.SameLine();
-
-		// Build status text with rate limit info if available
-		string statusText = $"{provider.Name}: {GetProviderStatusLabel(provider.Status)}";
-		if (provider.RateLimitDisplay != null)
-		{
-			statusText += $" [{provider.RateLimitDisplay}]";
-		}
-		ImGui.TextUnformatted(statusText);
-
-		// Show detailed tooltip with status message and rate limit details
-		if (ImGui.IsItemHovered())
-		{
-			string? tooltip = BuildProviderTooltip(provider);
-			if (!string.IsNullOrEmpty(tooltip))
-			{
-				Tooltip.Show(tooltip);
-			}
-		}
 	}
 
 	private static string? BuildProviderTooltip(BuildProvider provider)
