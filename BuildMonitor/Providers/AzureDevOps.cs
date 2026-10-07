@@ -17,8 +17,21 @@ internal sealed class AzureDevOps : BuildProvider
 	internal static BuildProviderName BuildProviderName => nameof(AzureDevOps).As<BuildProviderName>();
 	internal override BuildProviderName Name => BuildProviderName;
 
-	private CredentialedSessionCache<AzureDevOpsSession> Sessions { get; } = new(CreateSession);
+	private CredentialedSessionCache<AzureDevOpsSession> Sessions { get; }
 	private bool ShouldDiscoverProjects { get; set; }
+
+	/// <summary>
+	/// Initializes a new instance of the <see cref="AzureDevOps"/> class that connects to dev.azure.com.
+	/// </summary>
+	public AzureDevOps() : this(CreateSession) { }
+
+	/// <summary>
+	/// Initializes a new instance of the <see cref="AzureDevOps"/> class with its own session factory,
+	/// which is how a test stands in for a connection that dev.azure.com refuses.
+	/// </summary>
+	/// <param name="createSession">Builds a session from an organization name and a token.</param>
+	internal AzureDevOps(Func<string, string, AzureDevOpsSession> createSession) =>
+		Sessions = new(createSession);
 
 	/// <summary>
 	/// A connection to an Azure DevOps organization together with the clients built from it.
@@ -91,6 +104,15 @@ internal sealed class AzureDevOps : BuildProvider
 		try
 		{
 			return Sessions.Get(accountId, token, out session);
+		}
+		catch (VssUnauthorizedException ex)
+		{
+			// Building the clients authenticates, so a rejected token surfaces here rather than as a
+			// 401 from a request. VssUnauthorizedException is not a VssServiceException, and letting it
+			// escape faulted the whole update loop (ktsu-dev/BuildMonitor#305).
+			Log.Error($"{Name}: Unauthorized while connecting to '{accountId}' - {ex.Message}");
+			OnAuthenticationFailure();
+			return null;
 		}
 		catch (VssServiceException ex)
 		{
@@ -427,6 +449,11 @@ internal sealed class AzureDevOps : BuildProvider
 			catch (VssServiceResponseException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.Unauthorized)
 			{
 				Log.Error($"{Name}: 401 Unauthorized for request '{name}' - {ex.Message}");
+				OnAuthenticationFailure();
+			}
+			catch (VssUnauthorizedException ex)
+			{
+				Log.Error($"{Name}: Unauthorized for request '{name}' - {ex.Message}");
 				OnAuthenticationFailure();
 			}
 			catch (VssServiceResponseException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.TooManyRequests)

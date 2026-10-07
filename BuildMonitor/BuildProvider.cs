@@ -46,7 +46,7 @@ internal abstract class BuildProvider
 {
 	internal abstract BuildProviderName Name { get; }
 	[JsonInclude]
-	internal BuildProviderAccountId AccountId { get; private set; } = new();
+	internal BuildProviderAccountId AccountId { get; set; } = new();
 
 	/// <summary>
 	/// The provider token as earlier versions persisted it: plaintext, in the app data file.
