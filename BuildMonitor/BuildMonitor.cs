@@ -1268,7 +1268,7 @@ internal static class BuildMonitor
 		// Queue the build for immediate update
 		if (BuildSyncCollection.TryGetValue(build.Id, out BuildSync? buildSync))
 		{
-			buildSync.ResetTimer();
+			buildSync.ForceUpdate();
 		}
 	}
 
