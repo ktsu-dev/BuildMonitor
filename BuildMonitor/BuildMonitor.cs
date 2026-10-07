@@ -662,7 +662,7 @@ internal static class BuildMonitor
 		return branches.Any(branch => ShouldShowBuildBranch(build, branch));
 	}
 
-	private static bool ShouldShowBuildBranch(Build build, BranchName branch)
+	internal static bool ShouldShowBuildBranch(Build build, BranchName branch)
 	{
 		bool shouldShow = true;
 		if (!string.IsNullOrEmpty(AppData.FilterOwner))
@@ -776,7 +776,7 @@ internal static class BuildMonitor
 		}
 	}
 
-	private static bool ShouldShowEmptyRepository(Repository repository)
+	internal static bool ShouldShowEmptyRepository(Repository repository)
 	{
 		bool shouldShow = true;
 
