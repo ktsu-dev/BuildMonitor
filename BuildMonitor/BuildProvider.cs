@@ -111,6 +111,15 @@ internal abstract class BuildProvider
 	internal string StatusMessage { get; private set; } = string.Empty;
 
 	/// <summary>
+	/// Counts calls to <see cref="SetStatus"/>, so a request wrapper can tell whether the work it ran
+	/// reported a status of its own that a blanket <see cref="ClearStatus"/> would overwrite.
+	/// </summary>
+	[JsonIgnore]
+	internal int StatusSetCount => statusSetCount;
+
+	private int statusSetCount;
+
+	/// <summary>
 	/// When rate limited, the time when the rate limit resets.
 	/// </summary>
 	[JsonIgnore]
@@ -482,6 +491,7 @@ internal abstract class BuildProvider
 		Status = status;
 		StatusMessage = message;
 		StatusTimestamp = DateTimeOffset.UtcNow;
+		_ = Interlocked.Increment(ref statusSetCount);
 	}
 
 	/// <summary>
