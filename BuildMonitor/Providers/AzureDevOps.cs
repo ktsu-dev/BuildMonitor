@@ -238,7 +238,7 @@ internal sealed class AzureDevOps : BuildProvider
 			if (!foundProject)
 			{
 				Log.Warning($"{Name}: Project '{owner.Name}' not found among {projectCount} projects in organization '{AccountId}'");
-				SetStatus(ProviderStatus.Error, $"Project '{owner.Name}' not found in organization '{AccountId}'");
+				ReportProjectNotFound(owner.Name);
 			}
 		}).ConfigureAwait(false);
 	}
@@ -398,6 +398,9 @@ internal sealed class AzureDevOps : BuildProvider
 		BuildMonitor.QueueSaveAppData();
 	}
 
+	internal void ReportProjectNotFound(OwnerName ownerName) =>
+		SetStatus(ProviderStatus.Error, $"Project '{ownerName}' not found in organization '{AccountId}'");
+
 	internal async Task MakeAzureDevOpsRequestAsync(string name, Func<Task> action)
 	{
 		await RequestSemaphore.WaitAsync().ConfigureAwait(false);
@@ -412,8 +415,14 @@ internal sealed class AzureDevOps : BuildProvider
 
 			try
 			{
+				// Clear only when the action reported no status of its own. A project that matched no
+				// owner used to be reported and then cleared straight away (ktsu-dev/BuildMonitor#304).
+				int statusSetCountBefore = StatusSetCount;
 				await BuildMonitor.MakeRequestAsync(name, action).ConfigureAwait(false);
-				ClearStatus();
+				if (StatusSetCount == statusSetCountBefore)
+				{
+					ClearStatus();
+				}
 			}
 			catch (VssServiceResponseException ex) when (ex.HttpStatusCode == System.Net.HttpStatusCode.Unauthorized)
 			{
