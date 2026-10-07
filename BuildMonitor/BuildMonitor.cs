@@ -1402,7 +1402,7 @@ internal static class BuildMonitor
 		// Show tooltip on hover
 		if (ImGui.IsItemHovered())
 		{
-			ImGui.SetTooltip(errorSummary);
+			Tooltip.Show(errorSummary);
 		}
 
 		return shouldOpenContextMenu;
@@ -1472,7 +1472,7 @@ internal static class BuildMonitor
 				string? tooltip = BuildProviderTooltip(provider);
 				if (!string.IsNullOrEmpty(tooltip))
 				{
-					ImGui.SetTooltip(tooltip);
+					Tooltip.Show(tooltip);
 				}
 			}
 
