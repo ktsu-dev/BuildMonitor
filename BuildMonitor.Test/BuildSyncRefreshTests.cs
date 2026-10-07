@@ -56,6 +56,28 @@ public sealed class BuildSyncRefreshTests
 		// Assert
 		Assert.IsTrue(sync.ShouldUpdate, "A refresh should make the build due now, not a full interval later");
 		Assert.AreEqual(TimeSpan.Zero, sync.TimeRemaining);
+		Assert.AreEqual(1, sync.UpdateProgress, "The progress bar should show the build as due");
+	}
+
+	[TestMethod]
+	public void RefreshBuildDataForcesTheTrackedBuildsUpdate()
+	{
+		// Arrange
+		BuildSync sync = CreateSync(new());
+		Assert.IsTrue(BuildMonitor.BuildSyncCollection.TryAdd(sync.Build.Id, sync));
+
+		try
+		{
+			// Act
+			BuildMonitor.RefreshBuildData(sync.Build);
+
+			// Assert
+			Assert.IsTrue(sync.ShouldUpdate, "Refresh Build Data should queue the build for its next tick");
+		}
+		finally
+		{
+			_ = BuildMonitor.BuildSyncCollection.TryRemove(sync.Build.Id, out _);
+		}
 	}
 
 	[TestMethod]

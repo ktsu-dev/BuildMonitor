@@ -28,7 +28,7 @@ internal static class BuildMonitor
 
 	internal static object SyncLock { get; } = new();
 
-	private static ConcurrentDictionary<BuildId, BuildSync> BuildSyncCollection { get; } = [];
+	internal static ConcurrentDictionary<BuildId, BuildSync> BuildSyncCollection { get; } = [];
 	internal static ConcurrentDictionary<RunId, RunSync> RunSyncCollection { get; } = [];
 
 	private static Task UpdateTask { get; set; } = Task.CompletedTask;
@@ -1263,7 +1263,7 @@ internal static class BuildMonitor
 
 	private static string GetRunUrl(Run run) => $"https://github.com/{run.Owner.Name}/{run.Repository.Name}/actions/runs/{run.Id}";
 
-	private static void RefreshBuildData(Build build)
+	internal static void RefreshBuildData(Build build)
 	{
 		// Queue the build for immediate update
 		if (BuildSyncCollection.TryGetValue(build.Id, out BuildSync? buildSync))
