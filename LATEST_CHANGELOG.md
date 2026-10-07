@@ -1,4 +1,8 @@
-## v1.6.4
+## v1.6.5 (patch)
 
-No significant changes detected since v1.6.4.
+Changes since v1.6.4:
+
+- Cover RefreshBuildData and the forced UpdateProgress in tests ([@Claude](https://github.com/Claude))
+- fix: keep the Azure DevOps project-not-found error instead of clearing it [patch] ([@Claude](https://github.com/Claude))
+- fix: make Refresh Build Data force the next poll instead of delaying it [patch] ([@Claude](https://github.com/Claude))
 
