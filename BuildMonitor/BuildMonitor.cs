@@ -1340,7 +1340,7 @@ internal static class BuildMonitor
 		}
 	}
 
-	private static bool RenderErrorsColumn(Run run, Build build, BranchName branch)
+	internal static bool RenderErrorsColumn(Run run, Build build, BranchName branch)
 	{
 		if (run.Errors.Count == 0)
 		{
@@ -1402,7 +1402,7 @@ internal static class BuildMonitor
 		// Show tooltip on hover
 		if (ImGui.IsItemHovered())
 		{
-			ImGui.SetTooltip(errorSummary);
+			Tooltip.Show(errorSummary);
 		}
 
 		return shouldOpenContextMenu;
@@ -1451,7 +1451,7 @@ internal static class BuildMonitor
 		};
 	}
 
-	private static void RenderProviderStatusBar()
+	internal static void RenderProviderStatusBar()
 	{
 		foreach ((BuildProviderName _, BuildProvider? provider) in AppData.BuildProviders)
 		{
@@ -1472,7 +1472,7 @@ internal static class BuildMonitor
 				string? tooltip = BuildProviderTooltip(provider);
 				if (!string.IsNullOrEmpty(tooltip))
 				{
-					ImGui.SetTooltip(tooltip);
+					Tooltip.Show(tooltip);
 				}
 			}
 
