@@ -662,29 +662,29 @@ internal static class BuildMonitor
 		return branches.Any(branch => ShouldShowBuildBranch(build, branch));
 	}
 
-	private static bool ShouldShowBuildBranch(Build build, BranchName branch)
+	internal static bool ShouldShowBuildBranch(Build build, BranchName branch)
 	{
 		bool shouldShow = true;
 		if (!string.IsNullOrEmpty(AppData.FilterOwner))
 		{
-			shouldShow &= TextFilter.IsMatch(build.Owner.Name.ToString().ToUpperInvariant(), "*" + AppData.FilterOwner.ToUpperInvariant() + "*", AppData.FilterOwnerType, AppData.FilterOwnerMatchOptions);
+			shouldShow &= ColumnFilter.IsMatch(build.Owner.Name.ToString(), AppData.FilterOwner, AppData.FilterOwnerType, AppData.FilterOwnerMatchOptions);
 		}
 
 		if (!string.IsNullOrEmpty(AppData.FilterRepository))
 		{
 			string displayRepository = MakeRepositoryDisplayName(build);
-			shouldShow &= TextFilter.IsMatch(displayRepository.ToUpperInvariant(), "*" + AppData.FilterRepository.ToUpperInvariant() + "*", AppData.FilterRepositoryType, AppData.FilterRepositoryMatchOptions);
+			shouldShow &= ColumnFilter.IsMatch(displayRepository, AppData.FilterRepository, AppData.FilterRepositoryType, AppData.FilterRepositoryMatchOptions);
 		}
 
 		if (!string.IsNullOrEmpty(AppData.FilterBuildName))
 		{
 			string displayName = MakeBuildDisplayName(build);
-			shouldShow &= TextFilter.IsMatch(displayName.ToUpperInvariant(), "*" + AppData.FilterBuildName.ToUpperInvariant() + "*", AppData.FilterBuildNameType, AppData.FilterBuildNameMatchOptions);
+			shouldShow &= ColumnFilter.IsMatch(displayName, AppData.FilterBuildName, AppData.FilterBuildNameType, AppData.FilterBuildNameMatchOptions);
 		}
 
 		if (!string.IsNullOrEmpty(AppData.FilterBranch))
 		{
-			shouldShow &= TextFilter.IsMatch(branch.ToString().ToUpperInvariant(), "*" + AppData.FilterBranch.ToUpperInvariant() + "*", AppData.FilterBranchType, AppData.FilterBranchMatchOptions);
+			shouldShow &= ColumnFilter.IsMatch(branch.ToString(), AppData.FilterBranch, AppData.FilterBranchType, AppData.FilterBranchMatchOptions);
 		}
 
 		if (!string.IsNullOrEmpty(AppData.FilterStatus))
@@ -695,7 +695,7 @@ internal static class BuildMonitor
 				.FirstOrDefault();
 			if (latestRun is not null)
 			{
-				shouldShow &= TextFilter.IsMatch(latestRun.Status.ToString().ToUpperInvariant(), "*" + AppData.FilterStatus.ToUpperInvariant() + "*", AppData.FilterStatusType, AppData.FilterStatusMatchOptions);
+				shouldShow &= ColumnFilter.IsMatch(latestRun.Status.ToString(), AppData.FilterStatus, AppData.FilterStatusType, AppData.FilterStatusMatchOptions);
 			}
 		}
 
@@ -776,19 +776,19 @@ internal static class BuildMonitor
 		}
 	}
 
-	private static bool ShouldShowEmptyRepository(Repository repository)
+	internal static bool ShouldShowEmptyRepository(Repository repository)
 	{
 		bool shouldShow = true;
 
 		if (!string.IsNullOrEmpty(AppData.FilterOwner))
 		{
-			shouldShow &= TextFilter.IsMatch(repository.Owner.Name.ToString().ToUpperInvariant(), "*" + AppData.FilterOwner.ToUpperInvariant() + "*", AppData.FilterOwnerType, AppData.FilterOwnerMatchOptions);
+			shouldShow &= ColumnFilter.IsMatch(repository.Owner.Name.ToString(), AppData.FilterOwner, AppData.FilterOwnerType, AppData.FilterOwnerMatchOptions);
 		}
 
 		if (!string.IsNullOrEmpty(AppData.FilterRepository))
 		{
 			string displayRepository = MakeRepositoryDisplayName(repository);
-			shouldShow &= TextFilter.IsMatch(displayRepository.ToUpperInvariant(), "*" + AppData.FilterRepository.ToUpperInvariant() + "*", AppData.FilterRepositoryType, AppData.FilterRepositoryMatchOptions);
+			shouldShow &= ColumnFilter.IsMatch(displayRepository, AppData.FilterRepository, AppData.FilterRepositoryType, AppData.FilterRepositoryMatchOptions);
 		}
 
 		// If there's a build name, branch, or status filter, hide empty repositories
