@@ -1,4 +1,6 @@
-## v1.6.6
+## v1.6.7 (patch)
 
-No significant changes detected since v1.6.6.
+Changes since v1.6.6:
+
+- fix: take a run's completion even when its finish time is older than the last in-progress poll [patch] ([@Claude](https://github.com/Claude))
 
