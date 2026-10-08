@@ -541,7 +541,7 @@ internal sealed partial class GitHub : BuildProvider
 		// Fetch error details if the run just failed or is a failure without errors
 		if (ShouldFetchRunErrors(run.Status, previousStatus, run.Errors))
 		{
-			await FetchRunErrorsAsync(run, gitHubRun.Conclusion).ConfigureAwait(false);
+			await FetchRunErrorsAsync(GitHubJobs, run, gitHubRun.Conclusion).ConfigureAwait(false);
 		}
 
 		// Clear errors if the run is no longer a failure
@@ -594,11 +594,15 @@ internal sealed partial class GitHub : BuildProvider
 		|| exception.StatusCode == System.Net.HttpStatusCode.TooManyRequests
 		|| (exception.StatusCode == System.Net.HttpStatusCode.Forbidden && IsRateLimitResponse(exception));
 
-	private async Task FetchRunErrorsAsync(Run run, StringEnum<WorkflowRunConclusion>? conclusion)
+	/// <summary>
+	/// Reads a failed run's jobs, and their logs, for the errors to show against it. The jobs client
+	/// is passed in so the whole fetch can be driven from a test.
+	/// </summary>
+	internal static async Task FetchRunErrorsAsync(IActionsWorkflowJobsClient jobsClient, Run run, StringEnum<WorkflowRunConclusion>? conclusion)
 	{
 		try
 		{
-			WorkflowJobsResponse jobs = await GitHubJobs.List(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
+			WorkflowJobsResponse jobs = await jobsClient.List(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
 
 			List<string> errors = [];
 			foreach (WorkflowJob? job in jobs.Jobs)
@@ -606,7 +610,7 @@ internal sealed partial class GitHub : BuildProvider
 				if (IsFailedJob(job.Conclusion))
 				{
 					// Try to fetch and parse the job logs for actual error messages
-					List<string> logErrors = await FetchJobLogErrorsAsync(run.Owner.Name, run.Repository.Name, job.Id).ConfigureAwait(false);
+					List<string> logErrors = await FetchJobLogErrorsAsync(jobsClient, run.Owner.Name, run.Repository.Name, job.Id).ConfigureAwait(false);
 
 					if (logErrors.Count > 0)
 					{
@@ -647,12 +651,12 @@ internal sealed partial class GitHub : BuildProvider
 		}
 	}
 
-	private async Task<List<string>> FetchJobLogErrorsAsync(string owner, string repo, long jobId)
+	private static async Task<List<string>> FetchJobLogErrorsAsync(IActionsWorkflowJobsClient jobsClient, string owner, string repo, long jobId)
 	{
 		List<string> errors = [];
 		try
 		{
-			string logs = await GitHubJobs.GetLogs(owner, repo, jobId).ConfigureAwait(false);
+			string logs = await jobsClient.GetLogs(owner, repo, jobId).ConfigureAwait(false);
 			errors = ParseLogForErrors(logs);
 		}
 		catch (NotFoundException)
