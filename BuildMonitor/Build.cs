@@ -72,9 +72,11 @@ internal sealed class Build
 				LastUpdated = run.LastUpdated;
 				LastStatus = run.Status;
 			}
-			else if (run.Started == LastStarted && run.LastUpdated > LastUpdated)
+			else if (run.Started == LastStarted && (run.LastUpdated > LastUpdated || (IsOngoing && !run.IsOngoing)))
 			{
-				// Same run being updated with newer data
+				// Same run being updated with newer data. A run that has finished is always taken
+				// over an ongoing one, because a provider may stamp an in-progress poll with the
+				// local clock and the completion with the server's finish time, which can be earlier.
 				LastUpdated = run.LastUpdated;
 				LastStatus = run.Status;
 			}
