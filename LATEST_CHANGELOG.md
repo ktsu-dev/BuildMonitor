@@ -1,7 +1,6 @@
-## v1.6.8 (patch)
+## v1.6.9 (patch)
 
-Changes since v1.6.7:
+Changes since v1.6.8:
 
-- Drive the run-error fetch through a fake jobs client in tests ([@Claude](https://github.com/Claude))
-- fix: give failed GitHub runs with no failed job an error, and stop re-fetching their jobs [patch] ([@Claude](https://github.com/Claude))
+- Match whole segments when marking a build as updating, and count shared request keys [patch] ([@Claude](https://github.com/Claude))
 
