@@ -33,7 +33,12 @@ internal static class BuildMonitor
 
 	private static Task UpdateTask { get; set; } = Task.CompletedTask;
 
-	internal static ConcurrentDictionary<string, DateTimeOffset> ActiveRequests { get; set; } = [];
+	/// <summary>
+	/// Gets or sets the in-flight requests, each key with the number of requests running under it.
+	/// Two ongoing runs of one GitHub workflow poll under the same key, so a key stays while any of
+	/// its requests is still running.
+	/// </summary>
+	internal static ConcurrentDictionary<string, int> ActiveRequests { get; set; } = [];
 
 	private static void Main()
 	{
@@ -1410,9 +1415,18 @@ internal static class BuildMonitor
 
 	private static bool IsBuildUpdating(Build build)
 	{
-		string prefix = $"{build.Repository.Owner.BuildProvider.Name}/{build.Owner.Name}/{build.Repository.Name}/{build.Name}";
-		return ActiveRequests.Keys.Any(k => k.StartsWithOrdinal(prefix));
+		string buildKey = $"{build.Repository.Owner.BuildProvider.Name}/{build.Owner.Name}/{build.Repository.Name}/{build.Name}";
+		return ActiveRequests.Keys.Any(k => IsRequestForBuild(k, buildKey));
 	}
+
+	/// <summary>
+	/// Whether a request key is the build's own poll or one of its runs' polls. Request keys end in
+	/// <c>/{build.Name}</c> or <c>/{build.Name}/{run.Name}</c>, so the build key has to match a whole
+	/// segment: a bare prefix test let a build named <c>Build</c> light up while
+	/// <c>Build and Release</c> was being polled.
+	/// </summary>
+	internal static bool IsRequestForBuild(string requestKey, string buildKey) =>
+		string.Equals(requestKey, buildKey, StringComparison.Ordinal) || requestKey.StartsWithOrdinal(buildKey + "/");
 
 	private static ImColor GetStatusColor(RunStatus status)
 	{
@@ -1688,14 +1702,31 @@ internal static class BuildMonitor
 
 	internal static async Task MakeRequestAsync(string name, Func<Task> action)
 	{
-		_ = ActiveRequests.TryAdd(name, DateTimeOffset.UtcNow);
+		_ = ActiveRequests.AddOrUpdate(name, 1, (_, count) => count + 1);
 		try
 		{
 			await action.Invoke().ConfigureAwait(false);
 		}
 		finally
 		{
-			_ = ActiveRequests.TryRemove(name, out _);
+			ReleaseRequest(name);
+		}
+	}
+
+	private static void ReleaseRequest(string name)
+	{
+		// Compare-and-swap, so a request starting under the same key between the read and the write
+		// is never lost: the last one to finish is the one that removes the key.
+		while (ActiveRequests.TryGetValue(name, out int count))
+		{
+			bool released = count <= 1
+				? ActiveRequests.TryRemove(KeyValuePair.Create(name, count))
+				: ActiveRequests.TryUpdate(name, count - 1, count);
+
+			if (released)
+			{
+				return;
+			}
 		}
 	}
 }
