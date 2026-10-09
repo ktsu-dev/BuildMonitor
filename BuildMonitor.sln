@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BuildMonitor", "BuildMonito
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BuildMonitor.Test", "BuildMonitor.Test\BuildMonitor.Test.csproj", "{6E5F1A2C-9B34-4D71-8E62-5A0C7D3B9F41}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BuildMonitor.UITests", "tests\BuildMonitor.UITests\BuildMonitor.UITests.csproj", "{883968DD-FE47-430E-9721-7F22EAEDD693}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{6E5F1A2C-9B34-4D71-8E62-5A0C7D3B9F41}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6E5F1A2C-9B34-4D71-8E62-5A0C7D3B9F41}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{6E5F1A2C-9B34-4D71-8E62-5A0C7D3B9F41}.Release|Any CPU.Build.0 = Release|Any CPU
+		{883968DD-FE47-430E-9721-7F22EAEDD693}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{883968DD-FE47-430E-9721-7F22EAEDD693}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{883968DD-FE47-430E-9721-7F22EAEDD693}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{883968DD-FE47-430E-9721-7F22EAEDD693}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

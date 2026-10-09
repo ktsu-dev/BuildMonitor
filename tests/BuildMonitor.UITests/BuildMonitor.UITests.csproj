@@ -1,0 +1,23 @@
+<Project>
+  <Sdk Name="MSTest.Sdk" />
+  <Sdk Name="ktsu.Sdk" />
+
+  <PropertyGroup>
+    <IsTestProject>true</IsTestProject>
+    <TargetFramework>net10.0</TargetFramework>
+    <TargetFrameworks></TargetFrameworks>
+    <!-- The SDK folds the tests/ folder into the derived namespace, giving ktsu.tests.BuildMonitor.*,
+         so the name is stated here instead. -->
+    <RootNamespace>ktsu.BuildMonitor.UITests</RootNamespace>
+    <AssemblyName>$(RootNamespace)</AssemblyName>
+    <EnableSourceLink>false</EnableSourceLink>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\BuildMonitor\BuildMonitor.csproj" />
+    <PackageReference Include="ktsu.ImGui.App.Testing" />
+    <PackageReference Include="ktsu.ImGui.Probes" />
+    <PackageReference Include="TestableIO.System.IO.Abstractions.TestingHelpers" />
+  </ItemGroup>
+</Project>

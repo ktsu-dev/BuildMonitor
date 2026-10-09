@@ -22,6 +22,15 @@ internal sealed class BuildSync
 	internal Build Build { get; set; } = new();
 	private Stopwatch UpdateTimer { get; } = new Stopwatch();
 
+	/// <summary>
+	/// Gets the time since the build was last polled, or <see langword="null"/> to read it from the
+	/// timer the poll restarts. Lets a UI test show a countdown frozen part way through, which a
+	/// stopwatch cannot do.
+	/// </summary>
+	internal Func<TimeSpan>? ElapsedOverride { get; init; }
+
+	private TimeSpan Elapsed => ElapsedOverride?.Invoke() ?? UpdateTimer.Elapsed;
+
 	// Update intervals based on priority (in seconds)
 	private const int UpdateIntervalHigh = 30;
 	private const int UpdateIntervalMedium = 60;
@@ -53,7 +62,7 @@ internal sealed class BuildSync
 
 			// Recent failures are medium priority (within last hour)
 			if (Build.LastStatus == RunStatus.Failure &&
-				Build.LastUpdated > DateTimeOffset.UtcNow.AddHours(-1))
+				Build.LastUpdated > Clock.UtcNow.AddHours(-1))
 			{
 				return RequestPriority.Medium;
 			}
@@ -75,11 +84,11 @@ internal sealed class BuildSync
 
 	internal TimeSpan TimeRemaining => forceUpdate
 		? TimeSpan.Zero
-		: TimeSpan.FromSeconds(Math.Max(0, UpdateInterval - UpdateTimer.Elapsed.TotalSeconds));
+		: TimeSpan.FromSeconds(Math.Max(0, UpdateInterval - Elapsed.TotalSeconds));
 
-	internal double UpdateProgress => forceUpdate ? 1 : Math.Clamp(UpdateTimer.Elapsed.TotalSeconds / UpdateInterval, 0, 1);
+	internal double UpdateProgress => forceUpdate ? 1 : Math.Clamp(Elapsed.TotalSeconds / UpdateInterval, 0, 1);
 
-	internal bool ShouldUpdate => !IsOrphaned && (forceUpdate || UpdateTimer.Elapsed.TotalSeconds >= UpdateInterval);
+	internal bool ShouldUpdate => !IsOrphaned && (forceUpdate || Elapsed.TotalSeconds >= UpdateInterval);
 
 	internal BuildSync() => UpdateTimer.Start();
 

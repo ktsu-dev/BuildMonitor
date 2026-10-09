@@ -31,6 +31,7 @@
   <ItemGroup>
     <PackageReference Include="ktsu.ImGui.App" />
     <PackageReference Include="ktsu.ImGui.Popups" />
+    <PackageReference Include="ktsu.ImGui.Probes" />
     <PackageReference Include="ktsu.ImGui.Styler" />
     <PackageReference Include="ktsu.ImGui.Widgets" />
   </ItemGroup>

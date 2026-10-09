@@ -42,7 +42,7 @@ internal sealed class Build
 	internal TimeSpan CalculateETA()
 	{
 		TimeSpan estimate = CalculateEstimatedDuration();
-		TimeSpan duration = IsOngoing ? DateTimeOffset.UtcNow - LastStarted : LastDuration;
+		TimeSpan duration = IsOngoing ? Clock.UtcNow - LastStarted : LastDuration;
 		return duration < estimate ? estimate - duration : TimeSpan.Zero;
 	}
 

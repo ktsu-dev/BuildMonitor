@@ -12,6 +12,7 @@ using Hexa.NET.ImGui;
 using ktsu.Extensions;
 using ktsu.ImGui.App;
 using ktsu.ImGui.Popups;
+using ktsu.ImGui.Probes;
 using ktsu.ImGui.Styler;
 using ktsu.ImGui.Widgets;
 using ktsu.TextFilter;
@@ -40,18 +41,56 @@ internal static class BuildMonitor
 	/// </summary>
 	internal static ConcurrentDictionary<string, int> ActiveRequests { get; set; } = [];
 
+	/// <summary>
+	/// Gets or sets a value indicating whether the providers are polled. Always true in the
+	/// application; the UI tests turn it off so the seeded builds are drawn as they were seeded,
+	/// with no request reaching GitHub or Azure DevOps.
+	/// </summary>
+	internal static bool PollProviders { get; set; } = true;
+
 	private static void Main()
 	{
 		AppData = AppData.LoadOrCreate();
-		ImGuiApp.Start(new ImGuiAppConfig
+		ImGuiApp.Start(BuildConfig());
+	}
+
+	/// <summary>
+	/// Builds the configuration <see cref="Main"/> starts the application with, so the UI tests drive
+	/// the same setup rather than a copy of it.
+	/// </summary>
+	internal static ImGuiAppConfig BuildConfig() => new()
+	{
+		Title = Strings.ApplicationName,
+		InitialWindowState = AppData.WindowState,
+		OnStart = OnStart,
+		OnRender = OnRender,
+		OnAppMenu = OnAppMenu,
+		OnMoveOrResize = OnMoveOrResize
+	};
+
+	/// <summary>
+	/// Puts the static state back as a fresh process has it, for UI tests that start the application
+	/// more than once in one process.
+	/// </summary>
+	internal static void ResetState()
+	{
+		AppData = new();
+		ShouldSaveAppData = false;
+		PollProviders = true;
+		UpdateTask = Task.CompletedTask;
+		ProviderRefreshTimer.Reset();
+		BuildSyncCollection.Clear();
+		RunSyncCollection.Clear();
+		ActiveRequests.Clear();
+		CurrentErrorDetails = string.Empty;
+
+		foreach (string tabId in CurrentOwnerTabIds)
 		{
-			Title = Strings.ApplicationName,
-			InitialWindowState = AppData.WindowState,
-			OnStart = OnStart,
-			OnRender = OnRender,
-			OnAppMenu = OnAppMenu,
-			OnMoveOrResize = OnMoveOrResize
-		});
+			_ = OwnerTabPanel.RemoveTab(tabId);
+		}
+
+		CurrentOwnerTabIds.Clear();
+		Log.Clear();
 	}
 
 	private static void OnMoveOrResize()
@@ -84,7 +123,10 @@ internal static class BuildMonitor
 		}
 
 		Log.Info($"Initialized {AppData.BuildProviders.Count} build providers");
-		UpdateTask = UpdateAsync();
+		if (PollProviders)
+		{
+			UpdateTask = UpdateAsync();
+		}
 	}
 
 	private static readonly Dictionary<string, float> DefaultColumnWidths = new()
@@ -394,7 +436,7 @@ internal static class BuildMonitor
 
 	private static void OnRender(float dt)
 	{
-		if (UpdateTask.IsCompleted)
+		if (PollProviders && UpdateTask.IsCompleted)
 		{
 			if (UpdateTask.IsFaulted && UpdateTask.Exception is not null)
 			{
@@ -835,7 +877,7 @@ internal static class BuildMonitor
 		bool isOngoing = latestRun.IsOngoing;
 		// Use branch-specific estimation for more accurate estimates
 		TimeSpan estimate = build.CalculateEstimatedDuration(branch);
-		TimeSpan duration = isOngoing ? DateTimeOffset.UtcNow - latestRun.Started : latestRun.Duration;
+		TimeSpan duration = isOngoing ? Clock.UtcNow - latestRun.Started : latestRun.Duration;
 		TimeSpan eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
 		double progress = estimate > TimeSpan.Zero ? duration.TotalSeconds / estimate.TotalSeconds : 0;
 
@@ -848,7 +890,7 @@ internal static class BuildMonitor
 		shouldOpenContextMenu |= RenderTextColumn(MakeBuildDisplayName(build));
 		shouldOpenContextMenu |= RenderTextColumn(branch);
 		shouldOpenContextMenu |= RenderTextColumn($"{latestRun.Status}");
-		shouldOpenContextMenu |= RenderTextColumn(latestRun.Started.ToLocalTime().ToString("yyyy-MM-dd HH:mm zzz", CultureInfo.InvariantCulture));
+		shouldOpenContextMenu |= RenderTextColumn(Clock.ToLocal(latestRun.Started).ToString("yyyy-MM-dd HH:mm zzz", CultureInfo.InvariantCulture));
 		shouldOpenContextMenu |= RenderDurationColumn(duration);
 		shouldOpenContextMenu |= RenderEstimateColumn(estimate);
 		shouldOpenContextMenu |= RenderHistoryColumn(branchRuns);
@@ -1401,6 +1443,9 @@ internal static class BuildMonitor
 					new System.Numerics.Vector2(600, 400));
 			}
 
+			// Named so a UI test can open the error details the way a user does. Free when no probe
+			// is installed, which is every run outside the tests.
+			ImGuiProbes.MarkItem("Errors", run.Id.ToString());
 			shouldOpenContextMenu = ImGui.IsItemClicked(ImGuiMouseButton.Right);
 		}
 
