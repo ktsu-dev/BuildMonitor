@@ -375,7 +375,13 @@ Failed runs display error information fetched from provider-specific job logs:
 - Limited to first 10 errors to avoid UI overload
 - Prefixed with job name: `[{job.Name}] {errorMessage}`
 - Falls back to failed step names if no log errors found
-- Further falls back to `[{job.Name}] Failed` if no steps failed
+- Further falls back to `[{job.Name}] Failed` (or `Timed out`) if no steps failed
+- Jobs that concluded `timed_out` are read the same way as `failure` jobs
+- When no job yields an error (a `startup_failure` run has no jobs at all), the run gets
+  `Workflow failed: {conclusion}`, so a completed fetch never leaves `Errors` empty and is not
+  repeated on every update
+- Rate-limit `ApiException`s are not swallowed by the fetch; they reach `MakeGitHubRequestAsync` so
+  its backoff applies
 
 **UI Display:**
 - Errors shown in red text in the Errors column

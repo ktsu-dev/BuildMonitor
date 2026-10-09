@@ -539,9 +539,9 @@ internal sealed partial class GitHub : BuildProvider
 		}
 
 		// Fetch error details if the run just failed or is a failure without errors
-		if (run.Status == RunStatus.Failure && (previousStatus != RunStatus.Failure || run.Errors.Count == 0))
+		if (ShouldFetchRunErrors(run.Status, previousStatus, run.Errors))
 		{
-			await FetchRunErrorsAsync(run).ConfigureAwait(false);
+			await FetchRunErrorsAsync(GitHubJobs, run, gitHubRun.Conclusion).ConfigureAwait(false);
 		}
 
 		// Clear errors if the run is no longer a failure
@@ -554,19 +554,63 @@ internal sealed partial class GitHub : BuildProvider
 		BuildMonitor.QueueSaveAppData();
 	}
 
-	private async Task FetchRunErrorsAsync(Run run)
+	/// <summary>
+	/// Whether a run's jobs should be fetched for error details: when it has just failed, or is a
+	/// failure whose errors have not been fetched yet. A completed fetch always leaves at least one
+	/// error behind (see <see cref="WithRunLevelFallback"/>), so it is not repeated on every update
+	/// (ktsu-dev/BuildMonitor#311).
+	/// </summary>
+	internal static bool ShouldFetchRunErrors(RunStatus status, RunStatus previousStatus, IReadOnlyList<string> errors) =>
+		status == RunStatus.Failure && (previousStatus != RunStatus.Failure || errors.Count == 0);
+
+	/// <summary>
+	/// Whether a job's conclusion is one that fails its run. A job that hit its timeout ends as
+	/// <c>timed_out</c>, not <c>failure</c>, and is just as much the reason the run failed.
+	/// </summary>
+	internal static bool IsFailedJob(StringEnum<WorkflowJobConclusion>? conclusion) =>
+		conclusion == WorkflowJobConclusion.Failure || conclusion == WorkflowJobConclusion.TimedOut;
+
+	/// <summary>
+	/// The error shown for a failed job when neither its log nor its steps name anything.
+	/// </summary>
+	internal static string DescribeFailedJob(string jobName, StringEnum<WorkflowJobConclusion>? conclusion) =>
+		conclusion == WorkflowJobConclusion.TimedOut ? $"[{jobName}] Timed out" : $"[{jobName}] Failed";
+
+	/// <summary>
+	/// Returns the job-level errors, or a run-level message when there are none. A run that fails at
+	/// startup has no jobs at all, and a failed run's jobs can all have ended as cancelled, so without
+	/// this the run would show no reason for failing and its jobs would be fetched again on every update.
+	/// </summary>
+	internal static IReadOnlyList<string> WithRunLevelFallback(IReadOnlyList<string> errors, StringEnum<WorkflowRunConclusion>? conclusion) =>
+		errors.Count > 0 ? errors : [$"Workflow failed: {conclusion?.StringValue ?? "unknown"}"];
+
+	/// <summary>
+	/// Whether an API failure is a rate limit, which must reach <see cref="MakeGitHubRequestAsync"/> so
+	/// that its backoff applies, rather than being swallowed with the rest of the failures of a
+	/// best-effort error fetch.
+	/// </summary>
+	internal static bool IsRateLimitException(ApiException exception) =>
+		exception is RateLimitExceededException or SecondaryRateLimitExceededException
+		|| exception.StatusCode == System.Net.HttpStatusCode.TooManyRequests
+		|| (exception.StatusCode == System.Net.HttpStatusCode.Forbidden && IsRateLimitResponse(exception));
+
+	/// <summary>
+	/// Reads a failed run's jobs, and their logs, for the errors to show against it. The jobs client
+	/// is passed in so the whole fetch can be driven from a test.
+	/// </summary>
+	internal static async Task FetchRunErrorsAsync(IActionsWorkflowJobsClient jobsClient, Run run, StringEnum<WorkflowRunConclusion>? conclusion)
 	{
 		try
 		{
-			WorkflowJobsResponse jobs = await GitHubJobs.List(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
+			WorkflowJobsResponse jobs = await jobsClient.List(run.Owner.Name, run.Repository.Name, long.Parse(run.Id, CultureInfo.InvariantCulture)).ConfigureAwait(false);
 
 			List<string> errors = [];
 			foreach (WorkflowJob? job in jobs.Jobs)
 			{
-				if (job.Conclusion == WorkflowJobConclusion.Failure)
+				if (IsFailedJob(job.Conclusion))
 				{
 					// Try to fetch and parse the job logs for actual error messages
-					List<string> logErrors = await FetchJobLogErrorsAsync(run.Owner.Name, run.Repository.Name, job.Id).ConfigureAwait(false);
+					List<string> logErrors = await FetchJobLogErrorsAsync(jobsClient, run.Owner.Name, run.Repository.Name, job.Id).ConfigureAwait(false);
 
 					if (logErrors.Count > 0)
 					{
@@ -588,37 +632,38 @@ internal sealed partial class GitHub : BuildProvider
 						}
 						else
 						{
-							errors.Add($"[{job.Name}] Failed");
+							errors.Add(DescribeFailedJob(job.Name, job.Conclusion));
 						}
 					}
 				}
 			}
 
-			run.Errors = errors;
+			run.Errors = WithRunLevelFallback(errors, conclusion);
 		}
 		catch (NotFoundException)
 		{
-			// Jobs not found, ignore
+			// The run's jobs are gone, so a later fetch will not find them either
+			run.Errors = WithRunLevelFallback([], conclusion);
 		}
-		catch (ApiException)
+		catch (ApiException e) when (!IsRateLimitException(e))
 		{
-			// API error, ignore
+			// API error, ignore: the errors stay empty, so the next update tries again
 		}
 	}
 
-	private async Task<List<string>> FetchJobLogErrorsAsync(string owner, string repo, long jobId)
+	private static async Task<List<string>> FetchJobLogErrorsAsync(IActionsWorkflowJobsClient jobsClient, string owner, string repo, long jobId)
 	{
 		List<string> errors = [];
 		try
 		{
-			string logs = await GitHubJobs.GetLogs(owner, repo, jobId).ConfigureAwait(false);
+			string logs = await jobsClient.GetLogs(owner, repo, jobId).ConfigureAwait(false);
 			errors = ParseLogForErrors(logs);
 		}
 		catch (NotFoundException)
 		{
 			// Logs not found, ignore
 		}
-		catch (ApiException)
+		catch (ApiException e) when (!IsRateLimitException(e))
 		{
 			// API error, ignore
 		}
