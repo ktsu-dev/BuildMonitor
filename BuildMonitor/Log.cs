@@ -59,7 +59,7 @@ internal static class Log
 
 	private static void AddEntry(LogLevel level, string message)
 	{
-		Entries.Enqueue(new LogEntry(DateTimeOffset.Now, level, message));
+		Entries.Enqueue(new LogEntry(Clock.Now, level, message));
 
 		// Trim old entries if we exceed the max
 		while (Entries.Count > MaxEntries)

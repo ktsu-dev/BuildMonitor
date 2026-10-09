@@ -1,0 +1,138 @@
+name: App Gallery
+
+# Regenerates docs/gallery after CI passes on main, and commits the pictures back to main when they
+# differ. Modelled on ImGuiApp's widget-gallery.yml; the reasoning there holds here too, and is
+# repeated where it decides something.
+#
+# The pictures come from the Gallery tests in tests/BuildMonitor.UITests, run with
+# BUILDMONITOR_GALLERY_OUT pointing at docs/gallery. Pull requests already run those tests with the
+# rest of the UI suite, writing to a temporary directory, so a picture that can no longer be staged
+# fails the pull request; this workflow only ever builds main, and only to publish the result.
+#
+# Nothing is committed when the output is byte-identical, which it is run to run: the tests draw on
+# the CPU rasterizer at a pinned display size, from builds invented in code, with the application's
+# clock stopped, its time zone and culture pinned, and the font ImGuiApp ships. No provider is
+# polled, so nothing reaches GitHub or Azure DevOps. The only thing that moves a picture is a change
+# to the code that draws it. Always on the same runner image, because the pictures are compared with
+# the last ones committed.
+#
+# ci.yml calls this as a job that needs its pipeline, only for a push to main; it can also be run by
+# hand on main. It is deliberately not a workflow_run workflow: that runs with the repository's
+# token after a fork's pull request too, which is the pattern githubactions:S7631 exists to catch.
+# Here only a push to main or a dispatch by someone with write access can start it.
+#
+# Why the commit back cannot loop: it is pushed with the workflow's own GITHUB_TOKEN, which starts no
+# workflow run, and it carries the [bot][skip ci] prefix KtsuBuild's metadata commits use, so
+# KtsuBuild leaves it out of the version and the changelog either way.
+#
+# Pushing to main needs github-actions[bot] (the identity behind GITHUB_TOKEN) to be allowed to
+# bypass main's ruleset, as it is in ImGuiApp. If it is not, the push step fails and says so.
+
+on:
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_VERSION: "10.0"
+
+jobs:
+  regenerate:
+    name: Regenerate app gallery
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: github.repository == 'ktsu-dev/BuildMonitor' && github.ref == 'refs/heads/main'
+    # A newer run supersedes an older one: both regenerate from the current main. On the job rather
+    # than the workflow, because a called workflow's github.workflow is the caller's name.
+    concurrency:
+      group: app-gallery
+      cancel-in-progress: true
+    permissions:
+      contents: write # To push the regenerated pictures to main
+
+    steps:
+      # LFS content is not fetched: nothing the tests build from is in LFS, and every picture
+      # they write replaces the pointer that was there. The LFS filters are installed below instead,
+      # which is what makes git compare and commit the pictures as LFS objects.
+      - name: Checkout Repository
+        uses: actions/checkout@v7
+        with:
+          # The current main, never the triggering event's ref or SHA.
+          ref: main
+          fetch-depth: 1
+          lfs: false
+          persist-credentials: true
+
+      - name: Setup .NET SDK ${{ env.DOTNET_VERSION }}
+        uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}.x
+          cache: true
+          cache-dependency-path: |
+            **/*.csproj
+            **/Directory.Packages.props
+            **/global.json
+
+      - name: Install Git LFS filters
+        run: git lfs install --local
+
+      - name: Build the UI tests
+        run: dotnet build tests/BuildMonitor.UITests/BuildMonitor.UITests.csproj -c Release
+
+      # The old pictures are removed first so that one whose entry was renamed or removed goes with
+      # it. A stage that fails fails the job before anything is committed.
+      - name: Regenerate the gallery
+        env:
+          BUILDMONITOR_GALLERY_OUT: ${{ github.workspace }}/docs/gallery
+        run: |
+          rm -f docs/gallery/*.png docs/gallery/README.md
+          tests/BuildMonitor.UITests/bin/Release/net10.0/ktsu.BuildMonitor.UITests \
+            --filter "FullyQualifiedName~ktsu.BuildMonitor.UITests.Gallery"
+
+      # Only docs/gallery is staged. The build also rewrites some tracked files (ktsu.Sdk syncs
+      # .gitignore and friends from its own copy), and none of that belongs in this commit.
+      - name: Commit and push the pictures
+        env:
+          GIT_LFS_SKIP_SMUDGE: "1"
+        run: |
+          source_sha=$(git rev-parse HEAD)
+          git add --all docs/gallery
+
+          if git diff --cached --quiet; then
+            echo "The app gallery is up to date."
+            exit 0
+          fi
+
+          git diff --cached --stat
+
+          # A PNG committed as a blob rather than as an LFS pointer would bloat the history for good.
+          for path in $(git diff --cached --name-only --diff-filter=AM -- '*.png'); do
+            header=$(git cat-file blob ":$path" | head -c 42 | tr -d '\0' || true)
+            if [[ "$header" != "version https://git-lfs.github.com/spec/v1" ]]; then
+              echo "::error file=$path::Staged as a raw blob rather than an LFS pointer."
+              exit 1
+            fi
+          done
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit --quiet --message "[bot][skip ci] Regenerate the app gallery" \
+            --message "Rendered by .github/workflows/app-gallery.yml from $source_sha."
+
+          # Drop what the build rewrote and was left unstaged, which a rebase refuses to run over.
+          git reset --hard --quiet HEAD
+
+          for attempt in 1 2 3 4 5; do
+            if git push origin HEAD:main; then
+              exit 0
+            fi
+            echo "Push rejected (attempt $attempt); rebasing onto the current main."
+            sleep $((attempt * 5))
+            git fetch --depth=50 origin main
+            git rebase FETCH_HEAD
+          done
+
+          echo "::error::Could not push the regenerated gallery to main. If main's ruleset does not let github-actions[bot] bypass it, that is why."
+          exit 1

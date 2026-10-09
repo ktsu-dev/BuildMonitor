@@ -41,3 +41,10 @@ jobs:
     with:
       # `inputs` is empty on push, pull_request and schedule; only a dispatch sets it.
       version-bump: ${{ inputs.version-bump || 'auto' }}
+
+  app-gallery:
+    needs: ci
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: ./.github/workflows/app-gallery.yml
+    permissions:
+      contents: write
