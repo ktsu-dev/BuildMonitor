@@ -80,7 +80,7 @@ public sealed class AppGallery
 
 		Bitmap32 frame = harness.Target;
 		Rectangle region = entry.Crop?.Invoke(harness) ?? new Rectangle(0, 0, frame.Width, frame.Height);
-		Bitmap32 picture = Crop(frame, region);
+		Bitmap32 picture = Crop(frame, TrimEmptyBottom(frame, region));
 
 		Directory.CreateDirectory(OutputDirectory);
 		string path = Path.Combine(OutputDirectory, entry.Slug + ".png");
@@ -96,6 +96,57 @@ public sealed class AppGallery
 
 		Directory.CreateDirectory(OutputDirectory);
 		File.WriteAllText(Path.Combine(OutputDirectory, "README.md"), GalleryIndex.Render(GalleryCatalog.Entries));
+	}
+
+	/// <summary>
+	/// Raises the bottom of a region to just below the lowest thing drawn in it, so a picture is not
+	/// mostly the empty window under a short table.
+	/// </summary>
+	/// <remarks>
+	/// A row counts as empty when every pixel inside the window's border matches the one in the
+	/// middle of the region's last row, which is the window's background, or under a modal its
+	/// dimmed background. The display is tall enough for the tallest popup, so measuring beats
+	/// choosing one height that is too short for the context menu or too tall for the table.
+	/// </remarks>
+	internal static Rectangle TrimEmptyBottom(Bitmap32 source, Rectangle region)
+	{
+		const int Border = 2;
+		const int Margin = 12;
+
+		int minX = Math.Clamp(region.MinX + Border, 0, source.Width);
+		int maxX = Math.Clamp(region.MaxX - Border, minX, source.Width);
+		int minY = Math.Clamp(region.MinY, 0, source.Height);
+		int maxY = Math.Clamp(region.MaxY, minY, source.Height);
+		if (maxX <= minX || maxY - minY <= Border)
+		{
+			return region;
+		}
+
+		ReadOnlySpan<byte> pixels = source.Pixels;
+		int sampleY = maxY - Border - 1;
+		ReadOnlySpan<byte> background = pixels.Slice(((sampleY * source.Width) + ((minX + maxX) / 2)) * 4, 4);
+
+		int lastDrawn = sampleY;
+		while (lastDrawn > minY && IsEmptyRow(pixels, source.Width, lastDrawn, minX, maxX, background))
+		{
+			lastDrawn--;
+		}
+
+		int bottom = Math.Min(maxY, lastDrawn + 1 + Margin);
+		return new Rectangle(region.MinX, region.MinY, region.MaxX, bottom);
+	}
+
+	private static bool IsEmptyRow(ReadOnlySpan<byte> pixels, int width, int y, int minX, int maxX, ReadOnlySpan<byte> background)
+	{
+		for (int x = minX; x < maxX; x++)
+		{
+			if (!pixels.Slice(((y * width) + x) * 4, 4).SequenceEqual(background))
+			{
+				return false;
+			}
+		}
+
+		return true;
 	}
 
 	/// <summary>Copies a rectangle out of a frame, clamped to its edges.</summary>

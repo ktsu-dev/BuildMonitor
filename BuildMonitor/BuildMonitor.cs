@@ -1141,6 +1141,12 @@ internal static class BuildMonitor
 			ImGui.OpenPopup(contextMenuId);
 		}
 
+		// Highlight the row the open menu belongs to, so it is clear which build its actions act on.
+		if (ImGui.IsPopupOpen(contextMenuId))
+		{
+			ImGui.TableSetBgColor(ImGuiTableBgTarget.RowBg1, ImGui.GetColorU32(ImGuiCol.Header));
+		}
+
 		if (ImGui.BeginPopup(contextMenuId))
 		{
 			RenderRepositoryContextMenuItems(build);
@@ -1440,7 +1446,8 @@ internal static class BuildMonitor
 						{ Strings.OK, null }
 					},
 					ImGuiPopups.PromptTextLayoutType.Wrapped,
-					new System.Numerics.Vector2(600, 400));
+					// A zero height lets the popup fit its text rather than pad a short list out.
+					new System.Numerics.Vector2(600, 0));
 			}
 
 			// Named so a UI test can open the error details the way a user does. Free when no probe
