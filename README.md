@@ -27,6 +27,8 @@ BuildMonitor is a desktop application that provides real-time monitoring of CI/C
 
 ## Screenshots
 
+[![All builds](docs/gallery/all-builds.png)](docs/gallery/README.md)
+
 The [app gallery](docs/gallery/README.md) shows the build table, an owner's tab, the error details, the context menu and the Logs tab, drawn from invented builds and regenerated on every successful build of `main`.
 
 ## Installation
