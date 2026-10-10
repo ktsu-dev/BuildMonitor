@@ -1,27 +1,6 @@
-## v1.7.0 (minor)
+## v1.7.1 (patch)
 
-Changes since v1.6.0:
+Changes since v1.7.0:
 
-- Add a headless app gallery ([@Claude](https://github.com/Claude))
-- Match whole segments when marking a build as updating, and count shared request keys [patch] ([@Claude](https://github.com/Claude))
-- Drive the run-error fetch through a fake jobs client in tests ([@Claude](https://github.com/Claude))
-- fix: give failed GitHub runs with no failed job an error, and stop re-fetching their jobs [patch] ([@Claude](https://github.com/Claude))
-- fix: take a run's completion even when its finish time is older than the last in-progress poll [patch] ([@Claude](https://github.com/Claude))
-- Test the status bar directly instead of extracting a per-provider method ([@Claude](https://github.com/Claude))
-- Test the column filters through the table's own row checks ([@Claude](https://github.com/Claude))
-- Cover both tooltip call sites with hover tests ([@Claude](https://github.com/Claude))
-- fix: make Regex, Fuzzy and prefixed Glob column filters work [patch] ([@Claude](https://github.com/Claude))
-- fix: show build-log and provider text in tooltips without printf formatting [patch] ([@Claude](https://github.com/Claude))
-- fix: report a rejected Azure DevOps PAT as AuthFailed instead of faulting the update loop [patch] ([@Claude](https://github.com/Claude))
-- Cover RefreshBuildData and the forced UpdateProgress in tests ([@Claude](https://github.com/Claude))
-- fix: keep the Azure DevOps project-not-found error instead of clearing it [patch] ([@Claude](https://github.com/Claude))
-- fix: make Refresh Build Data force the next poll instead of delaying it [patch] ([@Claude](https://github.com/Claude))
-- fix: map Waiting/Pending workflow runs without an unhandled-status warning [patch] ([@Claude](https://github.com/Claude))
-- refactor: guard discovery batches through SyncGuard.RunAllAsync [patch] ([@Claude](https://github.com/Claude))
-- fix: keep the discovery change in place and cover RunSync [patch] ([@Claude](https://github.com/Claude))
-- fix: keep polling intervals when a provider update throws [patch] ([@Claude](https://github.com/Claude))
-- refactor: hand the Azure DevOps session back alongside its lease ([@matt-edmondson](https://github.com/matt-edmondson))
-- Move CI onto the shared ci-shared.yml pipeline ([@Claude](https://github.com/Claude))
-- fix: clear only the credential GitHub rejected, and stop treating a plain 403 as one [patch] ([@matt-edmondson](https://github.com/matt-edmondson))
-- fix: keep a replaced Azure DevOps session open until its last holder releases it [patch] ([@matt-edmondson](https://github.com/matt-edmondson))
+- Trim the gallery's empty space and fix two popups it shows ([@Claude](https://github.com/Claude))
 
