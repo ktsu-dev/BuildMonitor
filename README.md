@@ -71,7 +71,7 @@ The main interface displays a table of all your builds grouped by workflow and b
 - **Status**: Current status (Pending, Running, Success, Failure, Canceled)
 - **Last Run**: Timestamp of when the build started
 - **Duration**: How long the build has been running or took to complete
-- **History**: Visual history of the last 5 builds on this branch
+- **History**: Visual history of the last 5 builds on this branch, newest first
 - **Progress**: Progress bar for ongoing builds
 - **ETA**: Estimated time to completion for ongoing builds
 - **Errors**: Error messages from failed builds (click to view full details)

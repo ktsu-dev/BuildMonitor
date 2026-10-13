@@ -749,17 +749,27 @@ internal static class BuildMonitor
 		return shouldShow;
 	}
 
-	private static void ShowBranchHistory(List<Run> branchRuns)
+	/// <summary>
+	/// Picks the runs the History column shows from a branch's runs, most recent first.
+	/// </summary>
+	/// <remarks>
+	/// The indicators are drawn left to right, and a column too narrow for all of them clips on the
+	/// right, so the newest come first: clipping then drops the oldest runs rather than the newest.
+	/// </remarks>
+	/// <param name="branchRuns">The branch's runs, most recent first.</param>
+	/// <returns>Up to five runs that were not canceled, in the order they are drawn.</returns>
+	internal static List<Run> SelectHistoryRuns(IEnumerable<Run> branchRuns)
 	{
 		const int recentRuns = 5;
 
-		List<Run> runs = [.. branchRuns
+		return [.. branchRuns
 			.Where(r => r.Status != RunStatus.Canceled)
 			.Take(recentRuns)];
+	}
 
-		runs.Reverse();
-
-		foreach (Run? run in runs)
+	private static void ShowBranchHistory(List<Run> branchRuns)
+	{
+		foreach (Run? run in SelectHistoryRuns(branchRuns))
 		{
 			ImGui.SameLine();
 			ImGuiWidgets.ColorIndicator(GetStatusColor(run.Status), true);
