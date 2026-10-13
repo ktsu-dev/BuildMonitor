@@ -1,7 +1,6 @@
-## v1.7.2-pre.1 (prerelease)
+## v1.7.2 (patch)
 
 Changes since v1.7.1:
 
-- Bump Polyfill from 11.4.3 to 11.4.4 ([@dependabot[bot]](https://github.com/dependabot[bot]))
-- Bump the ktsu group with 9 updates ([@dependabot[bot]](https://github.com/dependabot[bot]))
+- Draw the History column newest first so clipping drops the oldest runs [patch] ([@Claude](https://github.com/Claude))
 
