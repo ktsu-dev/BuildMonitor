@@ -887,9 +887,7 @@ internal static class BuildMonitor
 		bool isOngoing = latestRun.IsOngoing;
 		// Use branch-specific estimation for more accurate estimates
 		TimeSpan estimate = build.CalculateEstimatedDuration(branch);
-		TimeSpan duration = isOngoing ? Clock.UtcNow - latestRun.Started : latestRun.Duration;
-		TimeSpan eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
-		double progress = estimate > TimeSpan.Zero ? duration.TotalSeconds / estimate.TotalSeconds : 0;
+		(TimeSpan duration, TimeSpan eta, double progress) = MeasureRun(latestRun, estimate);
 
 		bool shouldOpenContextMenu = false;
 
@@ -910,6 +908,24 @@ internal static class BuildMonitor
 		shouldOpenContextMenu |= RenderNextUpdateColumn(build);
 
 		return shouldOpenContextMenu;
+	}
+
+	/// <summary>
+	/// How long a run has taken, how long it has left and how far through it is, against an estimate.
+	/// A pending run is still queued and has not started building, so none of the time since
+	/// <see cref="Run.Started"/> counts: it shows no progress and the whole estimate as its ETA.
+	/// </summary>
+	internal static (TimeSpan Duration, TimeSpan Eta, double Progress) MeasureRun(Run run, TimeSpan estimate)
+	{
+		TimeSpan duration = run.Status switch
+		{
+			RunStatus.Pending => TimeSpan.Zero,
+			RunStatus.Running => Clock.UtcNow - run.Started,
+			_ => run.Duration,
+		};
+		TimeSpan eta = duration < estimate ? estimate - duration : TimeSpan.Zero;
+		double progress = estimate > TimeSpan.Zero ? duration.TotalSeconds / estimate.TotalSeconds : 0;
+		return (duration, eta, progress);
 	}
 
 	private static bool RenderStatusColumn(Build build, Run latestRun, bool isOngoing, double progress)
