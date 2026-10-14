@@ -1,6 +1,7 @@
-## v1.7.2 (patch)
+## v1.7.3 (patch)
 
-Changes since v1.7.1:
+Changes since v1.7.2:
 
-- Draw the History column newest first so clipping drops the oldest runs [patch] ([@Claude](https://github.com/Claude))
+- Show no progress for a queued run, and its whole estimate as the ETA [patch] (Claude)
+- Colour canceled runs dark gray instead of failure red [patch] (Claude)
 
