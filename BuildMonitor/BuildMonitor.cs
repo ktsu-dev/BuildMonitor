@@ -1506,13 +1506,18 @@ internal static class BuildMonitor
 	internal static bool IsRequestForBuild(string requestKey, string buildKey) =>
 		string.Equals(requestKey, buildKey, StringComparison.Ordinal) || requestKey.StartsWithOrdinal(buildKey + "/");
 
-	private static ImColor GetStatusColor(RunStatus status)
+	/// <summary>
+	/// The indicator colour for a run's status. A canceled run is neither a failure nor a run still
+	/// waiting to start, so it gets its own neutral colour rather than sharing red with
+	/// <see cref="RunStatus.Failure"/> or gray with <see cref="RunStatus.Pending"/>.
+	/// </summary>
+	internal static ImColor GetStatusColor(RunStatus status)
 	{
 		return status switch
 		{
 			RunStatus.Pending => Palette.Neutral.Gray,
 			RunStatus.Running => Palette.Basic.Yellow,
-			RunStatus.Canceled => Palette.Basic.Red,
+			RunStatus.Canceled => Palette.Neutral.DarkGray,
 			RunStatus.Success => Palette.Basic.Green,
 			RunStatus.Failure => Palette.Basic.Red,
 			_ => Palette.Neutral.Gray,
