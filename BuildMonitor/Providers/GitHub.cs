@@ -854,21 +854,61 @@ internal sealed partial class GitHub : BuildProvider
 		}
 	}
 
-	private static DateTimeOffset? ParseRateLimitResetTime(ApiException exception)
+	private static DateTimeOffset? ParseRateLimitResetTime(ApiException exception) =>
+		ParseRateLimitResetTime(exception, DateTimeOffset.UtcNow);
+
+	/// <summary>
+	/// Works out when a rate-limited request may be retried, following GitHub's guidance: honour
+	/// <c>Retry-After</c> when it is sent, wait for <c>X-RateLimit-Reset</c> only when the primary
+	/// budget is spent, and otherwise back off for a minute.
+	/// </summary>
+	/// <remarks>
+	/// A secondary limit can be hit with most of the hourly budget left, and its
+	/// <c>X-RateLimit-Reset</c> is still the end of the primary window, often most of an hour away.
+	/// Reading only that header paused polling for the 10-minute cap rather than the minute or so
+	/// GitHub asked for (ktsu-dev/BuildMonitor#385).
+	/// </remarks>
+	/// <param name="exception">The rate-limited response.</param>
+	/// <param name="now">The current time, which a relative <c>Retry-After</c> counts from.</param>
+	/// <returns>When to retry, or <see langword="null"/> when the response carried no headers.</returns>
+	internal static DateTimeOffset? ParseRateLimitResetTime(ApiException exception, DateTimeOffset now)
 	{
-		if (exception.HttpResponse?.Headers == null)
+		IReadOnlyDictionary<string, string>? headers = exception.HttpResponse?.Headers;
+		if (headers == null)
 		{
 			return null;
 		}
 
-		if (exception.HttpResponse.Headers.TryGetValue("X-RateLimit-Reset", out string? resetValue) &&
+		if (headers.TryGetValue("Retry-After", out string? retryAfterValue))
+		{
+			if (int.TryParse(retryAfterValue, NumberStyles.None, CultureInfo.InvariantCulture, out int retryAfterSeconds))
+			{
+				return now + TimeSpan.FromSeconds(retryAfterSeconds);
+			}
+
+			if (DateTimeOffset.TryParseExact(retryAfterValue, "r", CultureInfo.InvariantCulture, DateTimeStyles.AssumeUniversal, out DateTimeOffset retryAt))
+			{
+				return retryAt;
+			}
+		}
+
+		if (headers.TryGetValue("X-RateLimit-Remaining", out string? remainingValue) &&
+			int.TryParse(remainingValue, CultureInfo.InvariantCulture, out int remaining) &&
+			remaining == 0 &&
+			headers.TryGetValue("X-RateLimit-Reset", out string? resetValue) &&
 			long.TryParse(resetValue, CultureInfo.InvariantCulture, out long unixTimestamp))
 		{
 			return DateTimeOffset.FromUnixTimeSeconds(unixTimestamp);
 		}
 
-		return null;
+		return now + SecondaryRateLimitBackoff;
 	}
+
+	/// <summary>
+	/// How long to back off from a secondary rate limit that names no <c>Retry-After</c>. GitHub asks
+	/// for at least a minute.
+	/// </summary>
+	internal static TimeSpan SecondaryRateLimitBackoff { get; } = TimeSpan.FromMinutes(1);
 
 	private static bool IsRateLimitResponse(ApiException exception)
 	{
