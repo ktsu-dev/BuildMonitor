@@ -925,14 +925,9 @@ internal sealed partial class GitHub : BuildProvider
 			return true;
 		}
 
-		foreach (KeyValuePair<string, string> header in headers.Where(header => string.Equals(header.Key, name, StringComparison.OrdinalIgnoreCase)))
-		{
-			value = header.Value;
-			return true;
-		}
-
-		value = null;
-		return false;
+		KeyValuePair<string, string> match = headers.FirstOrDefault(header => string.Equals(header.Key, name, StringComparison.OrdinalIgnoreCase));
+		value = match.Value;
+		return match.Key is not null;
 	}
 
 	/// <summary>
