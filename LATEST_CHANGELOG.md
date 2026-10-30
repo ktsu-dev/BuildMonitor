@@ -1,6 +1,7 @@
-## v1.7.4-pre.8 (prerelease)
+## v1.7.4 (patch)
 
-Changes since v1.7.4-pre.7:
+Changes since v1.7.3:
 
-- Bump MSTest.Sdk from 4.5.1 to 4.5.2 (dependabot[bot])
+- Honour Retry-After on a GitHub rate limit [patch] (matt-edmondson)
+- Escape the branch name in GitHub branch URLs [patch] (matt-edmondson)
 
