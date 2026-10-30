@@ -3,6 +3,7 @@
 namespace ktsu.BuildMonitor;
 
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
@@ -879,7 +880,7 @@ internal sealed partial class GitHub : BuildProvider
 			return null;
 		}
 
-		if (headers.TryGetValue("Retry-After", out string? retryAfterValue))
+		if (TryGetHeader(headers, "Retry-After", out string? retryAfterValue))
 		{
 			if (int.TryParse(retryAfterValue, NumberStyles.None, CultureInfo.InvariantCulture, out int retryAfterSeconds))
 			{
@@ -892,16 +893,49 @@ internal sealed partial class GitHub : BuildProvider
 			}
 		}
 
-		if (headers.TryGetValue("X-RateLimit-Remaining", out string? remainingValue) &&
+		if (TryGetHeader(headers, "X-RateLimit-Remaining", out string? remainingValue) &&
 			int.TryParse(remainingValue, CultureInfo.InvariantCulture, out int remaining) &&
 			remaining == 0 &&
-			headers.TryGetValue("X-RateLimit-Reset", out string? resetValue) &&
+			TryGetHeader(headers, "X-RateLimit-Reset", out string? resetValue) &&
 			long.TryParse(resetValue, CultureInfo.InvariantCulture, out long unixTimestamp))
 		{
 			return DateTimeOffset.FromUnixTimeSeconds(unixTimestamp);
 		}
 
 		return now + SecondaryRateLimitBackoff;
+	}
+
+	/// <summary>
+	/// Looks a response header up by name, ignoring case as HTTP does.
+	/// </summary>
+	/// <remarks>
+	/// Octokit keys <see cref="IResponse.Headers"/> case-sensitively, by each name as it arrived on
+	/// the wire. GitHub sends <c>x-ratelimit-remaining</c> in lowercase, so an exact-case lookup of
+	/// <c>X-RateLimit-Remaining</c> missed it and a spent budget was retried every minute
+	/// (ktsu-dev/BuildMonitor#389).
+	/// </remarks>
+	/// <param name="headers">The response headers.</param>
+	/// <param name="name">The header name, in any casing.</param>
+	/// <param name="value">The header's value, when it is present.</param>
+	/// <returns>Whether the header is present.</returns>
+	internal static bool TryGetHeader(IReadOnlyDictionary<string, string> headers, string name, [NotNullWhen(true)] out string? value)
+	{
+		if (headers.TryGetValue(name, out value))
+		{
+			return true;
+		}
+
+		foreach (KeyValuePair<string, string> header in headers)
+		{
+			if (string.Equals(header.Key, name, StringComparison.OrdinalIgnoreCase))
+			{
+				value = header.Value;
+				return true;
+			}
+		}
+
+		value = null;
+		return false;
 	}
 
 	/// <summary>
@@ -918,7 +952,7 @@ internal sealed partial class GitHub : BuildProvider
 		}
 
 		// Check if X-RateLimit-Remaining is 0, indicating rate limit exceeded
-		if (exception.HttpResponse.Headers.TryGetValue("X-RateLimit-Remaining", out string? remainingValue) &&
+		if (TryGetHeader(exception.HttpResponse.Headers, "X-RateLimit-Remaining", out string? remainingValue) &&
 			int.TryParse(remainingValue, CultureInfo.InvariantCulture, out int remaining) &&
 			remaining == 0)
 		{
