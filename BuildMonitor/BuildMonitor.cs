@@ -1338,7 +1338,12 @@ internal static class BuildMonitor
 
 	private static string GetWorkflowUrl(Build build) => $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/actions/workflows/{build.Id}";
 
-	private static string GetBranchUrl(Build build, BranchName branch) => $"https://github.com/{build.Owner.Name}/{build.Repository.Name}/tree/{branch}";
+	/// <summary>
+	/// Escapes each segment of the branch name and keeps its <c>/</c> separators, so a <c>#</c> or
+	/// <c>%</c> in the name stays part of the path rather than starting a fragment or an escape.
+	/// </summary>
+	internal static string GetBranchUrl(Build build, BranchName branch) =>
+		$"https://github.com/{build.Owner.Name}/{build.Repository.Name}/tree/{string.Join('/', branch.ToString().Split('/').Select(Uri.EscapeDataString))}";
 
 	private static string GetRunUrl(Run run) => $"https://github.com/{run.Owner.Name}/{run.Repository.Name}/actions/runs/{run.Id}";
 
