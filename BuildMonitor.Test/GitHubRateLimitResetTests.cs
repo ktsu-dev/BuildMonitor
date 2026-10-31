@@ -92,4 +92,53 @@ public sealed class GitHubRateLimitResetTests
 
 		Assert.AreEqual(retryAt, GitHub.ParseRateLimitResetTime(limited, Now));
 	}
+
+	/// <summary>
+	/// GitHub sends the rate-limit headers in lowercase and proxies re-case them, but Octokit keys
+	/// them case-sensitively as they arrived, so an exact-case lookup missed a spent budget and
+	/// retried it every minute (ktsu-dev/BuildMonitor#389).
+	/// </summary>
+	[TestMethod]
+	[DataRow("x-ratelimit-remaining", "x-ratelimit-reset")]
+	[DataRow("X-Ratelimit-Remaining", "X-Ratelimit-Reset")]
+	public void ASpentPrimaryBudgetWaitsForTheResetWhateverTheHeaderCasing(string remainingName, string resetName)
+	{
+		DateTimeOffset reset = Now.AddMinutes(45);
+		ApiException primary = ApiFailure(HttpStatusCode.Forbidden, new()
+		{
+			[remainingName] = "0",
+			["x-ratelimit-limit"] = "5000",
+			[resetName] = UnixSeconds(reset),
+		});
+
+		Assert.AreEqual(reset, GitHub.ParseRateLimitResetTime(primary, Now));
+	}
+
+	[TestMethod]
+	public void ALowercaseRetryAfterIsHonoured()
+	{
+		ApiException limited = ApiFailure(HttpStatusCode.TooManyRequests, new()
+		{
+			["retry-after"] = "30",
+		});
+
+		Assert.AreEqual(Now.AddSeconds(30), GitHub.ParseRateLimitResetTime(limited, Now));
+	}
+
+	/// <summary>
+	/// A 403 whose message does not mention a rate limit is told apart by its spent budget alone.
+	/// </summary>
+	[TestMethod]
+	[DataRow("x-ratelimit-remaining")]
+	[DataRow("X-Ratelimit-Remaining")]
+	public void AForbiddenResponseWithASpentBudgetIsARateLimitWhateverTheHeaderCasing(string remainingName)
+	{
+		ApiException forbidden = ApiFailure(HttpStatusCode.Forbidden, new()
+		{
+			[remainingName] = "0",
+		});
+
+		Assert.DoesNotContain("rate limit", forbidden.Message, StringComparison.OrdinalIgnoreCase);
+		Assert.IsTrue(GitHub.IsRateLimitException(forbidden));
+	}
 }
