@@ -1,7 +1,8 @@
-## v1.7.4 (patch)
+## v1.7.5 (patch)
 
-Changes since v1.7.3:
+Changes since v1.7.4:
 
-- Honour Retry-After on a GitHub rate limit [patch] (matt-edmondson)
-- Escape the branch name in GitHub branch URLs [patch] (matt-edmondson)
+- Find a case-variant header with FirstOrDefault rather than a loop that always exits (Claude)
+- Filter the header scan with Where, per SonarCloud (Claude)
+- Read GitHub rate-limit headers whatever their casing [patch] (Claude)
 
