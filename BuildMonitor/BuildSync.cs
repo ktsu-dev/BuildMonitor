@@ -54,15 +54,14 @@ internal sealed class BuildSync
 	{
 		get
 		{
-			// Running builds are highest priority
-			if (Build.IsOngoing)
+			// Running builds are highest priority, whichever branch the running run is on
+			if (Build.HasOngoingRun)
 			{
 				return RequestPriority.High;
 			}
 
-			// Recent failures are medium priority (within last hour)
-			if (Build.LastStatus == RunStatus.Failure &&
-				Build.LastUpdated > Clock.UtcNow.AddHours(-1))
+			// Recent failures are medium priority (within last hour), on any branch
+			if (Build.HasRecentBranchFailure(Clock.UtcNow.AddHours(-1)))
 			{
 				return RequestPriority.Medium;
 			}
