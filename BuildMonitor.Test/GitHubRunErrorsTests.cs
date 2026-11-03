@@ -105,6 +105,42 @@ public sealed class GitHubRunErrorsTests
 	}
 
 	[TestMethod]
+	public void StartingANewAttemptDropsThePreviousAttemptsErrors()
+	{
+		// Arrange
+		DateTimeOffset firstAttempt = new(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
+		Run run = FailedRun();
+		run.Started = firstAttempt;
+		run.Errors = ["[build] OLD: error CS1002 from attempt 1"];
+
+		// Act
+		bool newAttempt = GitHub.StartAttempt(run, firstAttempt.AddHours(1));
+
+		// Assert
+		Assert.IsTrue(newAttempt);
+		Assert.IsEmpty(run.Errors, "Attempt 1's errors don't describe attempt 2");
+		Assert.AreEqual(firstAttempt.AddHours(1), run.Started);
+		Assert.IsTrue(GitHub.ShouldFetchRunErrors(RunStatus.Failure, RunStatus.Failure, run.Errors, newAttempt));
+	}
+
+	[TestMethod]
+	public void RereadingTheSameAttemptKeepsItsErrors()
+	{
+		// Arrange
+		DateTimeOffset started = new(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
+		Run run = FailedRun();
+		run.Started = started;
+		run.Errors = ["[build] error CS1002: ; expected"];
+
+		// Act
+		bool newAttempt = GitHub.StartAttempt(run, started);
+
+		// Assert
+		Assert.IsFalse(newAttempt);
+		AssertErrors(run, "[build] error CS1002: ; expected");
+	}
+
+	[TestMethod]
 	public void ARunReadForTheFirstTimeIsNotANewAttempt() =>
 		Assert.IsFalse(GitHub.IsNewAttempt(default, new DateTimeOffset(2026, 11, 3, 9, 0, 0, TimeSpan.Zero)));
 

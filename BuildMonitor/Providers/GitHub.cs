@@ -515,16 +515,7 @@ internal sealed partial class GitHub : BuildProvider
 
 	private async Task UpdateRunFromWorkflowAsync(Run run, WorkflowRun gitHubRun)
 	{
-		// A re-run keeps the run id but starts a new attempt with its own start time. The previous
-		// attempt's errors no longer describe the run, so they are dropped and fetched afresh
-		// (ktsu-dev/BuildMonitor#394).
-		bool newAttempt = IsNewAttempt(run.Started, gitHubRun.RunStartedAt);
-		if (newAttempt)
-		{
-			run.Errors = [];
-		}
-
-		run.Started = gitHubRun.RunStartedAt;
+		bool newAttempt = StartAttempt(run, gitHubRun.RunStartedAt);
 		run.LastUpdated = gitHubRun.UpdatedAt;
 		run.Branch = gitHubRun.HeadBranch.As<BranchName>();
 
@@ -581,6 +572,24 @@ internal sealed partial class GitHub : BuildProvider
 	/// </summary>
 	internal static bool IsNewAttempt(DateTimeOffset storedStarted, DateTimeOffset started) =>
 		storedStarted != default && started != storedStarted;
+
+	/// <summary>
+	/// Records the start time GitHub reports for a run, and returns whether it began a new attempt. A
+	/// re-run keeps the run id but starts a new attempt with its own start time, and the previous
+	/// attempt's errors no longer describe the run, so they are dropped to be fetched afresh
+	/// (ktsu-dev/BuildMonitor#394).
+	/// </summary>
+	internal static bool StartAttempt(Run run, DateTimeOffset started)
+	{
+		bool newAttempt = IsNewAttempt(run.Started, started);
+		if (newAttempt)
+		{
+			run.Errors = [];
+		}
+
+		run.Started = started;
+		return newAttempt;
+	}
 
 	/// <summary>
 	/// Whether a job's conclusion is one that fails its run. A job that hit its timeout ends as
