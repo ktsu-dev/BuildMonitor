@@ -515,7 +515,7 @@ internal sealed partial class GitHub : BuildProvider
 
 	private async Task UpdateRunFromWorkflowAsync(Run run, WorkflowRun gitHubRun)
 	{
-		bool newAttempt = StartAttempt(run, gitHubRun.RunStartedAt);
+		StartAttempt(run, gitHubRun.RunStartedAt);
 		run.LastUpdated = gitHubRun.UpdatedAt;
 		run.Branch = gitHubRun.HeadBranch.As<BranchName>();
 
@@ -540,7 +540,7 @@ internal sealed partial class GitHub : BuildProvider
 		}
 
 		// Fetch error details if the run just failed or is a failure without errors
-		if (ShouldFetchRunErrors(run.Status, previousStatus, run.Errors, newAttempt))
+		if (ShouldFetchRunErrors(run.Status, previousStatus, run.Errors))
 		{
 			await FetchRunErrorsAsync(GitHubJobs, run, gitHubRun.Conclusion).ConfigureAwait(false);
 		}
@@ -556,14 +556,14 @@ internal sealed partial class GitHub : BuildProvider
 	}
 
 	/// <summary>
-	/// Whether a run's jobs should be fetched for error details: when it has just failed, is a failure
-	/// whose errors have not been fetched yet, or is a failure of a new attempt of a run that had
-	/// already failed. A completed fetch always leaves at least one error behind (see
-	/// <see cref="WithRunLevelFallback"/>), so it is not repeated on every update
-	/// (ktsu-dev/BuildMonitor#311).
+	/// Whether a run's jobs should be fetched for error details: when it has just failed, or is a
+	/// failure whose errors have not been fetched yet. A completed fetch always leaves at least one
+	/// error behind (see <see cref="WithRunLevelFallback"/>), so it is not repeated on every update
+	/// (ktsu-dev/BuildMonitor#311). A new attempt of a failed run has its errors dropped by
+	/// <see cref="StartAttempt"/>, so it is fetched again too (ktsu-dev/BuildMonitor#394).
 	/// </summary>
-	internal static bool ShouldFetchRunErrors(RunStatus status, RunStatus previousStatus, IReadOnlyList<string> errors, bool newAttempt = false) =>
-		status == RunStatus.Failure && (newAttempt || previousStatus != RunStatus.Failure || errors.Count == 0);
+	internal static bool ShouldFetchRunErrors(RunStatus status, RunStatus previousStatus, IReadOnlyList<string> errors) =>
+		status == RunStatus.Failure && (previousStatus != RunStatus.Failure || errors.Count == 0);
 
 	/// <summary>
 	/// Whether a run read from GitHub is a later attempt than the one stored: a re-run keeps the run
@@ -574,21 +574,19 @@ internal sealed partial class GitHub : BuildProvider
 		storedStarted != default && started != storedStarted;
 
 	/// <summary>
-	/// Records the start time GitHub reports for a run, and returns whether it began a new attempt. A
-	/// re-run keeps the run id but starts a new attempt with its own start time, and the previous
-	/// attempt's errors no longer describe the run, so they are dropped to be fetched afresh
-	/// (ktsu-dev/BuildMonitor#394).
+	/// Records the start time GitHub reports for a run. A re-run keeps the run id but starts a new
+	/// attempt with its own start time, and the previous attempt's errors no longer describe the run,
+	/// so they are dropped, which makes <see cref="ShouldFetchRunErrors"/> fetch them afresh if the new
+	/// attempt failed too (ktsu-dev/BuildMonitor#394).
 	/// </summary>
-	internal static bool StartAttempt(Run run, DateTimeOffset started)
+	internal static void StartAttempt(Run run, DateTimeOffset started)
 	{
-		bool newAttempt = IsNewAttempt(run.Started, started);
-		if (newAttempt)
+		if (IsNewAttempt(run.Started, started))
 		{
 			run.Errors = [];
 		}
 
 		run.Started = started;
-		return newAttempt;
 	}
 
 	/// <summary>

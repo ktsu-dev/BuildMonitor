@@ -76,55 +76,21 @@ public sealed class GitHubRunErrorsTests
 	{
 		// Arrange
 		DateTimeOffset firstAttempt = new(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
-		DateTimeOffset secondAttempt = firstAttempt.AddHours(1);
-		IReadOnlyList<string> attemptOneErrors = ["[build] OLD: error CS1002 from attempt 1"];
-
-		// Act
-		bool newAttempt = GitHub.IsNewAttempt(firstAttempt, secondAttempt);
-		bool fetch = GitHub.ShouldFetchRunErrors(RunStatus.Failure, RunStatus.Failure, attemptOneErrors, newAttempt);
-
-		// Assert
-		Assert.IsTrue(newAttempt, "A later start time on the same run id is a new attempt");
-		Assert.IsTrue(fetch, "The new attempt's failure should be read from its jobs");
-	}
-
-	[TestMethod]
-	public void AnUnchangedFailedRunIsNotANewAttemptAndDoesNotRefetch()
-	{
-		// Arrange
-		DateTimeOffset started = new(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
-		IReadOnlyList<string> errors = ["[build] error CS1002: ; expected"];
-
-		// Act
-		bool newAttempt = GitHub.IsNewAttempt(started, started);
-		bool fetch = GitHub.ShouldFetchRunErrors(RunStatus.Failure, RunStatus.Failure, errors, newAttempt);
-
-		// Assert
-		Assert.IsFalse(newAttempt);
-		Assert.IsFalse(fetch, "The #311 guarantee: an unchanged failed run is not refetched on every update");
-	}
-
-	[TestMethod]
-	public void StartingANewAttemptDropsThePreviousAttemptsErrors()
-	{
-		// Arrange
-		DateTimeOffset firstAttempt = new(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
 		Run run = FailedRun();
 		run.Started = firstAttempt;
 		run.Errors = ["[build] OLD: error CS1002 from attempt 1"];
 
 		// Act
-		bool newAttempt = GitHub.StartAttempt(run, firstAttempt.AddHours(1));
+		GitHub.StartAttempt(run, firstAttempt.AddHours(1));
 
 		// Assert
-		Assert.IsTrue(newAttempt);
 		Assert.IsEmpty(run.Errors, "Attempt 1's errors don't describe attempt 2");
 		Assert.AreEqual(firstAttempt.AddHours(1), run.Started);
-		Assert.IsTrue(GitHub.ShouldFetchRunErrors(RunStatus.Failure, RunStatus.Failure, run.Errors, newAttempt));
+		Assert.IsTrue(GitHub.ShouldFetchRunErrors(RunStatus.Failure, RunStatus.Failure, run.Errors), "The new attempt's failure should be read from its jobs");
 	}
 
 	[TestMethod]
-	public void RereadingTheSameAttemptKeepsItsErrors()
+	public void RereadingAnUnchangedFailedRunKeepsItsErrorsAndDoesNotRefetch()
 	{
 		// Arrange
 		DateTimeOffset started = new(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
@@ -133,16 +99,27 @@ public sealed class GitHubRunErrorsTests
 		run.Errors = ["[build] error CS1002: ; expected"];
 
 		// Act
-		bool newAttempt = GitHub.StartAttempt(run, started);
+		GitHub.StartAttempt(run, started);
 
 		// Assert
-		Assert.IsFalse(newAttempt);
 		AssertErrors(run, "[build] error CS1002: ; expected");
+		Assert.IsFalse(GitHub.ShouldFetchRunErrors(RunStatus.Failure, RunStatus.Failure, run.Errors), "The #311 guarantee: an unchanged failed run is not refetched on every update");
 	}
 
 	[TestMethod]
-	public void ARunReadForTheFirstTimeIsNotANewAttempt() =>
-		Assert.IsFalse(GitHub.IsNewAttempt(default, new DateTimeOffset(2026, 11, 3, 9, 0, 0, TimeSpan.Zero)));
+	public void ARunReadForTheFirstTimeKeepsWhateverItHas()
+	{
+		// Arrange
+		Run run = FailedRun();
+		DateTimeOffset started = new(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
+
+		// Act
+		GitHub.StartAttempt(run, started);
+
+		// Assert
+		Assert.AreEqual(started, run.Started);
+		Assert.IsFalse(GitHub.IsNewAttempt(default, started));
+	}
 
 	[TestMethod]
 	[DataRow(WorkflowJobConclusion.Failure, true)]
