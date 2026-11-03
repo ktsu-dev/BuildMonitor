@@ -515,6 +515,15 @@ internal sealed partial class GitHub : BuildProvider
 
 	private async Task UpdateRunFromWorkflowAsync(Run run, WorkflowRun gitHubRun)
 	{
+		// A re-run keeps the run id but starts a new attempt with its own start time. The previous
+		// attempt's errors no longer describe the run, so they are dropped and fetched afresh
+		// (ktsu-dev/BuildMonitor#394).
+		bool newAttempt = IsNewAttempt(run.Started, gitHubRun.RunStartedAt);
+		if (newAttempt)
+		{
+			run.Errors = [];
+		}
+
 		run.Started = gitHubRun.RunStartedAt;
 		run.LastUpdated = gitHubRun.UpdatedAt;
 		run.Branch = gitHubRun.HeadBranch.As<BranchName>();
@@ -540,7 +549,7 @@ internal sealed partial class GitHub : BuildProvider
 		}
 
 		// Fetch error details if the run just failed or is a failure without errors
-		if (ShouldFetchRunErrors(run.Status, previousStatus, run.Errors))
+		if (ShouldFetchRunErrors(run.Status, previousStatus, run.Errors, newAttempt))
 		{
 			await FetchRunErrorsAsync(GitHubJobs, run, gitHubRun.Conclusion).ConfigureAwait(false);
 		}
@@ -556,13 +565,22 @@ internal sealed partial class GitHub : BuildProvider
 	}
 
 	/// <summary>
-	/// Whether a run's jobs should be fetched for error details: when it has just failed, or is a
-	/// failure whose errors have not been fetched yet. A completed fetch always leaves at least one
-	/// error behind (see <see cref="WithRunLevelFallback"/>), so it is not repeated on every update
+	/// Whether a run's jobs should be fetched for error details: when it has just failed, is a failure
+	/// whose errors have not been fetched yet, or is a failure of a new attempt of a run that had
+	/// already failed. A completed fetch always leaves at least one error behind (see
+	/// <see cref="WithRunLevelFallback"/>), so it is not repeated on every update
 	/// (ktsu-dev/BuildMonitor#311).
 	/// </summary>
-	internal static bool ShouldFetchRunErrors(RunStatus status, RunStatus previousStatus, IReadOnlyList<string> errors) =>
-		status == RunStatus.Failure && (previousStatus != RunStatus.Failure || errors.Count == 0);
+	internal static bool ShouldFetchRunErrors(RunStatus status, RunStatus previousStatus, IReadOnlyList<string> errors, bool newAttempt = false) =>
+		status == RunStatus.Failure && (newAttempt || previousStatus != RunStatus.Failure || errors.Count == 0);
+
+	/// <summary>
+	/// Whether a run read from GitHub is a later attempt than the one stored: a re-run keeps the run
+	/// id and gets a new start time. A run that has never been read has no stored start time, and is
+	/// not a re-run.
+	/// </summary>
+	internal static bool IsNewAttempt(DateTimeOffset storedStarted, DateTimeOffset started) =>
+		storedStarted != default && started != storedStarted;
 
 	/// <summary>
 	/// Whether a job's conclusion is one that fails its run. A job that hit its timeout ends as

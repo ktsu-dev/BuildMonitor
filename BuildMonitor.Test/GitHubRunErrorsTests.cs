@@ -66,6 +66,48 @@ public sealed class GitHubRunErrorsTests
 		Assert.IsFalse(fetchAgain);
 	}
 
+	/// <summary>
+	/// A re-run keeps the run id. When attempt 2 also failed and was never seen running, the stored run
+	/// was already a failure with attempt 1's errors, so its jobs were never fetched again
+	/// (ktsu-dev/BuildMonitor#394).
+	/// </summary>
+	[TestMethod]
+	public void AFailedReRunOfAFailedRunFetchesItsJobsAgain()
+	{
+		// Arrange
+		DateTimeOffset firstAttempt = new(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
+		DateTimeOffset secondAttempt = firstAttempt.AddHours(1);
+		IReadOnlyList<string> attemptOneErrors = ["[build] OLD: error CS1002 from attempt 1"];
+
+		// Act
+		bool newAttempt = GitHub.IsNewAttempt(firstAttempt, secondAttempt);
+		bool fetch = GitHub.ShouldFetchRunErrors(RunStatus.Failure, RunStatus.Failure, attemptOneErrors, newAttempt);
+
+		// Assert
+		Assert.IsTrue(newAttempt, "A later start time on the same run id is a new attempt");
+		Assert.IsTrue(fetch, "The new attempt's failure should be read from its jobs");
+	}
+
+	[TestMethod]
+	public void AnUnchangedFailedRunIsNotANewAttemptAndDoesNotRefetch()
+	{
+		// Arrange
+		DateTimeOffset started = new(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
+		IReadOnlyList<string> errors = ["[build] error CS1002: ; expected"];
+
+		// Act
+		bool newAttempt = GitHub.IsNewAttempt(started, started);
+		bool fetch = GitHub.ShouldFetchRunErrors(RunStatus.Failure, RunStatus.Failure, errors, newAttempt);
+
+		// Assert
+		Assert.IsFalse(newAttempt);
+		Assert.IsFalse(fetch, "The #311 guarantee: an unchanged failed run is not refetched on every update");
+	}
+
+	[TestMethod]
+	public void ARunReadForTheFirstTimeIsNotANewAttempt() =>
+		Assert.IsFalse(GitHub.IsNewAttempt(default, new DateTimeOffset(2026, 11, 3, 9, 0, 0, TimeSpan.Zero)));
+
 	[TestMethod]
 	[DataRow(WorkflowJobConclusion.Failure, true)]
 	[DataRow(WorkflowJobConclusion.TimedOut, true)]
