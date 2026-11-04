@@ -515,7 +515,7 @@ internal sealed partial class GitHub : BuildProvider
 
 	private async Task UpdateRunFromWorkflowAsync(Run run, WorkflowRun gitHubRun)
 	{
-		run.Started = gitHubRun.RunStartedAt;
+		StartAttempt(run, gitHubRun.RunStartedAt);
 		run.LastUpdated = gitHubRun.UpdatedAt;
 		run.Branch = gitHubRun.HeadBranch.As<BranchName>();
 
@@ -559,10 +559,35 @@ internal sealed partial class GitHub : BuildProvider
 	/// Whether a run's jobs should be fetched for error details: when it has just failed, or is a
 	/// failure whose errors have not been fetched yet. A completed fetch always leaves at least one
 	/// error behind (see <see cref="WithRunLevelFallback"/>), so it is not repeated on every update
-	/// (ktsu-dev/BuildMonitor#311).
+	/// (ktsu-dev/BuildMonitor#311). A new attempt of a failed run has its errors dropped by
+	/// <see cref="StartAttempt"/>, so it is fetched again too (ktsu-dev/BuildMonitor#394).
 	/// </summary>
 	internal static bool ShouldFetchRunErrors(RunStatus status, RunStatus previousStatus, IReadOnlyList<string> errors) =>
 		status == RunStatus.Failure && (previousStatus != RunStatus.Failure || errors.Count == 0);
+
+	/// <summary>
+	/// Whether a run read from GitHub is a later attempt than the one stored: a re-run keeps the run
+	/// id and gets a new start time. A run that has never been read has no stored start time, and is
+	/// not a re-run.
+	/// </summary>
+	internal static bool IsNewAttempt(DateTimeOffset storedStarted, DateTimeOffset started) =>
+		storedStarted != default && started != storedStarted;
+
+	/// <summary>
+	/// Records the start time GitHub reports for a run. A re-run keeps the run id but starts a new
+	/// attempt with its own start time, and the previous attempt's errors no longer describe the run,
+	/// so they are dropped, which makes <see cref="ShouldFetchRunErrors"/> fetch them afresh if the new
+	/// attempt failed too (ktsu-dev/BuildMonitor#394).
+	/// </summary>
+	internal static void StartAttempt(Run run, DateTimeOffset started)
+	{
+		if (IsNewAttempt(run.Started, started))
+		{
+			run.Errors = [];
+		}
+
+		run.Started = started;
+	}
 
 	/// <summary>
 	/// Whether a job's conclusion is one that fails its run. A job that hit its timeout ends as

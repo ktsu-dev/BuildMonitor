@@ -66,6 +66,61 @@ public sealed class GitHubRunErrorsTests
 		Assert.IsFalse(fetchAgain);
 	}
 
+	/// <summary>
+	/// A re-run keeps the run id. When attempt 2 also failed and was never seen running, the stored run
+	/// was already a failure with attempt 1's errors, so its jobs were never fetched again
+	/// (ktsu-dev/BuildMonitor#394).
+	/// </summary>
+	[TestMethod]
+	public void AFailedReRunOfAFailedRunFetchesItsJobsAgain()
+	{
+		// Arrange
+		DateTimeOffset firstAttempt = new(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
+		Run run = FailedRun();
+		run.Started = firstAttempt;
+		run.Errors = ["[build] OLD: error CS1002 from attempt 1"];
+
+		// Act
+		GitHub.StartAttempt(run, firstAttempt.AddHours(1));
+
+		// Assert
+		Assert.IsEmpty(run.Errors, "Attempt 1's errors don't describe attempt 2");
+		Assert.AreEqual(firstAttempt.AddHours(1), run.Started);
+		Assert.IsTrue(GitHub.ShouldFetchRunErrors(RunStatus.Failure, RunStatus.Failure, run.Errors), "The new attempt's failure should be read from its jobs");
+	}
+
+	[TestMethod]
+	public void RereadingAnUnchangedFailedRunKeepsItsErrorsAndDoesNotRefetch()
+	{
+		// Arrange
+		DateTimeOffset started = new(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
+		Run run = FailedRun();
+		run.Started = started;
+		run.Errors = ["[build] error CS1002: ; expected"];
+
+		// Act
+		GitHub.StartAttempt(run, started);
+
+		// Assert
+		AssertErrors(run, "[build] error CS1002: ; expected");
+		Assert.IsFalse(GitHub.ShouldFetchRunErrors(RunStatus.Failure, RunStatus.Failure, run.Errors), "The #311 guarantee: an unchanged failed run is not refetched on every update");
+	}
+
+	[TestMethod]
+	public void ARunReadForTheFirstTimeKeepsWhateverItHas()
+	{
+		// Arrange
+		Run run = FailedRun();
+		DateTimeOffset started = new(2026, 11, 3, 9, 0, 0, TimeSpan.Zero);
+
+		// Act
+		GitHub.StartAttempt(run, started);
+
+		// Assert
+		Assert.AreEqual(started, run.Started);
+		Assert.IsFalse(GitHub.IsNewAttempt(default, started));
+	}
+
 	[TestMethod]
 	[DataRow(WorkflowJobConclusion.Failure, true)]
 	[DataRow(WorkflowJobConclusion.TimedOut, true)]
