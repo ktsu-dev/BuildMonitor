@@ -25,6 +25,31 @@ internal sealed class Build
 	internal bool IsOngoing => !Runs.IsEmpty && LastStatus is RunStatus.Pending or RunStatus.Running;
 
 	/// <summary>
+	/// Gets a value indicating whether any of the build's runs, on any branch, is still pending or running.
+	/// <see cref="IsOngoing"/> reads only the most recently started run, so an earlier run on another
+	/// branch that is still going was missed once a later one finished (ktsu-dev/BuildMonitor#392).
+	/// </summary>
+	internal bool HasOngoingRun => IsOngoing || Runs.Values.Any(run => run.IsOngoing);
+
+	/// <summary>
+	/// Returns whether the newest run on any branch failed and was last updated after <paramref name="since"/>.
+	/// </summary>
+	/// <param name="since">The earliest update time that counts as recent.</param>
+	/// <returns><see langword="true"/> if some branch's newest run is a recent failure.</returns>
+	internal bool HasRecentBranchFailure(DateTimeOffset since)
+	{
+		if (LastStatus == RunStatus.Failure && LastUpdated > since)
+		{
+			return true;
+		}
+
+		return Runs.Values
+			.GroupBy(run => run.Branch)
+			.Select(branch => branch.MaxBy(run => run.Started)!)
+			.Any(newest => newest.Status == RunStatus.Failure && newest.LastUpdated > since);
+	}
+
+	/// <summary>
 	/// Calculates the estimated duration for this build using sophisticated statistical methods.
 	/// Uses all successful runs across all branches.
 	/// </summary>
