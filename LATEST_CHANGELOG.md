@@ -1,8 +1,7 @@
-## v1.7.5 (patch)
+## v1.7.6 (patch)
 
-Changes since v1.7.4:
+Changes since v1.7.5:
 
-- Find a case-variant header with FirstOrDefault rather than a loop that always exits (Claude)
-- Filter the header scan with Where, per SonarCloud (Claude)
-- Read GitHub rate-limit headers whatever their casing [patch] (Claude)
+- Fetch a re-run's errors again when the new attempt fails too [patch] (#397) (matt-edmondson)
+- Poll a build at its running or recent-failure rate whichever branch the run is on [patch] (#396) (matt-edmondson)
 
