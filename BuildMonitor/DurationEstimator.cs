@@ -15,7 +15,7 @@ internal static class DurationEstimator
 	/// <summary>
 	/// Maximum number of recent runs to consider for estimation.
 	/// </summary>
-	private const int MaxSamplesToConsider = 20;
+	internal const int MaxSamplesToConsider = 20;
 
 	/// <summary>
 	/// Decay factor for exponential weighting (0-1). Higher values give more weight to recent runs.
