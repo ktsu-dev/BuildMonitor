@@ -8,7 +8,6 @@ using System.Globalization;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
-using ktsu.Extensions;
 using ktsu.Semantics.Strings;
 using Octokit;
 
@@ -426,10 +425,7 @@ internal sealed partial class GitHub : BuildProvider
 			Log.Debug($"GitHub: UpdateBuild {build.Owner.Name}/{build.Repository.Name}/{build.Name} - API returned {gitHubRuns.TotalCount} total, {gitHubRuns.WorkflowRuns.Count} in page");
 			foreach (WorkflowRun? gitHubRun in gitHubRuns.WorkflowRuns)
 			{
-				RunId runId = gitHubRun.Id.ToString(CultureInfo.InvariantCulture).As<RunId>();
-				RunName runName = gitHubRun.Name.As<RunName>();
-				Run run = build.Runs.GetOrCreate(runId, build.CreateRun(runName, runId));
-				await UpdateRunFromWorkflowAsync(run, gitHubRun).ConfigureAwait(false);
+				await UpdateBuildRunAsync(build, gitHubRun).ConfigureAwait(false);
 			}
 		}, build.Owner).ConfigureAwait(false);
 		}
@@ -467,6 +463,39 @@ internal sealed partial class GitHub : BuildProvider
 			}
 		}
 	}
+
+	/// <summary>
+	/// Updates the build's run for one entry of its workflow's run listing. A run the build has not seen
+	/// yet is filled in before it is stored, so a run that cannot be read never leaves a half-made
+	/// Pending run behind in <see cref="Build.Runs"/>, which would keep the build at High priority and
+	/// show a row that never completes (ktsu-dev/BuildMonitor#400).
+	/// </summary>
+	internal async Task UpdateBuildRunAsync(Build build, WorkflowRun gitHubRun)
+	{
+		RunId runId = gitHubRun.Id.ToString(CultureInfo.InvariantCulture).As<RunId>();
+		if (build.Runs.TryGetValue(runId, out Run? run))
+		{
+			await UpdateRunFromWorkflowAsync(run, gitHubRun).ConfigureAwait(false);
+			return;
+		}
+
+		Run newRun = build.CreateRun(RunNameOf(gitHubRun, build), runId);
+		await UpdateRunFromWorkflowAsync(newRun, gitHubRun).ConfigureAwait(false);
+		build.Runs.TryAdd(runId, newRun);
+	}
+
+	/// <summary>
+	/// The name of a workflow run, which GitHub can send as null; the run then takes its workflow's name.
+	/// </summary>
+	internal static RunName RunNameOf(WorkflowRun gitHubRun, Build build) =>
+		(gitHubRun.Name ?? build.Name.ToString()).As<RunName>();
+
+	/// <summary>
+	/// The branch of a workflow run. GitHub sends a null head branch for a run whose head repository is
+	/// gone, such as a pull request from a deleted fork, and the run then has no branch.
+	/// </summary>
+	internal static BranchName BranchOf(WorkflowRun gitHubRun) =>
+		(gitHubRun.HeadBranch ?? string.Empty).As<BranchName>();
 
 	private static RunStatus MapWorkflowRunStatus(WorkflowRun gitHubRun) =>
 		MapWorkflowRunStatus(gitHubRun.Status, gitHubRun.Conclusion);
@@ -517,7 +546,7 @@ internal sealed partial class GitHub : BuildProvider
 	{
 		StartAttempt(run, gitHubRun.RunStartedAt);
 		run.LastUpdated = gitHubRun.UpdatedAt;
-		run.Branch = gitHubRun.HeadBranch.As<BranchName>();
+		run.Branch = BranchOf(gitHubRun);
 
 		RunStatus previousStatus = run.Status;
 		run.Status = MapWorkflowRunStatus(gitHubRun);
