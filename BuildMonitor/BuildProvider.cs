@@ -70,10 +70,50 @@ internal abstract class BuildProvider
 	/// The provider-level access token, held in the OS secret store rather than the app data file.
 	/// </summary>
 	[JsonIgnore]
-	protected BuildProviderToken Token
+	protected BuildProviderToken Token => TokenStorage.Read(TokenPersona);
+
+	/// <summary>
+	/// Stores the provider token the user entered, and reports whether it was stored.
+	/// </summary>
+	/// <param name="token">The token to store.</param>
+	/// <returns><see langword="false"/> when the secret store refused the write.</returns>
+	internal bool SetProviderToken(BuildProviderToken token) =>
+		ReportTokenWrite(TokenStorage.Write(TokenPersona, token), "Set provider token", "save the provider token");
+
+	/// <summary>
+	/// Stores or clears an owner's token at the user's request, and reports whether it was stored.
+	/// </summary>
+	/// <param name="owner">The owner whose token is set.</param>
+	/// <param name="token">The token to store, or an empty token to clear it.</param>
+	/// <returns><see langword="false"/> when the secret store refused the write.</returns>
+	internal bool SetOwnerToken(Owner owner, BuildProviderToken token)
 	{
-		get => TokenStorage.Read(TokenPersona);
-		private set => _ = TokenStorage.Write(TokenPersona, value);
+		Ensure.NotNull(owner);
+		Ensure.NotNull(token);
+		return token.IsEmpty()
+			? ReportTokenWrite(owner.TrySetToken(token), $"Cleared token for owner {owner.Name}", $"clear the token for owner {owner.Name}")
+			: ReportTokenWrite(owner.TrySetToken(token), $"Set token for owner {owner.Name}", $"save the token for owner {owner.Name}");
+	}
+
+	/// <summary>
+	/// Reports the outcome of a token write the user asked for. <see cref="TokenStorage"/> logs an
+	/// unavailable store only once per process, because tokens are read on every poll, and that one
+	/// error has usually scrolled out of the log by the time the user sets a token. A write the user
+	/// asked for therefore reports its own failure, every time, and success is logged only when the
+	/// token was actually stored (ktsu-dev/BuildMonitor#402).
+	/// </summary>
+	private bool ReportTokenWrite(bool written, string done, string attempted)
+	{
+		if (written)
+		{
+			Log.Info($"{Name}: {done}");
+			return true;
+		}
+
+		string message = $"{Strings.SecretStoreUnavailableMessage} Could not {attempted}.";
+		Log.Error($"{Name}: {message}");
+		SetStatus(ProviderStatus.Error, message);
+		return false;
 	}
 
 	[JsonInclude]
@@ -252,7 +292,7 @@ internal abstract class BuildProvider
 		{
 			PopupInputString.Open(Strings.SetToken, Strings.Token, string.Empty, (result) =>
 			{
-				Token = result.As<BuildProviderToken>();
+				_ = SetProviderToken(result.As<BuildProviderToken>());
 				BuildMonitor.QueueSaveAppData();
 			});
 			ShouldShowTokenPopup = false;
@@ -277,7 +317,7 @@ internal abstract class BuildProvider
 	{
 		Log.Error($"{Name}: Authentication failed - credentials cleared");
 		AccountId = new();
-		Token = new();
+		_ = TokenStorage.Write(TokenPersona, new());
 		SetStatus(ProviderStatus.AuthFailed, Strings.AuthFailedMessage);
 		BuildMonitor.QueueSaveAppData();
 	}
