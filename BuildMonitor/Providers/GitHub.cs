@@ -495,7 +495,11 @@ internal sealed partial class GitHub : BuildProvider
 			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.Skipped => RunStatus.Canceled,
 			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.StartupFailure => RunStatus.Failure,
 			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.TimedOut => RunStatus.Failure,
-			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.ActionRequired => RunStatus.Failure,
+			// A run waiting for a maintainer to approve it (a first-time contributor's fork PR) has not run
+			// anything, so nothing has failed. It is shown in the neutral state rather than as a failure, and
+			// not as Pending, which would poll it every 10 s for as long as approval takes
+			// (ktsu-dev/BuildMonitor#405, #332).
+			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.ActionRequired => RunStatus.Canceled,
 			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.Stale => RunStatus.Failure,
 			_ => null,
 		};
