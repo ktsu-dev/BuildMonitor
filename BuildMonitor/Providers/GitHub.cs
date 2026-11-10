@@ -868,15 +868,24 @@ internal sealed partial class GitHub : BuildProvider
 	/// Updates the rate limit budget from the last API response.
 	/// Uses Octokit's GetLastApiInfo() to retrieve rate limit headers.
 	/// </summary>
-	private void UpdateRateLimitFromApiInfo()
+	private void UpdateRateLimitFromApiInfo() => UpdateRateLimitFromApiInfo(CurrentClient?.GetLastApiInfo());
+
+	/// <summary>
+	/// Updates the rate limit budget from an API response's rate limit, unless the response carried
+	/// none. A job-log download ends on a redirect to blob storage, which sends no
+	/// <c>X-RateLimit-*</c> headers, and Octokit then reports a limit of 0 rather than no limit.
+	/// Recording that read the budget as 0/0, which <see cref="BuildProvider.BudgetPercentage"/> treats
+	/// as unknown, so the low-budget limits switched off (ktsu-dev/BuildMonitor#401).
+	/// </summary>
+	/// <param name="apiInfo">The API information from the last response, if any.</param>
+	internal void UpdateRateLimitFromApiInfo(ApiInfo? apiInfo)
 	{
-		ApiInfo? apiInfo = CurrentClient?.GetLastApiInfo();
-		if (apiInfo?.RateLimit != null)
+		if (apiInfo?.RateLimit is { Limit: > 0 } rateLimit)
 		{
 			UpdateRateLimitBudget(
-				apiInfo.RateLimit.Remaining,
-				apiInfo.RateLimit.Limit,
-				apiInfo.RateLimit.Reset);
+				rateLimit.Remaining,
+				rateLimit.Limit,
+				rateLimit.Reset);
 		}
 	}
 
