@@ -461,7 +461,7 @@ internal sealed partial class GitHub : BuildProvider
 		catch (NotFoundException)
 		{
 			// Run no longer exists (deleted or expired)
-			if (run.Build.Runs.TryRemove(run.Id, out _))
+			if (run.Build.RemoveRun(run.Id))
 			{
 				Log.Warning($"GitHub: Run not found, removed: {run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}/{run.Name}");
 			}
