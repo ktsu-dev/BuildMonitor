@@ -1,7 +1,6 @@
-## v1.7.8 (patch)
+## v1.7.9 (patch)
 
-Changes since v1.7.7:
+Changes since v1.7.8:
 
-- Show a run waiting for approval as neutral, not as a failure [patch] (#407) (matt-edmondson)
-- Prune old runs after each build poll so stale branches stop keeping rows [patch] (#398) (matt-edmondson)
+- Report a token the secret store refuses to save or clear [patch] (#404) (matt-edmondson)
 
