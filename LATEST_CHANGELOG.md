@@ -1,7 +1,7 @@
-## v1.7.7 (patch)
+## v1.7.8 (patch)
 
-Changes since v1.7.6:
+Changes since v1.7.7:
 
-- Stop polling a build at the running rate after its running run is deleted [patch] (#408) (matt-edmondson)
-- Keep the rate limit budget when a response carries no rate limit headers [patch] (#409) (matt-edmondson)
+- Show a run waiting for approval as neutral, not as a failure [patch] (#407) (matt-edmondson)
+- Prune old runs after each build poll so stale branches stop keeping rows [patch] (#398) (matt-edmondson)
 
