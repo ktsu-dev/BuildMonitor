@@ -134,9 +134,8 @@ internal sealed partial class GitHub : BuildProvider
 					{
 						if (Hexa.NET.ImGui.ImGui.MenuItem(ownerName.ToString()))
 						{
-							owner.Token = new();
+							_ = SetOwnerToken(owner, new());
 							BuildMonitor.QueueSaveAppData();
-							Log.Info($"GitHub: Cleared token for owner {ownerName}");
 						}
 					}
 					Hexa.NET.ImGui.ImGui.EndMenu();
@@ -174,9 +173,8 @@ internal sealed partial class GitHub : BuildProvider
 			OwnerPendingTokenPopup = null;
 			OwnerTokenPopup.Open($"{Strings.SetOwnerToken}: {owner.Name}", Strings.Token, string.Empty, (result) =>
 			{
-				owner.Token = result.As<BuildProviderToken>();
+				_ = SetOwnerToken(owner, result.As<BuildProviderToken>());
 				BuildMonitor.QueueSaveAppData();
-				Log.Info($"GitHub: Set token for owner {owner.Name}");
 			});
 		}
 
@@ -893,7 +891,7 @@ internal sealed partial class GitHub : BuildProvider
 	private void OnOwnerAuthenticationFailure(Owner owner)
 	{
 		Log.Error($"{Name}: Authentication failed for owner '{owner.Name}' - owner token cleared");
-		owner.Token = new();
+		_ = owner.TrySetToken(new());
 		SetStatus(ProviderStatus.AuthFailed, $"{Strings.AuthFailedMessage} ({owner.Name})");
 	}
 

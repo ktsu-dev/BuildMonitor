@@ -45,11 +45,14 @@ internal sealed class Owner
 	/// Kept in the OS secret store, not in the app data file.
 	/// </remarks>
 	[JsonIgnore]
-	public BuildProviderToken Token
-	{
-		get => TokenStorage.Read(TokenPersona);
-		internal set => _ = TokenStorage.Write(TokenPersona, value);
-	}
+	public BuildProviderToken Token => TokenStorage.Read(TokenPersona);
+
+	/// <summary>
+	/// Stores <paramref name="token"/> as this owner's token, or removes it when the token is empty.
+	/// </summary>
+	/// <param name="token">The token to store.</param>
+	/// <returns><see langword="false"/> when the secret store refused the write.</returns>
+	internal bool TrySetToken(BuildProviderToken token) => TokenStorage.Write(TokenPersona, token);
 
 	/// <summary>
 	/// Returns true if this owner has a specific token configured.

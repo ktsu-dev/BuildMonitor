@@ -225,7 +225,7 @@ public sealed class GitHubRequestOutcomeTests
 	private static Owner OwnerWithToken(GitHub provider)
 	{
 		Owner owner = provider.CreateOwner(OwnerName.Create<OwnerName>("alpha"));
-		owner.Token = BuildProviderToken.Create<BuildProviderToken>("alpha-pat");
+		Assert.IsTrue(owner.TrySetToken(BuildProviderToken.Create<BuildProviderToken>("alpha-pat")));
 		return owner;
 	}
 
