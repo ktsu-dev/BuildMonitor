@@ -21,6 +21,6 @@
     <PackageVersion Include="Hexa.NET.ImGui" Version="2.2.9" />
     <PackageVersion Include="Microsoft.VisualStudio.Services.Client" Version="19.225.2" />
     <PackageVersion Include="System.Data.SqlClient" Version="4.9.1" />
-    <PackageVersion Include="TestableIO.System.IO.Abstractions.TestingHelpers" Version="22.3.0" />
+    <PackageVersion Include="TestableIO.System.IO.Abstractions.TestingHelpers" Version="23.0.0" />
   </ItemGroup>
 </Project>
