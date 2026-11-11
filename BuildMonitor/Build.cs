@@ -61,6 +61,69 @@ internal sealed class Build
 	/// <returns>The estimated duration, or TimeSpan.Zero if insufficient data.</returns>
 	internal TimeSpan CalculateEstimatedDuration(BranchName branch) => DurationEstimator.EstimateDuration(this, branch);
 
+	/// <summary>
+	/// How many of a build's newest runs are always kept, whatever their branch or status.
+	/// </summary>
+	internal const int RetainedNewestRuns = 50;
+
+	/// <summary>
+	/// How long a branch keeps its newest run, and so its table row, after that run started.
+	/// </summary>
+	internal static readonly TimeSpan BranchRetention = TimeSpan.FromDays(30);
+
+	/// <summary>
+	/// Drops runs that nothing needs any more, so <see cref="Runs"/> and the app data file stay bounded
+	/// while a busy workflow is polled for months (ktsu-dev/BuildMonitor#313).
+	/// </summary>
+	/// <param name="now">The current instant, which the branch retention window is measured back from.</param>
+	/// <returns>The number of runs removed.</returns>
+	/// <remarks>
+	/// A run is kept when any of these holds:
+	/// <list type="bullet">
+	/// <item>it is still pending or running;</item>
+	/// <item>it is one of the build's <see cref="RetainedNewestRuns"/> newest runs;</item>
+	/// <item>it is one of the newest <see cref="DurationEstimator.MaxSamplesToConsider"/> successful runs,
+	/// which is every sample the duration estimator reads;</item>
+	/// <item>it is the newest run on a branch that ran within <see cref="BranchRetention"/>.</item>
+	/// </list>
+	/// A branch none of whose runs is kept disappears from the table.
+	/// </remarks>
+	internal int PruneRuns(DateTimeOffset now)
+	{
+		List<Run> runs = [.. Runs.Values];
+		if (runs.Count <= RetainedNewestRuns)
+		{
+			return 0;
+		}
+
+		HashSet<RunId> kept = [.. runs.Where(run => run.IsOngoing).Select(run => run.Id)];
+		kept.UnionWith(runs
+			.OrderByDescending(run => run.Started)
+			.Take(RetainedNewestRuns)
+			.Select(run => run.Id));
+		kept.UnionWith(runs
+			.Where(run => run.Status == RunStatus.Success)
+			.OrderByDescending(run => run.Started)
+			.Take(DurationEstimator.MaxSamplesToConsider)
+			.Select(run => run.Id));
+		kept.UnionWith(runs
+			.GroupBy(run => run.Branch)
+			.Select(branch => branch.MaxBy(run => run.Started)!)
+			.Where(newest => now - newest.Started <= BranchRetention)
+			.Select(newest => newest.Id));
+
+		int removed = 0;
+		foreach (Run run in runs.Where(run => !kept.Contains(run.Id)))
+		{
+			if (Runs.TryRemove(run.Id, out _))
+			{
+				removed++;
+			}
+		}
+
+		return removed;
+	}
+
 	internal TimeSpan CalculateETA()
 	{
 		TimeSpan estimate = CalculateEstimatedDuration();
