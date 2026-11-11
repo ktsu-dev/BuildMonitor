@@ -233,7 +233,7 @@ public sealed class TokenStorageTests
 		Owner owner = AddOwner(provider, "ktsu-dev");
 
 		provider.SetToken("ghp_provider");
-		owner.Token = "ghp_owner".As<BuildProviderToken>();
+		Assert.IsTrue(owner.TrySetToken("ghp_owner".As<BuildProviderToken>()));
 
 		Assert.AreEqual("ghp_provider", provider.ReadToken().ToString());
 		Assert.AreEqual("ghp_owner", owner.Token.ToString());
@@ -249,9 +249,9 @@ public sealed class TokenStorageTests
 	{
 		TestProvider provider = NewProvider();
 		Owner owner = AddOwner(provider, "ktsu-dev");
-		owner.Token = "ghp_owner".As<BuildProviderToken>();
+		Assert.IsTrue(owner.TrySetToken("ghp_owner".As<BuildProviderToken>()));
 
-		owner.Token = new();
+		Assert.IsTrue(owner.TrySetToken(new()));
 
 		Assert.IsFalse(owner.HasToken);
 		Assert.IsFalse(Cache.TryGet(owner.TokenPersona, out _));
@@ -386,9 +386,89 @@ public sealed class TokenStorageTests
 		Owner first = AddOwner(provider, "ktsu-dev");
 		Owner second = AddOwner(provider, "ktsu-io");
 
-		first.Token = "ghp_first".As<BuildProviderToken>();
+		Assert.IsTrue(first.TrySetToken("ghp_first".As<BuildProviderToken>()));
 
 		Assert.AreEqual("ghp_first", first.Token.ToString());
 		Assert.IsFalse(second.HasToken);
+	}
+
+	/// <summary>
+	/// Setting an owner token from the menu while the secret store refuses writes reports the failure
+	/// every time, rather than logging "Set token for owner" over a token that was never stored. The
+	/// store's own error is logged once per process and has usually scrolled away by then
+	/// (ktsu-dev/BuildMonitor#402).
+	/// </summary>
+	[TestMethod]
+	public void SettingAnOwnerTokenTheStoreRefusesReportsTheFailure()
+	{
+		TestProvider provider = NewProvider();
+		string ownerName = $"refused-{Guid.NewGuid():N}";
+		Owner owner = AddOwner(provider, ownerName);
+		using CredentialCache unavailable = new(new UnavailableCredentialStore());
+		TokenStorage.UseCache(unavailable);
+
+		Assert.IsFalse(provider.SetOwnerToken(owner, "ghp_owner".As<BuildProviderToken>()));
+		Assert.IsFalse(provider.SetOwnerToken(owner, "ghp_owner".As<BuildProviderToken>()));
+
+		Assert.IsFalse(owner.HasToken);
+		Assert.AreEqual(ProviderStatus.Error, provider.Status);
+		Assert.Contains("secret store", provider.StatusMessage, StringComparison.OrdinalIgnoreCase);
+		LogEntry[] entries = [.. Log.GetEntries().Where(e => e.Message.Contains(ownerName, StringComparison.Ordinal))];
+		Assert.AreEqual(2, entries.Count(e => e.Level == LogLevel.Error), "Each refused write is reported");
+		Assert.IsFalse(entries.Any(e => e.Message.Contains("Set token", StringComparison.Ordinal)), "A refused write must not be logged as set");
+	}
+
+	/// <summary>
+	/// Clearing an owner token the store will not remove reports the failure too, instead of
+	/// "Cleared token for owner" (ktsu-dev/BuildMonitor#402).
+	/// </summary>
+	[TestMethod]
+	public void ClearingAnOwnerTokenTheStoreRefusesReportsTheFailure()
+	{
+		TestProvider provider = NewProvider();
+		string ownerName = $"refused-{Guid.NewGuid():N}";
+		Owner owner = AddOwner(provider, ownerName);
+		using CredentialCache unavailable = new(new UnavailableCredentialStore());
+		TokenStorage.UseCache(unavailable);
+
+		Assert.IsFalse(provider.SetOwnerToken(owner, new()));
+
+		Assert.AreEqual(ProviderStatus.Error, provider.Status);
+		LogEntry[] entries = [.. Log.GetEntries().Where(e => e.Message.Contains(ownerName, StringComparison.Ordinal))];
+		Assert.AreEqual(1, entries.Count(e => e.Level == LogLevel.Error));
+		Assert.IsFalse(entries.Any(e => e.Message.Contains("Cleared token", StringComparison.Ordinal)), "A refused removal must not be logged as cleared");
+	}
+
+	/// <summary>
+	/// A provider token the store refuses is reported the same way as an owner token.
+	/// </summary>
+	[TestMethod]
+	public void SettingAProviderTokenTheStoreRefusesReportsTheFailure()
+	{
+		TestProvider provider = NewProvider();
+		using CredentialCache unavailable = new(new UnavailableCredentialStore());
+		TokenStorage.UseCache(unavailable);
+
+		Assert.IsFalse(provider.SetProviderToken("ghp_provider".As<BuildProviderToken>()));
+
+		Assert.AreEqual(ProviderStatus.Error, provider.Status);
+		Assert.IsTrue(provider.ReadToken().IsEmpty());
+	}
+
+	/// <summary>
+	/// A stored owner token is logged as set, and leaves the provider status alone.
+	/// </summary>
+	[TestMethod]
+	public void SettingAnOwnerTokenTheStoreTakesIsLoggedAsSet()
+	{
+		TestProvider provider = NewProvider();
+		string ownerName = $"stored-{Guid.NewGuid():N}";
+		Owner owner = AddOwner(provider, ownerName);
+
+		Assert.IsTrue(provider.SetOwnerToken(owner, "ghp_owner".As<BuildProviderToken>()));
+
+		Assert.IsTrue(owner.HasToken);
+		Assert.AreEqual(ProviderStatus.OK, provider.Status);
+		Assert.Contains(e => e.Level == LogLevel.Info && e.Message.Contains($"Set token for owner {ownerName}", StringComparison.Ordinal), Log.GetEntries());
 	}
 }
