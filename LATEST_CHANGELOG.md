@@ -1,7 +1,7 @@
-## v1.7.6 (patch)
+## v1.7.7 (patch)
 
-Changes since v1.7.5:
+Changes since v1.7.6:
 
-- Fetch a re-run's errors again when the new attempt fails too [patch] (#397) (matt-edmondson)
-- Poll a build at its running or recent-failure rate whichever branch the run is on [patch] (#396) (matt-edmondson)
+- Stop polling a build at the running rate after its running run is deleted [patch] (#408) (matt-edmondson)
+- Keep the rate limit budget when a response carries no rate limit headers [patch] (#409) (matt-edmondson)
 
