@@ -116,10 +116,19 @@ The application uses a **GetOrAdd pattern** to ensure existing entities are upda
 - Errors are cleared when run status changes from failure to non-failure
 - Triggers `Build.UpdateFromRun()` to keep parent build state in sync
 
+**Run Retention:**
+- After each build poll, `BuildSync` calls `Build.PruneRuns()`, which keeps a run when any of these holds:
+  - it is still pending or running
+  - it is one of the build's `Build.RetainedNewestRuns` (50) newest runs
+  - it is one of the newest `DurationEstimator.MaxSamplesToConsider` (20) successful runs, so the estimator keeps its full sample
+  - it is the newest run on a branch that ran within `Build.BranchRetention` (30 days)
+- Every other run is removed, so a merged and deleted branch loses its table row once it falls outside both the
+  newest runs and the retention window, and the app data file stays bounded
+
 **Benefits of Update Strategy:**
 - Repository visibility changes are reflected without manual intervention
 - Renamed workflows/build definitions don't create duplicate entries
-- No data accumulation from stale entities
+- No data accumulation from stale entities, including runs (see Run Retention)
 - Efficient AppData saves (only when changes occur)
 - Better logging distinguishes between discovery and updates
 

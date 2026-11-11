@@ -119,6 +119,14 @@ internal sealed class BuildSync
 	{
 		int runsBefore = Build.Runs.Count;
 		await Build.Owner.BuildProvider.UpdateBuildAsync(Build).ConfigureAwait(false);
+
+		int pruned = Build.PruneRuns(Clock.UtcNow);
+		if (pruned > 0)
+		{
+			Log.Debug($"BuildSync: {Build.Owner.Name}/{Build.Repository.Name}/{Build.Name} pruned {pruned} old runs");
+			BuildMonitor.QueueSaveAppData();
+		}
+
 		int runsAfter = Build.Runs.Count;
 
 		if (runsAfter != runsBefore)

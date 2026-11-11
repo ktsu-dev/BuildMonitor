@@ -77,4 +77,32 @@ public sealed class GitHubWorkflowStatusTests
 		Assert.AreEqual(RunStatus.Success, GitHub.MapWorkflowRunStatus(WorkflowRunStatus.Completed, WorkflowRunConclusion.Success));
 		Assert.AreEqual(RunStatus.Failure, GitHub.MapWorkflowRunStatus(WorkflowRunStatus.Completed, WorkflowRunConclusion.Failure));
 	}
+
+	/// <summary>
+	/// A run waiting for a maintainer to approve it has run nothing, so it is not a failure: it takes
+	/// the neutral state, is not fetched for errors, and is not Pending, which would poll it every 10 s
+	/// (ktsu-dev/BuildMonitor#405).
+	/// </summary>
+	[TestMethod]
+	public void ARunAwaitingApprovalIsNeutralNotAFailure()
+	{
+		// Act
+		RunStatus status = GitHub.MapWorkflowRunStatus(WorkflowRunStatus.Completed, WorkflowRunConclusion.ActionRequired);
+
+		// Assert
+		Assert.AreEqual(RunStatus.Canceled, status);
+		Assert.IsFalse(GitHub.ShouldFetchRunErrors(status, RunStatus.Pending, []), "A run that has not run has no job errors to fetch");
+	}
+
+	/// <summary>
+	/// Once a maintainer approves it, the same run is queued and then runs, and is tracked as usual.
+	/// </summary>
+	[TestMethod]
+	public void AnApprovedRunIsTrackedAsItQueuesAndRuns()
+	{
+		Assert.AreEqual(RunStatus.Pending, GitHub.MapWorkflowRunStatus(WorkflowRunStatus.Queued, WorkflowRunConclusion.ActionRequired));
+		Assert.AreEqual(RunStatus.Running, GitHub.MapWorkflowRunStatus(WorkflowRunStatus.InProgress, WorkflowRunConclusion.ActionRequired));
+		Assert.AreEqual(RunStatus.Pending, GitHub.MapWorkflowRunStatus(WorkflowRunStatus.Queued, null));
+		Assert.AreEqual(RunStatus.Running, GitHub.MapWorkflowRunStatus(WorkflowRunStatus.InProgress, null));
+	}
 }

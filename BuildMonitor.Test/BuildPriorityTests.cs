@@ -99,4 +99,80 @@ public sealed class BuildPriorityTests
 		// Assert
 		Assert.AreEqual(RequestPriority.Low, priority);
 	}
+
+	[TestMethod]
+	public void ADeletedRunThatWasRunningNoLongerKeepsTheBuildHigh()
+	{
+		// Arrange
+		Clock.UtcNowOverride = () => T0.AddDays(30);
+		Build build = new();
+		Run older = AddRun(build, "1", "main", T0, RunStatus.Success, T0.AddMinutes(5));
+		Run deleted = AddRun(build, "2", "main", T0.AddMinutes(10), RunStatus.Running, T0.AddMinutes(12));
+
+		// Act
+		bool removed = build.RemoveRun(deleted.Id);
+		build.UpdateFromRun(older);
+		RequestPriority priority = new BuildSync { Build = build }.Priority;
+
+		// Assert
+		Assert.IsTrue(removed);
+		Assert.IsFalse(build.HasOngoingRun, "no remaining run is ongoing (ktsu-dev/BuildMonitor#406)");
+		Assert.AreEqual(RunStatus.Success, build.LastStatus, "the newest remaining run is the build's last run");
+		Assert.AreEqual(older.Started, build.LastStarted);
+		Assert.AreEqual(RequestPriority.Low, priority, "a dormant workflow should not be polled at the running rate");
+	}
+
+	[TestMethod]
+	public void ASavedOngoingStatusWithNoOngoingRunIsNotOngoing()
+	{
+		// Arrange: app data saved before the fix, still naming a deleted run as running
+		Clock.UtcNowOverride = () => T0.AddDays(30);
+		Build build = new();
+		AddRun(build, "1", "main", T0, RunStatus.Success, T0.AddMinutes(5));
+		build.LastStarted = T0.AddMinutes(10);
+		build.LastUpdated = T0.AddMinutes(12);
+		build.LastStatus = RunStatus.Running;
+
+		// Act
+		RequestPriority priority = new BuildSync { Build = build }.Priority;
+
+		// Assert
+		Assert.AreEqual(RequestPriority.Low, priority);
+	}
+
+	[TestMethod]
+	public void RemovingTheLastRunClearsTheBuildsLastRun()
+	{
+		// Arrange
+		Build build = new();
+		Run only = AddRun(build, "1", "main", T0, RunStatus.Failure, T0.AddMinutes(5));
+
+		// Act
+		bool removed = build.RemoveRun(only.Id);
+		bool removedAgain = build.RemoveRun(only.Id);
+
+		// Assert
+		Assert.IsTrue(removed);
+		Assert.IsFalse(removedAgain);
+		Assert.AreEqual(default, build.LastStarted);
+		Assert.AreNotEqual(RunStatus.Failure, build.LastStatus);
+		Assert.IsFalse(build.HasRecentBranchFailure(T0.AddMinutes(-1)));
+	}
+
+	[TestMethod]
+	public void ARunAwaitingApprovalIsNotARecentFailure()
+	{
+		// Arrange
+		Clock.UtcNowOverride = () => T0.AddHours(3);
+		Build build = new();
+		AddRun(build, "1", "main", T0, RunStatus.Success, T0.AddMinutes(5));
+		RunStatus awaitingApproval = GitHub.MapWorkflowRunStatus(Octokit.WorkflowRunStatus.Completed, Octokit.WorkflowRunConclusion.ActionRequired);
+		AddRun(build, "2", "patch-1", T0.AddHours(3).AddMinutes(-2), awaitingApproval, T0.AddHours(3).AddMinutes(-2));
+
+		// Act
+		RequestPriority priority = new BuildSync { Build = build }.Priority;
+
+		// Assert
+		Assert.AreEqual(RequestPriority.Low, priority, "a fork PR waiting for approval has not failed (ktsu-dev/BuildMonitor#405)");
+	}
 }
