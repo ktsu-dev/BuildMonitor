@@ -1,7 +1,7 @@
-## v1.7.6 (patch)
+## v1.7.8 (patch)
 
-Changes since v1.7.5:
+Changes since v1.7.7:
 
-- Fetch a re-run's errors again when the new attempt fails too [patch] (#397) (matt-edmondson)
-- Poll a build at its running or recent-failure rate whichever branch the run is on [patch] (#396) (matt-edmondson)
+- Show a run waiting for approval as neutral, not as a failure [patch] (#407) (matt-edmondson)
+- Prune old runs after each build poll so stale branches stop keeping rows [patch] (#398) (matt-edmondson)
 

@@ -457,7 +457,7 @@ internal sealed partial class GitHub : BuildProvider
 		catch (NotFoundException)
 		{
 			// Run no longer exists (deleted or expired)
-			if (run.Build.Runs.TryRemove(run.Id, out _))
+			if (run.Build.RemoveRun(run.Id))
 			{
 				Log.Warning($"GitHub: Run not found, removed: {run.Owner.Name}/{run.Repository.Name}/{run.Build.Name}/{run.Name}");
 			}
@@ -524,7 +524,11 @@ internal sealed partial class GitHub : BuildProvider
 			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.Skipped => RunStatus.Canceled,
 			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.StartupFailure => RunStatus.Failure,
 			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.TimedOut => RunStatus.Failure,
-			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.ActionRequired => RunStatus.Failure,
+			// A run waiting for a maintainer to approve it (a first-time contributor's fork PR) has not run
+			// anything, so nothing has failed. It is shown in the neutral state rather than as a failure, and
+			// not as Pending, which would poll it every 10 s for as long as approval takes
+			// (ktsu-dev/BuildMonitor#405, #332).
+			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.ActionRequired => RunStatus.Canceled,
 			_ when runStatus == WorkflowRunStatus.Completed && conclusion == WorkflowRunConclusion.Stale => RunStatus.Failure,
 			_ => null,
 		};
@@ -897,15 +901,24 @@ internal sealed partial class GitHub : BuildProvider
 	/// Updates the rate limit budget from the last API response.
 	/// Uses Octokit's GetLastApiInfo() to retrieve rate limit headers.
 	/// </summary>
-	private void UpdateRateLimitFromApiInfo()
+	private void UpdateRateLimitFromApiInfo() => UpdateRateLimitFromApiInfo(CurrentClient?.GetLastApiInfo());
+
+	/// <summary>
+	/// Updates the rate limit budget from an API response's rate limit, unless the response carried
+	/// none. A job-log download ends on a redirect to blob storage, which sends no
+	/// <c>X-RateLimit-*</c> headers, and Octokit then reports a limit of 0 rather than no limit.
+	/// Recording that read the budget as 0/0, which <see cref="BuildProvider.BudgetPercentage"/> treats
+	/// as unknown, so the low-budget limits switched off (ktsu-dev/BuildMonitor#401).
+	/// </summary>
+	/// <param name="apiInfo">The API information from the last response, if any.</param>
+	internal void UpdateRateLimitFromApiInfo(ApiInfo? apiInfo)
 	{
-		ApiInfo? apiInfo = CurrentClient?.GetLastApiInfo();
-		if (apiInfo?.RateLimit != null)
+		if (apiInfo?.RateLimit is { Limit: > 0 } rateLimit)
 		{
 			UpdateRateLimitBudget(
-				apiInfo.RateLimit.Remaining,
-				apiInfo.RateLimit.Limit,
-				apiInfo.RateLimit.Reset);
+				rateLimit.Remaining,
+				rateLimit.Limit,
+				rateLimit.Reset);
 		}
 	}
 
