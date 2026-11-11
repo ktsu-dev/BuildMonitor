@@ -158,4 +158,21 @@ public sealed class BuildPriorityTests
 		Assert.AreNotEqual(RunStatus.Failure, build.LastStatus);
 		Assert.IsFalse(build.HasRecentBranchFailure(T0.AddMinutes(-1)));
 	}
+
+	[TestMethod]
+	public void ARunAwaitingApprovalIsNotARecentFailure()
+	{
+		// Arrange
+		Clock.UtcNowOverride = () => T0.AddHours(3);
+		Build build = new();
+		AddRun(build, "1", "main", T0, RunStatus.Success, T0.AddMinutes(5));
+		RunStatus awaitingApproval = GitHub.MapWorkflowRunStatus(Octokit.WorkflowRunStatus.Completed, Octokit.WorkflowRunConclusion.ActionRequired);
+		AddRun(build, "2", "patch-1", T0.AddHours(3).AddMinutes(-2), awaitingApproval, T0.AddHours(3).AddMinutes(-2));
+
+		// Act
+		RequestPriority priority = new BuildSync { Build = build }.Priority;
+
+		// Assert
+		Assert.AreEqual(RequestPriority.Low, priority, "a fork PR waiting for approval has not failed (ktsu-dev/BuildMonitor#405)");
+	}
 }
