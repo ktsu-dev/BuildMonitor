@@ -701,7 +701,12 @@ internal sealed partial class GitHub : BuildProvider
 	[GeneratedRegex(@"(?:^|\s)error\s*:", RegexOptions.IgnoreCase)]
 	private static partial Regex ErrorPatternRegex();
 
-	private static List<string> ParseLogForErrors(string logs)
+	/// <summary>
+	/// Collects the distinct error messages in a job log, at most ten of them.
+	/// </summary>
+	/// <param name="logs">The job log text.</param>
+	/// <returns>The error messages, in the order they first appear.</returns>
+	internal static List<string> ParseLogForErrors(string logs)
 	{
 		List<string> errors = [];
 		HashSet<string> seenErrors = new(StringComparer.OrdinalIgnoreCase);
@@ -722,17 +727,14 @@ internal sealed partial class GitHub : BuildProvider
 				}
 			}
 			// Common error patterns: "error:" or "Error:" at start or after timestamp
-			else if (ErrorPatternRegex().IsMatch(trimmedLine))
+			// The message starts where the regex matched, not at the first "error" in the line,
+			// which may be part of a path such as src/errors.c (ktsu-dev/BuildMonitor#415)
+			else if (ErrorPatternRegex().Match(trimmedLine) is { Success: true } match)
 			{
-				int errorIndex = trimmedLine.IndexOf("error", StringComparison.OrdinalIgnoreCase);
-				int colonIndex = trimmedLine.IndexOf(':', errorIndex);
-				if (colonIndex >= 0 && colonIndex < trimmedLine.Length - 1)
+				string errorMessage = trimmedLine[(match.Index + match.Length)..].Trim();
+				if (!string.IsNullOrWhiteSpace(errorMessage) && seenErrors.Add(errorMessage))
 				{
-					string errorMessage = trimmedLine[(colonIndex + 1)..].Trim();
-					if (!string.IsNullOrWhiteSpace(errorMessage) && seenErrors.Add(errorMessage))
-					{
-						errors.Add(errorMessage);
-					}
+					errors.Add(errorMessage);
 				}
 			}
 		}
