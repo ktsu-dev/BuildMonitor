@@ -15,11 +15,11 @@
     <PackageVersion Include="ktsu.ImGui.Widgets" Version="3.80.0" />
     <PackageVersion Include="ktsu.Semantics.Strings" Version="6.0.0" />
     <PackageVersion Include="ktsu.TextFilter" Version="1.7.13" />
-    <PackageVersion Include="Microsoft.TeamFoundationServer.Client" Version="19.225.2" />
+    <PackageVersion Include="Microsoft.TeamFoundationServer.Client" Version="20.256.2" />
     <PackageVersion Include="Octokit" Version="14.0.0" />
     <PackageVersion Include="Polyfill" Version="11.4.5" />
     <PackageVersion Include="Hexa.NET.ImGui" Version="2.2.9" />
-    <PackageVersion Include="Microsoft.VisualStudio.Services.Client" Version="19.225.2" />
+    <PackageVersion Include="Microsoft.VisualStudio.Services.Client" Version="20.256.2" />
     <PackageVersion Include="System.Data.SqlClient" Version="4.9.1" />
     <PackageVersion Include="TestableIO.System.IO.Abstractions.TestingHelpers" Version="23.0.0" />
   </ItemGroup>
