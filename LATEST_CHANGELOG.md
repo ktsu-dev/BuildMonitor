@@ -1,6 +1,6 @@
-## v1.7.10 (patch)
+## v1.7.11-pre.1 (prerelease)
 
-Changes since v1.7.9:
+Changes since v1.7.10:
 
-- [patch] Read a log error's message from where "error:" matched, not the first "error" in the line (#416) (matt-edmondson)
+- Bump the ktsu group with 13 updates (dependabot[bot])
 
